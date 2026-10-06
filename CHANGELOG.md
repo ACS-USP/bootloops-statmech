@@ -15,3 +15,8 @@ All notable changes to BootLoops are recorded here. The format follows
   `galois` updated to the contract; documented in `tools/README.md`
   (Verification classes) and `INSTALL.md`. Reported by @Aspect5
   (bootloops#3).
+- `run_selftests.py`: a timeout in the Julia `Pkg.instantiate()` pre-step
+  aborted the whole run and `selftest_results.json` was never written. The
+  timeout now fails that one package (status FAIL, cause in `tail`, remedy in
+  `fix`) and the run continues; the exit code stays 1. Fix by @hzshen88
+  (PR #2), reported in feedback#1.
