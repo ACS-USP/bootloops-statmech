@@ -724,7 +724,14 @@ def main():
     if a.ring:
         init_ring(a.ring)
     if a.cmd == 'selftest':
-        selftest(a.receipt, a.dps or CHECK_DPS, a.svalign)
+        try:
+            selftest(a.receipt, a.dps or CHECK_DPS, a.svalign)
+        except RuntimeError as e:
+            # the named reference-data refusals (_bank / init_ring: banks that
+            # do not ship) exit 4, the data-gated refusal code; gate failures
+            # are assertions and still crash with exit 1
+            print(f"REFUSED: {e}", flush=True)
+            sys.exit(4)
     elif a.cmd == 'derive':
         assert a.comps, 'derive needs --comps'
         comps = [tuple(int(x) for x in c.split(','))

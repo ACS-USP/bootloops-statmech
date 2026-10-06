@@ -43,6 +43,9 @@ clone differs by package:
   positive/negative controls) verified.
 - **data-gated** — the package operates on data you supply (or a reference-data
   root that does not ship with the clone); without it, it refuses loudly by design.
+  The refusal is exit code 4 with the reason printed; `run_selftests.py` reports
+  that as REFUSED (by design). Any other nonzero exit of a data-gated battery
+  (an import error, an assertion, a timeout) is a FAIL, as in every other class.
 
 ## Package index
 

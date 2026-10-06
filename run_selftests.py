@@ -16,6 +16,14 @@ a named error — that is not breakage.
 Exit code: 1 if any package FAILs (a data-gated REFUSED is not a failure), else 0. The full per-package
 record (commands tried, exit codes, output tails) lands in selftest_results.json.
 
+Refusal contract for data-gated packages: a battery that cannot run because the
+data or reference-data root it needs is absent exits with code 4
+(DATA_GATED_REFUSAL_RC) after printing the reason; the runner reports that as
+REFUSED (by design) and keeps the last output line as the reason. Any other
+nonzero exit from a data-gated package — an import error, an assertion, a
+timeout — is a FAIL like in every other class, with the output tail in the record.
+A refusal and a crash therefore never share a status.
+
 Each package's canonical battery command and working directory are pinned in
 tools/BATTERIES.json — the runner executes exactly that entry, once. There is
 no discovery and no guessing: a package absent from the manifest is reported
@@ -33,6 +41,10 @@ STANDARD_S = 20   # a package's default battery completes in ~20 s on a laptop
 # Julia batteries share one depot: concurrent precompiles/loads race its locks
 # and fail nondeterministically at high --par, so they run one at a time.
 JULIA_LOCK = threading.Lock()
+# A data-gated battery that lacks its data exits with THIS code (the toolkit's
+# "required data or dependency absent" code, see tools/README.md, Verification
+# classes). Any other nonzero exit of a data-gated package is a failure.
+DATA_GATED_REFUSAL_RC = 4
 def classes():
     out = {}
     for line in open(os.path.join(TOOLS, "README.md"), encoding="utf-8"):
@@ -117,8 +129,12 @@ def run_pkg(pkg, cls, timeout):
             return entry
     if usage_only:
         entry["status"] = "entry-not-found"
-    elif cls == "data-gated":
-        entry["status"] = "REFUSED (by design)"   # data-gated: loud refusal is the contract
+    elif cls == "data-gated" and rc == DATA_GATED_REFUSAL_RC:
+        # data-gated: a loud refusal is the contract — but only the dedicated
+        # exit code is one; a crash (exit 1, assertion, timeout) is a FAIL
+        entry["status"] = "REFUSED (by design)"
+        lines = [l for l in (tail or "").splitlines() if l.strip()]
+        entry["reason"] = lines[-1][:300] if lines else ""
     else:
         entry["status"] = "FAIL"
     return entry

@@ -18,8 +18,9 @@ prime table, both synthesizable here — so it runs FOR REAL:
         picked from the grid and the full battery must PASS,
      c. too-small grid: the named CONTROL refusal must fire (nonzero rc),
         never a crash.
-Without user ff_save data the exit is always nonzero: the final line names
-the data gate for the harvest members. Point the member CLIs at your save
+Without user ff_save data the exit is always 4 (the data-gated refusal
+code; a crash never exits 4): the final line names the data gate for the
+harvest members. Point the member CLIs at your save
 (GUIDE.md INVOKE) to run the full gate battery.
 """
 import gzip
@@ -164,7 +165,7 @@ def main():
           "and no public fixtures ship (see GUIDE.md INVOKE). The "
           "recon_symbolic_d synthetic control battery above is the "
           "data-free part.")
-    return 1
+    return 4   # the data-gated refusal code (run_selftests.py): not a crash
 
 
 if __name__ == "__main__":

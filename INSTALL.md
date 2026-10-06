@@ -135,7 +135,10 @@ PARI/GP binary `gp` on PATH.
 How to read the table:
 - **PASS** — the battery ran green.
 - **REFUSED (by design)** — data-gated packages refuse loudly without your
-  data or a reference-data root; that is their contract, not breakage.
+  data or a reference-data root; that is their contract, not breakage. The
+  refusal is exit code 4 from the battery; the runner keeps the printed
+  reason in the record. A data-gated battery that stops for any other reason
+  (import error, assertion, timeout) is reported FAIL, not REFUSED.
 - **FAIL** — a real problem; the exit code is then 1 (a REFUSED row never sets
   it). Per-package commands, exit codes, and output tails land in
   `selftest_results.json`.

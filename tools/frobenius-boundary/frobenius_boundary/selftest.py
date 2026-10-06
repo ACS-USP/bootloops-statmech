@@ -62,7 +62,7 @@ def main():
               'per-point Kira reduction table (kira2math output), which is '
               'not distributed with the repo. Fill in a copy of '
               'config_example.json and set FROB_CONFIG to it.')
-        sys.exit(3)
+        sys.exit(4)   # the data-gated refusal code (run_selftests.py): not a crash
     t0 = time.time()
     spec, br = cli.run(cfg)
     fails = []
