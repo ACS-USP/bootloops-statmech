@@ -22,7 +22,8 @@ data or reference-data root it needs is absent exits with code 4
 REFUSED (by design) and keeps the last output line as the reason. Any other
 nonzero exit from a data-gated package — an import error, an assertion, a
 timeout — is a FAIL like in every other class, with the output tail in the record.
-A refusal and a crash therefore never share a status.
+An exit 4 with no printed reason, or whose last line is an uncaught exception,
+is a FAIL too. A refusal and a crash therefore never share a status.
 
 Each package's canonical battery command and working directory are pinned in
 tools/BATTERIES.json — the runner executes exactly that entry, once. There is
@@ -45,6 +46,10 @@ JULIA_LOCK = threading.Lock()
 # "required data or dependency absent" code, see tools/README.md, Verification
 # classes). Any other nonzero exit of a data-gated package is a failure.
 DATA_GATED_REFUSAL_RC = 4
+# a last output line that is a Python traceback header, frame or exception
+# line is a crash, whatever the exit code says
+CRASH_LINE = re.compile(r'(?:Traceback \(most recent call last\):|  File ".*", line \d+|'
+                        r'(?:[A-Za-z_][\w.]*\.)?[A-Z]\w*(?:Error|Exception|Exit)\b: )')
 def classes():
     out = {}
     for line in open(os.path.join(TOOLS, "README.md"), encoding="utf-8"):
@@ -138,10 +143,21 @@ def run_pkg(pkg, cls, timeout):
         entry["status"] = "entry-not-found"
     elif cls == "data-gated" and rc == DATA_GATED_REFUSAL_RC:
         # data-gated: a loud refusal is the contract — but only the dedicated
-        # exit code is one; a crash (exit 1, assertion, timeout) is a FAIL
-        entry["status"] = "REFUSED (by design)"
+        # exit code is one; a crash (exit 1, assertion, timeout) is a FAIL.
+        # The code alone is not enough either: the refusal must have PRINTED
+        # its reason, and that reason must not be an uncaught exception line
+        # (a crash wrapped in the refusal code is still a crash).
         lines = [l for l in (tail or "").splitlines() if l.strip()]
-        entry["reason"] = lines[-1][:300] if lines else ""
+        reason = lines[-1][:300] if lines else ""
+        if not reason or re.match(CRASH_LINE, reason):
+            entry["status"] = "FAIL"
+            entry["why"] = (f"exit {DATA_GATED_REFUSAL_RC} without a printed refusal "
+                            "reason" if not reason else
+                            f"exit {DATA_GATED_REFUSAL_RC} but the last line is an "
+                            "uncaught exception, not a refusal reason")
+        else:
+            entry["status"] = "REFUSED (by design)"
+            entry["reason"] = reason
     else:
         entry["status"] = "FAIL"
     return entry

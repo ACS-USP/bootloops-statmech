@@ -14,7 +14,13 @@ All notable changes to BootLoops are recorded here. The format follows
   package is a FAIL. `ffcapital`, `frobenius-boundary` (was exit 3) and
   `galois` updated to the contract; documented in `tools/README.md`
   (Verification classes) and `INSTALL.md`. Reported by @Aspect5
-  (bootloops#3).
+  (bootloops#3). An exit 4 without a printed reason, or whose last line is
+  an uncaught exception, is a FAIL as well. `galois` resolves its reference
+  data before any gate runs and its bank lookups raise a dedicated
+  `ReferenceDataMissing` (a `RuntimeError` subclass, so existing callers
+  are unaffected); only that class is the exit-4 refusal. Anything a gate
+  raises, including a plain `RuntimeError` or another subclass such as
+  `RecursionError` or `NotImplementedError`, is a crash.
 - `run_selftests.py`: a timeout in the Julia `Pkg.instantiate()` pre-step
   aborted the whole run and `selftest_results.json` was never written. The
   timeout now fails that one package (status FAIL, cause in `tail`, remedy in

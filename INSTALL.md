@@ -138,7 +138,8 @@ How to read the table:
   data or a reference-data root; that is their contract, not breakage. The
   refusal is exit code 4 from the battery; the runner keeps the printed
   reason in the record. A data-gated battery that stops for any other reason
-  (import error, assertion, timeout) is reported FAIL, not REFUSED.
+  (import error, assertion, timeout) is reported FAIL, not REFUSED; so is an
+  exit 4 that printed no reason, or whose last line is an uncaught exception.
 - **FAIL** — a real problem; the exit code is then 1 (a REFUSED row never sets
   it). Per-package commands, exit codes, and output tails land in
   `selftest_results.json`.

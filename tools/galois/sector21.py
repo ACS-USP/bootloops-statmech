@@ -62,6 +62,7 @@ if TOOLS not in sys.path:
     sys.path.insert(0, TOOLS)
 
 from galois import mzvring as MZR         # the ring MEMBER, by identity
+from galois.mzvring import ReferenceDataMissing  # the one refusal class
 from galois.mzvring import (Fr, dadd, dsum, dscale, dmul, znorm, mweight)  # noqa
 
 CAMPAIGN = os.environ.get('GALOIS_CAMPAIGN_BANK')  # reference-table root (not shipped; point at your own)
@@ -73,7 +74,7 @@ def _bank(p, what):
     """fail-closed default-path guard: the reference tables do not
     ship with this repo."""
     if p is None:
-        raise RuntimeError(
+        raise ReferenceDataMissing(
             f"{what}: no explicit path given and GALOIS_CAMPAIGN_BANK is not "
             "set. The SECTOR_TABLES/SV_FORMULAS reference tables "
             "do not ship with this repo — "
@@ -94,7 +95,7 @@ def init_ring(path=None):
     hard-asserted in sym_vec)."""
     if path is None:
         if not MZR.RING_BANK:
-            raise RuntimeError(
+            raise ReferenceDataMissing(
                 "init_ring: no explicit path and GALOIS_RING_BANK unset — the "
                 "reference ring pkls are not shipped; build one with "
                 "mzvring/build_ring.py or pass init_ring(path).")

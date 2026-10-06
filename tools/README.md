@@ -45,7 +45,8 @@ clone differs by package:
   root that does not ship with the clone); without it, it refuses loudly by design.
   The refusal is exit code 4 with the reason printed; `run_selftests.py` reports
   that as REFUSED (by design). Any other nonzero exit of a data-gated battery
-  (an import error, an assertion, a timeout) is a FAIL, as in every other class.
+  (an import error, an assertion, a timeout) is a FAIL, as in every other class,
+  and so is an exit 4 without a printed reason.
 
 ## Package index
 

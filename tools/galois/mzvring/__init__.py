@@ -30,6 +30,15 @@ from . import mzvring as _mz
 RING_BANK = _os.environ.get('GALOIS_RING_BANK')  # reference ring pkl dir (not shipped; build your own via build_ring.py)
 
 
+class ReferenceDataMissing(RuntimeError):
+    """A reference-data bank that does not ship with this repo was neither
+    given explicitly nor configured (GALOIS_RING_BANK / GALOIS_CAMPAIGN_BANK).
+    Raised ONLY by the bank lookups (load_ring, sector21.init_ring/_bank,
+    svmap21._bank); the selftest entry point turns exactly this class into
+    the data-gated refusal (exit 4). Any other exception, including a plain
+    RuntimeError or one of its other subclasses, is a crash."""
+
+
 def load_ring(path=None):
     """Load stored canonicalization tables -> Ring (no rebuild).
 
@@ -37,7 +46,7 @@ def load_ring(path=None):
     eliminated symbols at 150d — ringval_results.json in the bank)."""
     if path is None:
         if not RING_BANK:
-            raise RuntimeError(
+            raise ReferenceDataMissing(
                 "GALOIS_RING_BANK is not set and no explicit path was given. "
                 "The ring pickles are reference data "
                 "that do not ship with this repo — build one with "

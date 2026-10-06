@@ -87,6 +87,7 @@ from galois.sector21 import (sym_vec, dmul, dsum, dscale, to_name_form,  # noqa
                              Dm_comp, Dm_vec, sv_proj, parse_brown_name,
                              ms_for)
 from galois.mzvring import znorm, mweight, shuffle as wshuffle  # noqa
+from galois.mzvring import ReferenceDataMissing  # the one refusal class
 
 CAMPAIGN = os.environ.get('GALOIS_CAMPAIGN_BANK')  # reference-table root (not shipped; point at your own)
 SVALIGN = os.path.join(CAMPAIGN, 'svalign') if CAMPAIGN else None
@@ -95,7 +96,7 @@ SVALIGN = os.path.join(CAMPAIGN, 'svalign') if CAMPAIGN else None
 def _bank(p, what):
     """fail-closed default-path guard (see sector21._bank)."""
     if p is None:
-        raise RuntimeError(
+        raise ReferenceDataMissing(
             f"{what}: no explicit svalign dir given and GALOIS_CAMPAIGN_BANK "
             "is not set. The SV formula/numeric banks are reference "
             "data that do not ship with this repo — pass --svalign / "
@@ -724,14 +725,20 @@ def main():
     if a.ring:
         init_ring(a.ring)
     if a.cmd == 'selftest':
+        # The reference data is resolved HERE, before any gate runs, and
+        # only the bank lookups' own class (ReferenceDataMissing: no svalign
+        # bank, or no ring bank — data that does not ship) is the refusal,
+        # exit 4. Everything a gate raises, and anything else the lookups
+        # raise (a plain RuntimeError, its other subclasses such as
+        # RecursionError or NotImplementedError, a missing file under a
+        # configured bank), crashes with a traceback and exit 1.
         try:
-            selftest(a.receipt, a.dps or CHECK_DPS, a.svalign)
-        except RuntimeError as e:
-            # the named reference-data refusals (_bank / init_ring: banks that
-            # do not ship) exit 4, the data-gated refusal code; gate failures
-            # are assertions and still crash with exit 1
+            svalign = a.svalign or _bank(SVALIGN, 'selftest')
+            _ring()
+        except ReferenceDataMissing as e:
             print(f"REFUSED: {e}", flush=True)
             sys.exit(4)
+        selftest(a.receipt, a.dps or CHECK_DPS, svalign)
     elif a.cmd == 'derive':
         assert a.comps, 'derive needs --comps'
         comps = [tuple(int(x) for x in c.split(','))
