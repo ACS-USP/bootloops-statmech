@@ -20,3 +20,10 @@ All notable changes to BootLoops are recorded here. The format follows
   timeout now fails that one package (status FAIL, cause in `tail`, remedy in
   `fix`) and the run continues; the exit code stays 1. Fix by @hzshen88
   (PR #2), reported in feedback#1.
+- `nestor`: the farm's orphan guard compared each worker's parent pid with
+  the pool parent's pid, which is wrong under the `forkserver` start method
+  (Python 3.14's default on Linux): every worker exited at its first chunk
+  and the self-test hung at P5. The guard now records the parent seen from
+  inside the worker at initialization and also probes the pool parent's pid,
+  so it works under `fork`, `forkserver` and `spawn` with the same behavior
+  under `fork`. Reported by @drdavidglew-afk (feedback#2).

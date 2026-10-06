@@ -40,9 +40,12 @@ THE ENGINE (source math, general [a,b])
 SWEEP-PROOF POOL DISCIPLINE (pool-parent liveness; no orphan pools)
 ===================================================================
   * The Pool lives in a with-block AND a try/finally terminate/join.
-  * Every worker records the parent pid at init and aborts its chunk loop
-    if it finds itself reparented (os.getppid() changed) -- a SIGKILLed
-    parent cannot leave a silently grinding orphan pool.
+  * Every worker records its parent pid at init (os.getppid() inside the
+    worker: the pool parent under the 'fork' and 'spawn' start methods, the
+    fork server under 'forkserver') and the pool parent's pid, and aborts
+    its chunk loop if it finds itself reparented (os.getppid() changed) or
+    the pool parent gone -- a SIGKILLed parent cannot leave a silently
+    grinding orphan pool, whatever the start method.
   * The parent pid + worker pids go into the receipt (the kill handle).
 
 """
@@ -96,6 +99,15 @@ def _winit(spec, a_str, b_str, dps, md, path_entry, ppid, fkw, wants_dists,
     """Worker initializer (ported pattern: oracle_par._winit)."""
     import mpmath as _mp
     if in_worker:
+        # the orphan guard compares against the parent SEEN FROM THE WORKER,
+        # not the pool parent's pid: under the 'forkserver' start method
+        # (Python 3.14's default on Linux) workers are children of the fork
+        # server, so the pool parent's pid would make every worker exit at
+        # its first chunk and the pool would wait forever. Under 'fork' and
+        # 'spawn' this is the pool parent's pid, as before. The pool
+        # parent's pid is kept too: its death ends the farm promptly even
+        # when the fork server outlives it for a while.
+        pool_pid, ppid = ppid, os.getppid()
         # pool workers must be PLAINLY killable: the pool parent installs a
         # SIGTERM->AbortRefusal handler (oracle.py abort discipline) and
         # forked workers inherit it -- inside a worker that handler turns
@@ -110,12 +122,25 @@ def _winit(spec, a_str, b_str, dps, md, path_entry, ppid, fkw, wants_dists,
             _sig.signal(_sig.SIGTERM, _sig.SIG_DFL)
         except (ValueError, OSError):          # non-main thread: leave it
             pass
+    else:
+        pool_pid = os.getpid()                 # serial: _wchunk runs in-process
     _mp.mp.dps = dps + 20                      # source: dps + 20
     if path_entry and path_entry not in sys.path:
         sys.path.insert(0, path_entry)
     _G.update(mp=_mp, f=_load_spec(spec), a=_mp.mpf(a_str), b=_mp.mpf(b_str),
-              dps=dps, h=_mp.mpf(2) ** (-md), ppid=ppid, fkw=fkw or {},
-              wants_dists=bool(wants_dists))
+              dps=dps, h=_mp.mpf(2) ** (-md), ppid=ppid, pool_pid=pool_pid,
+              fkw=fkw or {}, wants_dists=bool(wants_dists))
+
+
+def _pool_parent_alive(pid):
+    """True while the pool parent exists (signal 0 probes without sending)."""
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:                    # exists under another user
+        return True
+    return True
 
 
 def _node_uw(_mp, k, h, a, b):
@@ -145,7 +170,8 @@ def _wchunk(ks):
     out = []
     t0 = time.time()
     for k in ks:
-        if os.getppid() != _G['ppid']:         # sweep-proof: no orphan pools
+        if (os.getppid() != _G['ppid']         # sweep-proof: no orphan pools
+                or not _pool_parent_alive(_G['pool_pid'])):
             raise SystemExit(3)
         u, d_a, d_b, w = _node_uw(_mp, k, h, a, b)
         v = f(u, d_a, d_b, **fkw) if wd else f(u, **fkw)
