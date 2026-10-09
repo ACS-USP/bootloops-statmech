@@ -39,6 +39,10 @@
   "cmd": "julia --project=. test/runtests.jl",
   "cwd": "package"
  },
+ "cutbasis": {
+  "cmd": "python3 selftest.py",
+  "cwd": "package"
+ },
  "dipstick": {
   "cmd": "D=\"$(mktemp -d)\" && python3 tools/dipstick/battery.py --receipts \"$D\" --summary-out \"$D/battery_SUMMARY.json\"",
   "cwd": "root",

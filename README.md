@@ -87,7 +87,7 @@ One command verifies a fresh clone:
 python3 run_selftests.py --par 8
 ```
 
-This walks every package under `tools/` (49 of them), runs each package's own
+This walks every package under `tools/` (50 of them), runs each package's own
 battery on the toy data it ships with, and prints a status line per package.
 The run takes a few minutes on a laptop: the packages come back green, and 3
 stop with a named error because they need data the repository does not

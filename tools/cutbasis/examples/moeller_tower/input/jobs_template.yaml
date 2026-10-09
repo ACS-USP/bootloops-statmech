@@ -1,0 +1,14 @@
+jobs:
+  - reduce_sectors:
+      reduce:
+        - {topologies: [moeller], sectors: [107], r: 7, s: 2}
+      select_integrals:
+        select_mandatory_list:
+          - [moeller, targets]
+      preferred_masters: PREFERRED
+      run_initiate: true
+      run_triangular: true
+      run_back_substitution: true
+  - kira2math:
+      target:
+        - [moeller, targets]

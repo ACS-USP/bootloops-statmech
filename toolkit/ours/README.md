@@ -15,7 +15,9 @@ The registered packages, grouped as the index groups them:
   formerly topology-audit), Winnow
   (upgraded-Laporta elimination with a per-row certificate), Maxcut, Trust (the
   reduction-verification triad), Formglue, and ffcapital (exact salvage of
-  FireFly reconstruction state from dead or capped runs).
+  FireFly reconstruction state from dead or capped runs), and Cutbasis (the geometric master-basis selector on the maximal cut:
+  Kira preferred_masters from arXiv:2511.15381's Algorithms 1–3, with the certified
+  reducer comparison).
 - **Singularities and geometry** — Landau Alphabet, Leviathan, Dipstick, GeoTriage,
   Coalescer, SubTropica, Surd (exact slice integration with radical last-variable letters
   over SubTropica's fibration conventions), plus the in-house Gröbner backend and the SOFIA

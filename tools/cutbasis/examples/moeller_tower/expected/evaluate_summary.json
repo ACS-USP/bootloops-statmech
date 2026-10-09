@@ -1,0 +1,63 @@
+{
+ "best_certified_candidate": "echelon",
+ "family": "moeller",
+ "runs": {
+  "echelon": {
+   "bytes": 507364,
+   "certified": true,
+   "factor_classes": {
+    "kinematic": 9,
+    "kinematic_not_in_alphabet": 9,
+    "mixed": 0,
+    "pure_d": 6
+   },
+   "metrics": {
+    "bytes": 507364,
+    "max_coeff_bits": 26,
+    "max_deg_den": 18,
+    "max_deg_num": 21,
+    "rules": 102,
+    "terms": 1131
+   },
+   "status": "ran"
+  },
+  "integrals": {
+   "bytes": 2877633,
+   "certified": true,
+   "factor_classes": {
+    "kinematic": 6,
+    "kinematic_not_in_alphabet": 6,
+    "mixed": 0,
+    "pure_d": 9
+   },
+   "metrics": {
+    "bytes": 2877633,
+    "max_coeff_bits": 32,
+    "max_deg_den": 19,
+    "max_deg_num": 20,
+    "rules": 102,
+    "terms": 1220
+   },
+   "status": "ran"
+  },
+  "stock": {
+   "bytes": 1550369,
+   "certified": null,
+   "factor_classes": {
+    "kinematic": 8,
+    "kinematic_not_in_alphabet": 8,
+    "mixed": 1,
+    "pure_d": 5
+   },
+   "metrics": {
+    "bytes": 1550369,
+    "max_coeff_bits": 32,
+    "max_deg_den": 24,
+    "max_deg_num": 24,
+    "rules": 102,
+    "terms": 1150
+   },
+   "status": "ran"
+  }
+ }
+}

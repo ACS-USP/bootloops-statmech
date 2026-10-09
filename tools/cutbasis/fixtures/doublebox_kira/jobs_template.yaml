@@ -1,0 +1,14 @@
+jobs:
+  - reduce_sectors:
+      reduce:
+        - {topologies: [db], sectors: [127], r: 8, s: 2}
+      select_integrals:
+        select_mandatory_list:
+          - [db, targets]
+      preferred_masters: PREFERRED
+      run_initiate: true
+      run_triangular: true
+      run_back_substitution: true
+  - kira2math:
+      target:
+        - [db, targets]
