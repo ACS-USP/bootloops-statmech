@@ -60,7 +60,7 @@ bracketed in float64 (_perceptron_float), then polished by secant and
 audited in mpmath tanh-sinh at 15 digits, or the caller's precision if higher.
 """
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import lru_cache
 
 import mpmath as mp
@@ -69,7 +69,7 @@ import sympy as sp
 from ..core import Refusal
 from ..gauss import GaussE
 from . import _perceptron_float as F
-from .common import CAVEAT
+from .common import CAVEAT, Capacity  # noqa: F401 (re-exported)
 
 _DPS = 15
 _VARIABLES = ("spherical", "ising")
@@ -89,19 +89,6 @@ class RSPoint:
     replicon: object
     variables: str
     kappa: object
-    caveat: str = CAVEAT
-
-
-@dataclass(frozen=True)
-class Capacity:
-    alpha_c: object
-    stable: bool          # the ansatz's alpha_c is self-consistent (see note)
-    ansatz: str
-    variables: str = "spherical"
-    kappa: object = 0
-    replicon: object = None
-    note: str = ""
-    point: object = field(default=None, compare=False)   # RSPoint at the threshold, if any
     caveat: str = CAVEAT
 
 

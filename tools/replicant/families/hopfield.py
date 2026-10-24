@@ -86,29 +86,12 @@ import sympy as sp
 
 from ..core import Refusal
 from ..gauss import GaussE
-from .common import CAVEAT
+from .common import CAVEAT, HopfieldSolution  # noqa: F401 (re-exported)
 
 _DPS = 20
 _BRANCHES = ("retrieval", "spinglass", "paramagnet")
 _EQ_TOL = "1e-14"
 _GRAD_TOL = "1e-8"
-
-
-@dataclass(frozen=True)
-class HopfieldSolution:
-    m: object
-    q: object
-    r: object
-    branch: str
-    f: object = None
-    stable: bool = None            # mode_stable and replicon > 0
-    residual: object = None        # max |equation| over (m, q, r)
-    grad: tuple = ()               # analytic (df/dm, df/dq, df/dr) at the point
-    mode_stable: bool = None       # m-mode (retrieval, spin glass) or q-mode (paramagnet)
-    mode_eig: object = None
-    replicon: object = None        # lambda_AT = 1 - alpha beta^2 E sech^4 / (1 - C)^2
-    note: str = ""
-    caveat: str = CAVEAT
 
 
 @dataclass(frozen=True)
