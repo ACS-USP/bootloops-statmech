@@ -43,8 +43,10 @@ alpha_c H(-kappa) = kappa (kappa H(-kappa) + phi(kappa)) alpha_c: zero at
 kappa = 0 (marginal), positive for kappa > 0 (convex version space, RS
 exact), negative for kappa < 0 (RS breaks; Franz & Parisi, arXiv:1501.03397).
 Ising at q -> 1: lambda ~ -alpha/(3(1-q)) -> -inf; replicant finds lambda = 0
-near alpha = 1.015 at kappa = 0 (Gyorgyi, arXiv:cond-mat/0010025, writes that
-RS stays AT-stable up to 4/pi: we do not reproduce that statement).
+near alpha = 1.015 at kappa = 0 (alpha_AT ~ 1.0147).  This agrees with the commonly
+quoted Gardner-Derrida value (unsourced here: not fetched, NOT banked).  Gyorgyi, arXiv:cond-mat/0010025, writes that RS stays
+AT-stable up to 4/pi; we do not reproduce that statement and believe it is a slip (the
+q -> 1 endpoint 4/pi itself is reproduced).
 
 1RSB (Ising, frozen).  q1 = 1 within blocks of m replicas: each block is one
 configuration, so (1/n) ln E Z^n = S_RS(q0, qhat0)/m with the RS functional
@@ -334,8 +336,8 @@ def gardner_capacity(variables, kappa=0, ansatz="rs") -> Capacity:
             elif k == 0:
                 note = "kappa = 0: replicon -> 0 at alpha_c (marginal); RS exact (Gardner 1988)"
             else:
-                note = ("kappa < 0: replicon < 0 at capacity; RS alpha_c is only an upper bound "
-                        "(non-convex, RSB needed)")
+                note = ("kappa < 0: replicon < 0 at capacity; RS alpha_c is not the capacity "
+                        "(non-convex, RSB needed; Franz & Parisi, arXiv:1501.03397)")
             return Capacity(ac, bool(lam >= 0), "rs", variables, k, lam, note)
         if ansatz == "rs":
             note = ("RS q -> 1 endpoint (Gardner-Derrida), not the capacity: RS entropy is negative "

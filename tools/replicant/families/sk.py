@@ -313,6 +313,11 @@ def _ground_1rsb():
 
 
 def sk_ground_energy(ansatz: str):
+    """Ground-state energy per spin (J = 1) as a bare mpf: 'rs' by quadrature, '1rsb' from
+    the 1RSB solve, 'fullrsb' (slow) the K-extrapolated full-RSB value.  The 'fullrsb'
+    number is an extrapolation in the number of RSB steps K and carries NO error band here:
+    use families.parisi.parisi_ground_energy, which returns the value with its stated error
+    estimate (the whole extrapolated tail plus grid and optimiser terms) and a label."""
     if ansatz == "rs":   # e0 = -lim beta(1-q) = -2 phi(0) = -E|z|, by quadrature
         with mp.workdps(30):
             return -gauss_expect(abs, dps=30)

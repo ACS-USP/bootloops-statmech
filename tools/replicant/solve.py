@@ -7,7 +7,7 @@
 gauss_expect integrates f(z) exp(-z^2/2)/sqrt(2 pi) over the real line with
 mpmath tanh-sinh quadrature on [-inf, -6, 0, 6, inf].  For smooth f of
 moderate growth it agrees with exact values to ~25 digits at dps=30 (tests:
-z^2, z^4, cos z, exp(a z) at 1e-25) and with independent trapezoid references
+z^2, z^4, cos z at 1e-25) and with independent trapezoid references
 for tanh^2 and log cosh at beta=10 (tests, ~1e-10).  NOT validated for
 integrands with kinks or singularities (e.g. erfc-type), nor for f growing
 faster than exp(z^2/2 - eps).

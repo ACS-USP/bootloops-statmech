@@ -150,7 +150,7 @@ def _ft_run(p, rng):
         off = 1 - (ws**2).sum(1)
         q0 = np.where(off > 1e-9, (s1**2 - s2) / np.where(off > 1e-9, off, 1), s1**2)
         row = (f, e, float(np.mean(q0)), float(np.mean((ws * mag**2).sum(1))))
-        if m == 1:                                 # exact m = 1 functional of barycentres
+        if m == 1:                                 # variational m = 1 functional of barycentres
             mb = np.clip(np.tanh(b * h).mean(1), -1 + 1e-15, 1 - 1e-15)
             row += _bary_functional(rng, mb, law, jl, b, cbar, p["bary_samples"] * P)
         acc.append(row)
@@ -189,7 +189,8 @@ def pop_of_pops_1rsb(degree_law, J_law, beta, m, *, pop: int, inner: int, sweeps
     At m = 1 the result also carries f_bary, e_bary: the variational Bethe f and e of the
     reweighted barycentres m = E_states tanh(beta h) of each inner population
     (_bary_functional, bary_samples * pop site and link samples per measured sweep;
-    sampling stderr ~2e-4 at the default 64, pop 1000): the m = 1 functional evaluated without finite-PAIR (ratio)
+    sampling stderr ~2e-4 at the default 64, pop 1000): the m = 1 functional evaluated
+    without finite-PAIR (ratio)
     estimator bias.  It does NOT remove the dynamical bias of finite inner populations:
     the stationary barycentre population is a fixed point of a NOISY BP (barycentre
     sampling noise ~ (q1 - q0) / inner), which shifts e by ~+0.002-0.003 (k = 2, beta 1.5;

@@ -222,7 +222,7 @@ def capacity(kappa_key) -> Capacity:
         elif k == 0:
             note = "kappa = 0: cavity stability -> 0 at alpha_c (marginal)"
         else:
-            note = "kappa < 0: cavity stability < 0 at capacity; RS alpha_c only an upper bound"
+            note = "kappa < 0: cavity stability < 0 at capacity; RS alpha_c is not the capacity (RSB needed)"
         return Capacity(ac, bool(lam >= 0), "rs", "spherical", k, lam,
                         "cavity route (q -> 1 of the closure): " + note,
                         caveat=CAVITY_CAVEAT)

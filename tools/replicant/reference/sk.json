@@ -39,7 +39,7 @@
     "value": "-0.7631667265",
     "tol": "2e-4",
     "cite": "Oppermann, Schmidt & Sherrington, Phys. Rev. Lett. 98, 127201 (2007), arXiv:cond-mat/0608581: E_inf = -0.7631667265(6) (k-RSB extrapolation); same digits in Schmidt & Oppermann, arXiv:0801.1756 (2008): -0.763166726566547",
-    "independent_route": "replicant's own Parisi solve (families/parisi.py): T = 0 K-step staircases K = 1..8 maximised over (q, mu), audited (gradient, Hessian, grid refinement), extrapolated in K with a fitted power law E_K = E_inf - C K^-s from K = 6, 7, 8; error estimate = the whole extrapolated tail (6.9e-6) plus grid and optimiser terms. Does not use the banked number (it is the test's target). tol 2e-4 covers the spread of the sources below (largest gap 1.33e-4, Parisi 1980); two independent published methods agree to 5e-5 (Crisanti-Rizzo infinite-RSB PDE vs Oppermann et al. high-order k-RSB)",
+    "independent_route": "replicant's own Parisi solve (families/parisi.py): T = 0 K-step staircases K = 1..8 maximised over (q, mu), audited (gradient, Hessian, grid refinement), extrapolated in K with a fitted power law E_K = E_inf - C K^-s from K = 6, 7, 8; error estimate = the whole extrapolated tail (6.8e-6) plus grid and optimiser terms. Does not use the banked number (it is the test's target). tol 2e-4 covers the spread of the sources below (largest gap 1.33e-4, Parisi 1980); two independent published methods agree to 5e-5 (Crisanti-Rizzo infinite-RSB PDE vs Oppermann et al. high-order k-RSB)",
     "sources_disagree": [
       {
         "value": "-0.76321",

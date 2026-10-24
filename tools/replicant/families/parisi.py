@@ -2,7 +2,7 @@
 
   krsb_ground_energy(K)              -> KLevel   T = 0, K RSB steps (raw, audited)
   parisi_ground_energy(*, grid, dps) -> FRSBResult(value, error_estimate, "numerical")
-  sk_frsb(beta, *, grid=6)           -> FRSBSolution  finite T, h = 0
+  sk_frsb(beta, *, grid=5)           -> FRSBSolution  finite T, h = 0 (grid <= 5)
 
 Conventions (SK of families/sk.py: J_ij ~ N(0, 1/N), h = 0, beta = 1/T, energies per
 spin).  Parisi order parameter: a staircase q(x) with K steps, 0 <= q_0 < ... < q_K and

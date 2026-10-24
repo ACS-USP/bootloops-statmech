@@ -17,8 +17,10 @@ from typing import Callable, Sequence
 
 
 class Refusal(Exception):
-    """A named, fail-closed refusal; `reason` is kebab-case, e.g.
-    `precondition:gaussian_disorder`."""
+    """A named, fail-closed refusal; `reason` is a `kind:detail` string, e.g.
+    `precondition:supported-disorder-law` or `no-solution:audit`.  The detail words are
+    mostly hyphenated; a few keep an underscore where they name a parameter (e.g.
+    `precondition:positive-N_scale`)."""
 
     def __init__(self, reason: str, detail: str = "", *, trace=None, step=None):
         self.reason = reason
