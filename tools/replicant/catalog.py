@@ -217,7 +217,12 @@ _HELD_OUT = ("Ising perceptron: held out of the catalog on purpose (Task 16 comp
              "from the spherical perceptron entry, and the composer must not look its "
              "answer up); level (b) gardner_capacity('ising') reproduces it in "
              "tests/test_perceptron.py")
+_HELD_OUT_SK = ("+-J SK: held out of the catalog (Task 16); the composed level-(a) "
+                "calculation is checked against it in tests/test_heldout.py, never a "
+                "catalog pipeline")
 UNCLAIMED = {
+    ("heldout", "sk_pm_one_tc"): _HELD_OUT_SK,
+    ("heldout", "sk_pm_one_rs_ground_energy"): _HELD_OUT_SK,
     ("sk", "fullrsb_ground_energy"):
         "literature-only full-RSB (Parisi) value: no full-RSB solver in the catalog until "
         "Task 17 (families/parisi.py)",
