@@ -13,10 +13,12 @@ Run parameters: with no state point (no beta / alpha) an entry computes its head
 quantities (transitions, capacities, ground energies); with one it solves the saddle
 there.  Every number is the family function's own output; nothing is retyped.
 """
+from functools import lru_cache
+
 import mpmath as mp
 
 from .agree import default_spec
-from .catalog import Out, RefCheck, entry, fstep, has, lacks
+from .catalog import Out, RefCheck, Stability, entry, fstep, from_flag, has, lacks, saddle
 from .cavity import dense
 from .cavity.dense_hopfield import energy as hopfield_cavity_energy
 from .core import Refusal, Step
@@ -40,6 +42,7 @@ TS_CITE = ("Gyorgyi, Phys. Rev. A 41, 7097 (1990); Seung, Sompolinsky & Tishby, 
            "45, 6056 (1992); Opper & Haussler, PRL 66, 2677 (1991)")
 AGS_CITE = ("Amit, Gutfreund & Sompolinsky, PRL 55, 1530 (1985); Ann. Phys. 173, 30 (1987)")
 MPV = "Mezard, Parisi & Virasoro, Spin Glass Theory and Beyond (1987), ch. V"
+AT_CITE = "de Almeida & Thouless, J. Phys. A 11, 983 (1978) (replicon)"
 
 
 def _saddle(ansatz, stable, **values):
@@ -101,8 +104,14 @@ def rem():
             RefCheck("rem", "ground_energy_derrida", lambda v: v["f"], params={"beta": 3}),
             RefCheck("rem", "m_times_beta_over_beta_c", lambda v: v["m"] * v["beta"] / v["beta_c"],
                      params={"beta": 3})]
+    exact = lambda v: Stability(
+        "exact-by-literature", v.get("ansatz", "1rsb"),
+        "Derrida, Phys. Rep. 67, 29 (1980); Phys. Rev. B 24, 2613 (1981) (exact solution: "
+        "microcanonical entropy s(e)); Derrida & Mottishaw, arXiv:1410.1432 (m = T/T_c)")
+    fin = {k: exact for k in ("beta_c", "T_c", "f", "q", "q0", "q1", "m", "e")}
     return entry("rem", ModelSpec("rem", "ising", "gaussian"), REM_CITE, {"replica": steps},
-                 refs, {"replica": CAVEAT}, "random energy model: T_c, frozen 1RSB phase")
+                 refs, {"replica": CAVEAT}, "random energy model: T_c, frozen 1RSB phase",
+                 finality=fin, meta=("N_scale", "beta"))
 
 
 # ---- SK ------------------------------------------------------------------------------
@@ -115,9 +124,17 @@ def _sk_tc(p):
     return Out({"tc": 1 / b}, "T_c: root of the q = 0 replicon 1 - beta^2")
 
 
+@lru_cache(maxsize=None)
+def _sk_replicon_t0p5():
+    return sk_replicon("2.0")
+
+
 def _sk_e0(p):
+    lam = _sk_replicon_t0p5()
     return Out({"rs_ground_energy": sk_ground_energy("rs"),
-                "rsb1_ground_energy": sk_ground_energy("1rsb")})
+                "rsb1_ground_energy": sk_ground_energy("1rsb"), "rs_replicon_T0p5": lam},
+               f"T = 0 energies; RS replicon at T = 0.5 (beta = 2) = {mp.nstr(lam, 6)} "
+               "(the h = 0 AT line is T = 1: RS is unstable at all T < 1)")
 
 
 def _sk_rs(p):
@@ -146,9 +163,19 @@ def sk():
     refs = [RefCheck("sk", "tc", lambda v: v["tc"]),
             RefCheck("sk", "rs_ground_energy", lambda v: v["rs_ground_energy"]),
             RefCheck("sk", "rsb1_ground_energy", lambda v: v["rsb1_ground_energy"])]
+    fin = {"tc": Stability("stable", "rs", AT_CITE, "paramagnet replicon 1 - beta^2 > 0 above "
+                           "T_c (computed); T_c is where it vanishes"),
+           "rs_ground_energy": lambda v: from_flag(
+               bool(v["rs_replicon_T0p5"] > 0), "rs", AT_CITE,
+               f"computed RS replicon {mp.nstr(v['rs_replicon_T0p5'], 6)} at T = 0.5"),
+           "rsb1_ground_energy": Stability(
+               "not-computed", "1rsb", "Parisi, PRL 43, 1754 (1979); J. Phys. A 13, L115 (1980)",
+               "1RSB is not the exact SK solution (full RSB is); its stability is not computed"),
+           **{k: saddle(AT_CITE) for k in ("q", "f", "e", "replicon", "q0", "q1", "m")}}
     return entry("sk", default_spec("sk"), SK_CITE, {"replica": steps, "cavity": cav}, refs,
                  {"replica": CAVEAT, "cavity": CAVITY_CAVEAT},
-                 "Sherrington-Kirkpatrick: RS, AT stability, 1RSB")
+                 "Sherrington-Kirkpatrick: RS, AT stability, 1RSB", finality=fin,
+                 meta=("rs_replicon_T0p5",))
 
 
 # ---- spherical p-spin ----------------------------------------------------------------
@@ -175,9 +202,18 @@ def pspin():
             RefCheck("pspin", "td_p3", lambda v: v["T_d"]),
             RefCheck("pspin", "qs_p3", lambda v: v["q_s"]),
             RefCheck("pspin", "e0_p3", lambda v: v["e"], params={"beta": 10000}, slow=True)]
+    exact = Stability("exact-by-literature", "1rsb",
+                      PSPIN_CITE + " (1RSB is the exact solution of the pure spherical p-spin, "
+                      "p >= 3, zero field); equilibrium 1RSB values as in Cugliandolo, Lozano & "
+                      "Nessi, J. Stat. Mech. (2017) 083301, Table 1")
+    fin = {k: exact for k in ("T_s", "q_s", "q0", "q1", "m", "f", "e")}
+    fin["T_d"] = Stability("exact-by-literature", "1rsb",
+                           "Castellani & Cavagna, J. Stat. Mech. (2005) P05012, Eq. (147)",
+                           "dynamic (mode-coupling) transition, closed form")
     return entry("pspin", ModelSpec("pspin", "spherical", "gaussian", params={"p": 3}),
                  PSPIN_CITE, {"replica": steps}, refs, {"replica": CAVEAT},
-                 "spherical p-spin: static and dynamic transitions, 1RSB")
+                 "spherical p-spin: static and dynamic transitions, 1RSB", finality=fin,
+                 meta=("p",))
 
 
 # ---- spherical perceptron ----------------------------------------------------------------
@@ -209,7 +245,13 @@ def perceptron():
     return entry("perceptron", default_spec("perceptron"), GARDNER_CITE,
                  {"replica": steps, "cavity": cav}, refs,
                  {"replica": CAVEAT, "cavity": CAVITY_CAVEAT},
-                 "spherical perceptron (Gardner volume): capacity alpha_c(kappa), entropy")
+                 "spherical perceptron (Gardner volume): capacity alpha_c(kappa), entropy",
+                 finality={"alpha_c": lambda v: from_flag(
+                               v["capacity_stable"], "rs", GARDNER_CITE.split(";")[0],
+                               f"computed replicon at capacity {v['capacity_replicon']}"),
+                           "S": saddle(GARDNER_CITE.split(";")[0]),
+                           "q": saddle(MEZARD_CITE)},
+                 meta=("capacity_replicon", "capacity_stable", "stability"))
 
 
 # ---- teacher-student -------------------------------------------------------------------
@@ -237,8 +279,15 @@ def teacher_student():
             RefCheck("perceptron", "bayes_asymptotic_constant",
                      lambda v: v["bayes_asymptotic_constant"])]
     spec = ModelSpec("teacher_student", "spherical", "gaussian", prior="teacher")
+    exact = Stability("exact-by-literature", "rs",
+                      "Barbier, Krzakala, Macris, Miolane & Zdeborova, PNAS 116, 5451 (2019) "
+                      "(the RS formula is proved for Bayes-optimal generalized linear models)",
+                      "Gibbs sampling of the version space is Bayes-consistent with the teacher "
+                      "prior (Nishimori line q = R), so both curves are on the proved RS branch")
+    fin = {k: exact for k in ("gibbs_asymptotic_constant", "bayes_asymptotic_constant", "eps")}
     return entry("teacher_student", spec, TS_CITE, {"replica": steps}, refs,
-                 {"replica": CAVEAT}, "teacher-student perceptron: Gibbs and Bayes learning curves")
+                 {"replica": CAVEAT}, "teacher-student perceptron: Gibbs and Bayes learning curves",
+                 finality=fin, meta=("learning",))
 
 
 # ---- Hopfield -----------------------------------------------------------------------------
@@ -278,13 +327,22 @@ def hopfield():
              fstep("hopfield-rs", AGS_CITE, _hop_rs, when=has("alpha", "beta"),
                    skip="needs alpha and beta")]
     cav = cavity_route("hopfield", ("alpha", "beta"), _hop_cavity, AGS_CITE)
+    t0rs = Stability("not-computed", "rs", "Steffan & Kuehn, arXiv:cond-mat/9404036 (1994)",
+                     "RS at T = 0: the replicon is not evaluated at T = 0 here; Steffan & Kuehn "
+                     "find RSB corrections to the T = 0 retrieval state")
+    fin = {"alpha_c_T0": t0rs, "m_at_alpha_c_T0": t0rs, "energy_at_alpha_c_T0": t0rs,
+           "alpha_global_T0": Stability("not-computed", "rs", AGS_CITE.split(";")[0],
+                                        "compares the RS energies of the retrieval and the "
+                                        "(AT-unstable) spin-glass states at T = 0"),
+           **{k: saddle(AGS_CITE) for k in ("m", "q", "r", "f", "e", "replicon")}}
     refs = [RefCheck("hopfield", k, (lambda key: lambda v: v[key])(k))
             for k in ("alpha_c_T0", "m_at_alpha_c_T0", "energy_at_alpha_c_T0",
                       "alpha_global_T0")]
     return entry("hopfield", default_spec("hopfield"), AGS_CITE,
                  {"replica": steps, "cavity": cav}, refs,
                  {"replica": CAVEAT, "cavity": CAVITY_CAVEAT},
-                 "Hopfield (AGS), RS with branch control: retrieval capacity, T = 0 energies")
+                 "Hopfield (AGS), RS with branch control: retrieval capacity, T = 0 energies",
+                 finality=fin, meta=("branch",))
 
 
 def dense_entries():

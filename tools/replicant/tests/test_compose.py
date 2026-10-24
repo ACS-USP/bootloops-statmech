@@ -17,7 +17,7 @@ import mpmath as mp
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from replicant import derive as D
 from replicant.agree import default_spec
-from replicant.catalog import catalog
+from replicant.catalog import catalog, run_cached
 from replicant.compose import LEVEL_A_STEPS, Result, compose, nearest_entry
 from replicant.core import Refusal
 from replicant.families.common import CAVEAT, CAVITY_CAVEAT
@@ -57,10 +57,23 @@ def test_nearest_entry_unknown_family_is_none():
 
 
 def test_nearest_entry_prefers_constraint_and_prior_over_variables():
-    # same family, two candidate entries would differ; here: a perceptron with the
-    # catalogued constraint but other variables and disorder is still the perceptron
-    s = ModelSpec("perceptron", "ising", "pm_one", "margin kappa")
-    assert nearest_entry(s).name == "perceptron"
+    """A real tie-break: register a second perceptron entry that matches the query's
+    variables and disorder but not its constraint; the catalogued entry (same constraint)
+    must win.  The registry is restored afterwards."""
+    import dataclasses
+    from replicant import catalog as C
+    base = catalog()["perceptron"]
+    fake = dataclasses.replace(base, name="perceptron_parity",
+                               spec=ModelSpec("perceptron", "ising", "pm_one", "parity"))
+    query = ModelSpec("perceptron", "ising", "pm_one", "margin kappa")
+    C._CATALOG["perceptron_parity"] = fake
+    try:
+        assert nearest_entry(query).name == "perceptron"      # (constraint, prior) first
+        q2 = ModelSpec("perceptron", "ising", "pm_one", "parity", prior="x")
+        assert nearest_entry(q2).name == "perceptron_parity"  # constraint matches the fake
+    finally:
+        del C._CATALOG["perceptron_parity"]
+    assert "perceptron_parity" not in catalog()
 
 
 # ---- catalog specs: reuse ----------------------------------------------------------
@@ -72,6 +85,7 @@ def test_compose_known_spec_reports_all_reused():
             assert r.kind == "catalog" and r.nearest == name, (name, route)
             assert r.reused == [s.name for s in e.route_steps[route]], (name, route, r.reused)
             assert r.adapted == [] and r.missing == [], (name, route)
+            assert r.relative_to.startswith(f"catalog entry {name!r} itself"), r.relative_to
             assert [s.name for s in c.steps] == r.reused
     # and the run is the entry's family pipeline, with its trace and citations
     from replicant.families.sk import sk_rs
@@ -97,18 +111,20 @@ def test_compose_pm_one_sk_reports_adapted_disorder_step():
     assert [(a.step, a.field, a.was, a.now, a.hook) for a in r.adapted] == \
         [("average-disorder", "disorder", "gaussian", "pm_one", "disorder:pm_one")]
     assert r.reused == [n for n in LEVEL_A_STEPS if n != "average-disorder"]
-    assert r.missing == []
+    assert r.missing == [] and "level-(a) derivation of catalog entry 'sk'" in r.relative_to
     assert [s.name for s in c.steps] == list(LEVEL_A_STEPS)
 
 
 def test_compose_ising_perceptron_reports_adapted_site():
     r = compose(_ising_perceptron()).report
     assert r.kind == "composed" and r.nearest == "perceptron"
-    sites = [a for a in r.adapted if a.hook == "site:ising"]
-    assert sites and {a.step for a in sites} >= {"introduce-order-parameters", "rs-ansatz"}
-    assert all((a.field, a.was, a.now) == ("variables", "spherical", "ising") for a in r.adapted)
-    assert "average-disorder" in r.reused and "replicate" in r.reused
-    assert not set(r.reused) & {a.step for a in r.adapted}
+    # replicate checks the variables against SITES / Family.variables: adapted too
+    assert [a.step for a in r.adapted] == ["replicate", "introduce-order-parameters",
+                                           "rs-ansatz", "solve-derived"], r.adapted
+    assert all((a.field, a.was, a.now, a.hook) == ("variables", "spherical", "ising",
+                                                   "site:ising") for a in r.adapted)
+    assert r.reused == ["average-disorder", "replica-limit", "rs-stationarity"]
+    assert "'perceptron'" in r.relative_to
 
 
 # ---- refusals -----------------------------------------------------------------------
@@ -148,8 +164,10 @@ def test_result_declares_physics_level():
     assert cav.rigor == "physics-level" and cav.route == "cavity" and CAVITY_CAVEAT in cav.notes
     assert cav.stable is True and cav.final is True
     assert abs(cav.values["q"]) < 1e-12 and cav.trace.to_json()["steps"][1] == "remove_site"
-    head = compose(catalog()["rem"].spec).run()          # headline numbers: no saddle judged
-    assert head.rigor == "physics-level" and head.final is None and "T_c" in head.values
+    head = compose(catalog()["rem"].spec).run(require_final=True)    # exact by literature
+    assert head.rigor == "physics-level" and head.final is True
+    assert head.finality["T_c"].state == "exact-by-literature" and "Derrida" in \
+        head.finality["T_c"].cite
 
 
 def test_compose_pm_one_sk_says_rs_not_final():
@@ -165,6 +183,8 @@ def test_compose_pm_one_sk_says_rs_not_final():
     assert res.rigor == "physics-level" and res.route == "replica"
     assert res.stable is False and res.final is False
     assert any("NOT final" in n and "unstable" in n for n in res.notes), res.notes
+    assert {st.state for st in res.finality.values()} == {"unstable"}
+    assert res.trace.entries[-1].cite == "replicant level (a) derivation (this package)"
     assert abs(res.values["q"] - sk_rs("1.5").q) < 1e-9
     assert res.trace.to_json()["steps"] == list(LEVEL_A_STEPS)
     assert "dropped fourth cumulant" in res.trace.render()
@@ -175,13 +195,56 @@ def test_require_final_refuses():
     sk = compose(catalog()["sk"].spec)
     r = _refusal(lambda: sk.run(beta="2.0", h=0, require_final=True))
     assert r.reason == "unstable:rs" and "replicon" in r.detail, r
-    ts = compose(catalog()["teacher_student"].spec)
-    r = _refusal(lambda: ts.run(alpha=2, require_final=True))
-    assert r.reason == "unknown-stability:rs", r
-    res = ts.run(alpha=2)
-    assert res.stable is None and any("NOT final" in n and "unknown" in n for n in res.notes)
+    vb = compose(catalog()["viana_bray"].spec, "cavity")
+    small = dict(k=2, beta=1.3, pop=300, sweeps=10, burn_in=30, runs=4, seed=0)
+    r = _refusal(lambda: vb.run(require_final=True, **small))
+    assert r.reason == "unknown-stability:rs" and "not-computed" in r.detail, r
+    r = _refusal(lambda: sk.run(beta="1.5", h=0, ansatz="1rsb", require_final=True))
+    assert r.reason == "not-final:1rsb", r
+    ts = compose(catalog()["teacher_student"].spec).run(alpha=2, require_final=True)
+    assert ts.final and ts.finality["eps"].state == "exact-by-literature"
     cav = compose(catalog()["sk"].spec, "cavity")
     assert cav.run(beta=0.5, h=0, require_final=True).final      # stable passes through
+
+
+def test_headline_ground_energies_are_not_final():
+    """`python3 -m replicant run sk` (no state point): the RS ground energy comes from an
+    AT-unstable saddle and the 1RSB one is not the exact (full-RSB) answer."""
+    res = compose(catalog()["sk"].spec).run()
+    fin = res.finality
+    assert fin["rs_ground_energy"].state == "unstable" and "replicon" in fin["rs_ground_energy"].note
+    assert fin["rsb1_ground_energy"].state == "not-computed"
+    assert fin["tc"].final and res.final is False
+    assert any(n.startswith("rs_ground_energy: RS value is NOT final (unstable") for n in res.notes)
+    assert any(n.startswith("rsb1_ground_energy: 1RSB value is NOT final (not-computed")
+               for n in res.notes)
+    r = _refusal(lambda: compose(catalog()["sk"].spec).run(require_final=True))
+    assert r.reason == "unstable:rs" and "rs_ground_energy" in r.detail \
+        and "rsb1_ground_energy" in r.detail, r
+
+
+def test_every_catalog_value_has_a_finality_declaration():
+    """Guard: no un-annotated physical value (finality_of refuses on one)."""
+    from replicant.catalog import Stability
+    runs = [(n, r.route, r.params) for n, e in catalog().items() for r in e.refs
+            if not (r.slow or r.statistical)]
+    runs += [("sk", "replica", {"beta": "2.0", "h": 0}), ("sk", "cavity", {"beta": 2}),
+             ("rem", "replica", {"beta": 1}), ("perceptron", "cavity", {"alpha": "0.5"}),
+             ("teacher_student", "replica", {"alpha": 2}),
+             ("hopfield", "cavity", {"alpha": "0.05", "beta": 20}),
+             ("viana_bray", "cavity", dict(k=2, beta=1.3, pop=300, sweeps=10, burn_in=30,
+                                           runs=4, seed=0))]
+    for name, route, params in runs:
+        e = catalog()[name]
+        values, _ = run_cached(e, route, params)        # the pipeline's own run (memoised)
+        fin = e.finality_of(values)
+        assert fin and all(isinstance(st, Stability) for st in fin.values()), (name, params)
+        assert set(fin) | (set(values) & e.meta) == set(values)
+    bad = catalog()["sk"]
+    import dataclasses
+    stripped = dataclasses.replace(bad, finality={})
+    assert _refusal(lambda: stripped.finality_of({"tc": 1})).reason == \
+        "precondition:finality-declared"
 
 
 def test_population_dynamics_values_are_labelled_statistical():

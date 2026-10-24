@@ -14,7 +14,7 @@ Sampling settings (pop, sweeps, burn_in, runs, seed, inner, ys, ...) pass throug
 cavity functions; their defaults are those functions' (seed 0).  Statistical values are
 labelled as such and carry stderr (over independent runs) in errors.
 """
-from .catalog import Out, RefCheck, entry, fstep, lacks
+from .catalog import Out, RefCheck, Stability, entry, fstep, lacks, saddle
 from .cavity import sparse as S
 from .cavity._rsb_common import FACTORIZED_CAVEAT, RSB_CAVEAT
 from .cavity.rsb_sparse import pop_of_pops_1rsb
@@ -49,8 +49,9 @@ def _laws(p):
 
 def _kw(p, keys, defaults):
     out = {**defaults, **{k: p[k] for k in keys if k in p}}
-    if "ys" in out:
-        out["ys"] = tuple(out["ys"])
+    if "ys" in out:              # a single value is a 1-grid (refused downstream: >= 3)
+        ys = out["ys"]
+        out["ys"] = tuple(ys) if isinstance(ys, (list, tuple)) else (ys,)
     return out
 
 
@@ -156,7 +157,24 @@ def viana_bray():
     return entry("viana_bray", spec, f"{VB}; {MP01}; {MP03}", {"cavity": steps}, refs,
                  {"cavity": CAVITY_CAVEAT},
                  "sparse +-J spin glass (Viana-Bray / Bethe lattice): BP and population "
-                 "dynamics, RS and 1RSB", default_route="cavity")
+                 "dynamics, RS and 1RSB", default_route="cavity", finality=_finality(),
+                 meta=("phase",))
+
+
+def _finality():
+    t0 = Stability("not-computed", "rs", f"{MP03}, Sec. III.B",
+                   "T = 0 RS; its stability is not computed here (MP03 report a different, "
+                   "1RSB ground energy)")
+    fac = Stability("not-computed", "1rsb", f"{MP03}, Sec. V.F.1",
+                    "factorized 1RSB ansatz; not the full 1RSB solution")
+    ggs = Stability("not-computed", "1rsb", f"{MP03}, Secs. IV-V", "1RSB stability not computed")
+    return {"beta_c": Stability("stable", "rs", f"{MP01}, Eq. (36)",
+                                "computed linear stability limit of the paramagnet "
+                                "(B E tanh^2(beta J) = 1)"),
+            "T_c": Stability("stable", "rs", f"{MP01}, Eq. (36)", "1 / beta_c"),
+            "p0_rs_T0": t0, "e0_rs": t0, "q_rs_T0": t0,
+            "e0_1rsb_factorized": fac, "mu_star_factorized": fac, "e0": ggs, "y_star": ggs,
+            **{k: saddle(MP01) for k in ("q", "e", "f", "q0", "q1")}}
 
 
 def sparse_entries():

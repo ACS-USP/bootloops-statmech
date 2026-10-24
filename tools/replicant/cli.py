@@ -8,8 +8,11 @@
 (values, errors, rigor, route, stable, final, notes, the composition report, the trace
 and the entry's non-slow banked comparisons) to --out (default stdout) and the rendered
 trace to stderr.  A refusal prints `REFUSED: <reason>: <detail>` to stderr and exits 2;
-success exits 0.  --param values parse as int, float, true/false, comma lists of numbers,
-or else stay strings (e.g. learning=bayes).  spec.json: {"family", "variables",
+any other exception prints `ERROR: <type>: <message>` and exits 1; success exits 0.
+--param values: integers parse as int; decimals stay DECIMAL STRINGS (the families convert
+them with mpmath, so 0.1 is not rounded through a binary float); true/false -> bool; a
+comma list (a trailing comma makes a 1-list: ys=0.3,) -> tuple of those; anything else
+stays a string (e.g. learning=bayes).  spec.json: {"family", "variables",
 "disorder", "constraint", "prior", "params"}; a param given as null is left symbolic
 (beta, h, alpha, kappa: the derivation's own symbols); numbers are run parameters.
 `build_result(...)` returns the Result object, so writers (e.g. LaTeX) can be added.
@@ -32,12 +35,18 @@ _SYMBOLS = {"beta": D.BETA, "h": D.H_FIELD, "alpha": ALPHA, "kappa": KAPPA}
 
 
 def _number(text):
-    for kind in (int, float):
-        try:
-            return kind(text)
-        except ValueError:
-            pass
-    return None
+    """int for an integer literal, the decimal string itself for a finite decimal, else
+    None."""
+    t = text.strip()
+    try:
+        return int(t)
+    except ValueError:
+        pass
+    try:
+        x = mp.mpf(t)
+    except (ValueError, TypeError):
+        return None
+    return t if mp.isfinite(x) else None
 
 
 def parse_param(item):
@@ -48,7 +57,7 @@ def parse_param(item):
     if low in ("true", "false"):
         return k, low == "true"
     if "," in v:
-        parts = [_number(x) for x in v.split(",")]
+        parts = [_number(x) for x in v.split(",") if x.strip()]
         if all(x is not None for x in parts):
             return k, tuple(parts)
     n = _number(v)
@@ -120,6 +129,8 @@ def result_json(target, spec, res):
     return jsonable({"target": target, "spec": vars(spec), "route": res.route,
                      "rigor": res.rigor, "values": res.values, "errors": res.errors,
                      "statistical": res.statistical, "stable": res.stable, "final": res.final,
+                     "finality": {k: {**vars(st), "final": st.final}
+                                  for k, st in res.finality.items()},
                      "notes": res.notes, "params": res.params, "report": res.report.to_json(),
                      "trace": res.trace.to_json(), "references": refs,
                      "references_skipped_slow": skipped})
@@ -147,6 +158,9 @@ def main(argv=None, stdout=None, stderr=None):
     except Refusal as r:
         print(f"REFUSED: {r.reason}: {r.detail}", file=stderr)
         return 2
+    except Exception as exc:          # not a named refusal: report it, never a traceback
+        print(f"ERROR: {type(exc).__name__}: {exc}", file=stderr)
+        return 1
     text = json.dumps(doc, indent=2)
     if args.out:
         with open(args.out, "w") as f:

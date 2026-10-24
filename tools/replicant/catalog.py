@@ -13,9 +13,10 @@ read State["params"] and add to State["values"] (plus "errors": numerical error 
 apply to the given parameters (e.g. a T = 0 headline when beta is given) is recorded
 in the trace as "skipped: ...", never silently dropped.
 
-Values that come from a saddle point carry values["ansatz"] and values["stable"]
-(True / False / None = not established by the pipeline); compose.Result turns that into
-the finality statement.  Honest labels: every route is physics-level (replica n -> 0 and
+Finality is per value: each entry declares, for every physical value key, a Stability
+(stable / unstable / not-computed / exact-by-literature, with the ansatz and a cite), or a
+callable reading the run's computed values["stable"]; compose.Result reports it per key
+and refuses require_final when any value is not final.  Honest labels: every route is physics-level (replica n -> 0 and
 RS/1RSB ansaetze, or the cavity clustering assumptions); population-dynamics numbers are
 statistical (value +- stderr over independent runs), never certified.
 
@@ -61,6 +62,46 @@ class RefOutcome:
     detail: str = ""
 
 
+STATES = ("stable", "unstable", "not-computed", "exact-by-literature")
+FINAL_STATES = ("stable", "exact-by-literature")
+
+
+@dataclass(frozen=True)
+class Stability:
+    """Finality of one reported value.  state: "stable" (stability computed by this
+    pipeline and positive), "unstable" (computed and negative, or the computed entropy
+    rules the ansatz out), "not-computed" (no stability computed here), or
+    "exact-by-literature" (the cited source establishes the value; needs `cite`).
+    Only "stable" and "exact-by-literature" are final."""
+    state: str
+    ansatz: str
+    cite: str = ""
+    note: str = ""
+
+    def __post_init__(self):
+        if self.state not in STATES:
+            raise ValueError(f"stability state {self.state!r} not in {STATES}")
+        if self.state == "exact-by-literature" and not self.cite.strip():
+            raise ValueError("exact-by-literature needs a cite")
+
+    @property
+    def final(self):
+        return self.state in FINAL_STATES
+
+
+def from_flag(stable, ansatz, cite="", note=""):
+    """Stability from a computed flag: True -> stable, False -> unstable, None ->
+    not-computed."""
+    state = {True: "stable", False: "unstable"}.get(stable, "not-computed")
+    return Stability(state, ansatz, cite, note)
+
+
+def saddle(cite="", note=""):
+    """Declaration for values of a saddle step that records values['ansatz'] and the
+    computed values['stable']."""
+    return lambda v: from_flag(v.get("stable"), v.get("ansatz", "rs"), cite, note)
+
+
 @dataclass(frozen=True, eq=False)
 class CatalogEntry:
     name: str
@@ -74,6 +115,26 @@ class CatalogEntry:
     caveats: dict = field(default_factory=dict)       # route -> honest label
     description: str = ""
     default_route: str = "replica"
+    # value key -> Stability, or a callable(values) -> Stability (state-point values);
+    # `meta`: value keys that are not physical results (echoed parameters, labels,
+    # diagnostics).  Every other value key must have a finality declaration.
+    finality: dict = field(default_factory=dict)
+    meta: frozenset = frozenset()
+
+    def finality_of(self, values):
+        """{key: Stability} for the physical values of one run; a key with no
+        declaration is a Refusal (precondition:finality-declared), never assumed final."""
+        out = {}
+        for k in values:
+            if k in self.meta:
+                continue
+            d = self.finality.get(k)
+            if d is None:
+                raise Refusal("precondition:finality-declared",
+                              f"catalog entry {self.name!r}: value {k!r} has no finality "
+                              "declaration")
+            out[k] = d(values) if callable(d) else d
+        return out
 
     def execute(self, route=None, **params):
         """(final State, Trace) of the route's pipeline at `params`."""
@@ -114,14 +175,16 @@ def fstep(name, cite, compute, *, when=None, skip=""):
                 lambda s: s["step_note"])
 
 
-def entry(name, spec, cite, route_steps, refs, caveats, description, default_route="replica"):
+def entry(name, spec, cite, route_steps, refs, caveats, description, default_route="replica",
+          finality=None, meta=()):
     holder = {}
 
     def run(route=None, **params):
         return holder["e"].execute(route, **params)[0]["values"]
 
     e = CatalogEntry(name, spec, route_steps[default_route], cite, set(route_steps), refs, run,
-                     route_steps, caveats, description, default_route)
+                     route_steps, caveats, description, default_route, dict(finality or {}),
+                     frozenset(meta) | {"ansatz", "stable"})
     holder["e"] = e
     return e
 
@@ -223,4 +286,5 @@ def catalog() -> dict:
     return dict(_CATALOG)
 
 
-__all__ = ["CatalogEntry", "RefCheck", "RefOutcome", "UNCLAIMED", "catalog", "check_ref"]
+__all__ = ["CatalogEntry", "RefCheck", "RefOutcome", "Stability", "UNCLAIMED", "catalog",
+           "check_ref", "from_flag", "saddle"]

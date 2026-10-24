@@ -59,6 +59,8 @@ def test_cli_writes_json_and_rendered_trace():
     assert res["report"]["kind"] == "catalog" and res["report"]["adapted"] == []
     assert res["trace"]["steps"] == [s.name for s in catalog()["sk"].steps]
     assert any("NOT final" in n for n in res["notes"])
+    assert res["finality"]["q"] == {**res["finality"]["q"], "state": "unstable", "final": False}
+    assert res["report"]["relative_to"].startswith("catalog entry 'sk' itself")
     assert res["params"] == {"beta": 2, "h": 0}
     # the rendered trace goes to stderr, with citations
     assert "sk-rs-saddle [Sherrington" in err and "1. " in err, err
@@ -80,11 +82,17 @@ def test_cli_json_spec_composes_and_prints_to_stdout():
 
 
 def test_cli_param_parsing():
-    assert parse_param("alpha=0.5") == ("alpha", 0.5)
+    assert parse_param("alpha=0.1") == ("alpha", "0.1")       # decimal string, no float
     assert parse_param("k=2") == ("k", 2)
     assert parse_param("learning=bayes") == ("learning", "bayes")
-    assert parse_param("ys=0.3,0.5,0.7") == ("ys", (0.3, 0.5, 0.7))
+    assert parse_param("ys=0.3,0.5,0.7") == ("ys", ("0.3", "0.5", "0.7"))
+    assert parse_param("ys=0.3,") == ("ys", ("0.3",))           # trailing comma: a 1-list
     assert parse_param("require_stable=true") == ("require_stable", True)
+
+
+def test_cli_unexpected_error_prints_ERROR_and_exits_1():
+    code, out, err = _main(["run", "sk", "--param", "beta=abc", "--param", "h=0"])
+    assert code == 1 and err.startswith("ERROR: ") and "Traceback" not in err, err
 
 
 @slow

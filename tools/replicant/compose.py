@@ -18,10 +18,13 @@ Any other spec: the calculation is assembled from the level-(a) steps
   replicate -> average-disorder -> introduce-order-parameters -> rs-ansatz ->
   replica-limit -> rs-stationarity -> solve-derived
 through the registered hooks (derive.FAMILIES, derive.SITES, derive.LAWS); nothing is
-looked up in the catalog.  Each step declares the spec fields it consumes (STEP_INPUTS);
-a step is ADAPTED when one of those fields differs from the nearest entry's spec (the
-Adaptation names the hook now used, e.g. disorder:pm_one, site:ising) and REUSED
-otherwise.  A hook that does not exist is a Refusal, never a partial result:
+looked up in the catalog.  The report is relative to the level-(a) derivation of the
+nearest entry's spec (report.relative_to): both step lists are built (level_a_steps) and,
+step by step, the registry objects each step's code resolves (hooks_used: the Family
+hook it calls, the SITES entry, the LAWS entry, the constraint / prior the family hook
+implements, the solver's discrete-variable rule) are compared.  A step is ADAPTED when
+any of them differs (the Adaptation names the hook now used, e.g. disorder:pm_one,
+site:ising) and REUSED otherwise.  A hook that does not exist is a Refusal, never a partial result:
   missing-step:family:<f>        no derive.FAMILIES hook (detail: what exists, nearest)
   missing-step:site:<v>          the family has no hook for these variables
   missing-step:disorder:<d>      the family's average does not handle this law
@@ -31,17 +34,21 @@ otherwise.  A hook that does not exist is a Refusal, never a partial result:
                                  composer)
 The detail wraps the underlying step's own refusal reason where there is one.
 
-Results.  Result.rigor is always "physics-level".  An answer from a saddle point is
-FINAL only when its stability was established (stable is True); stable False or None
-(unknown, e.g. replicon not derived) is stated in Result.notes as "NOT final", and
-run(require_final=True) refuses with unstable:<ansatz> / unknown-stability:<ansatz>.
+Results.  Result.rigor is always "physics-level".  Finality is per value
+(Result.finality: key -> catalog.Stability): catalog values carry their entry's
+declaration; composed values the solver's computed flag (True -> stable, False ->
+unstable, None -> not-computed).  Only "stable" and "exact-by-literature" are final;
+every other value gets a "NOT final (<state>)" note, Result.final = all values final,
+and run(require_final=True) refuses if ANY value is not final: unstable:<ansatz>, else
+unknown-stability:rs (RS, stability not computed), else not-final:<ansatz>.
 """
 from dataclasses import dataclass, field
 
 import sympy as sp
 
 from . import derive as D
-from .catalog import CatalogEntry, catalog, compare, run_cached
+from . import solve_derived as SD
+from .catalog import CatalogEntry, catalog, compare, from_flag, run_cached
 from .core import Refusal, State, Step, Trace, run_pipeline
 from .solve_derived import lift_numeric_beta, solve_derived_rs
 from .spec import ModelSpec
@@ -50,16 +57,27 @@ ROUTES = ("replica", "cavity")
 FIELDS = ("family", "variables", "disorder", "constraint", "prior")
 LEVEL_A_STEPS = ("replicate", "average-disorder", "introduce-order-parameters", "rs-ansatz",
                  "replica-limit", "rs-stationarity", "solve-derived")
-# spec fields each level-(a) step consumes (the hook it calls depends on them)
-STEP_INPUTS = {"replicate": ("family",),
-               "average-disorder": ("disorder", "constraint", "prior"),
-               "introduce-order-parameters": ("variables",),
-               "rs-ansatz": ("variables",),
-               "replica-limit": (),
-               "rs-stationarity": (),
-               "solve-derived": ("variables",)}     # discrete-variable entropy check
 _HOOK = {"disorder": "disorder", "variables": "site", "constraint": "constraint",
          "prior": "prior", "family": "family"}
+LEVEL_A_CITE = "replicant level (a) derivation (this package)"
+
+
+def hooks_used(step, spec):
+    """{spec field: the registry object step `step` resolves for `spec`}: what the
+    step's code looks up (derive.replicate: Family.formal and the SITES entry it checks;
+    average_disorder: Family.average, which reads LAWS and implements the declared
+    constraint / prior; introduce_order_parameters: Family.order_parameters and SITES;
+    rs_ansatz: the site's reduction rule; solve-derived: the discrete-variable rule)."""
+    fam, site = D.FAMILIES[spec.family], D.SITES.get(spec.variables)
+    return {"replicate": {"family": fam.formal, "variables": site},
+            "average-disorder": {"family": fam.average,
+                                 "disorder": D.LAWS.get(spec.disorder, spec.disorder),
+                                 "constraint": spec.constraint, "prior": spec.prior},
+            "introduce-order-parameters": {"family": fam.order_parameters, "variables": site},
+            "rs-ansatz": {"variables": site},
+            "replica-limit": {},
+            "rs-stationarity": {},
+            "solve-derived": {"variables": spec.variables in SD._DISCRETE}}[step]
 _SOLVER_KNOBS = ("branch", "quad", "dps", "seed", "seeds", "gh_nodes", "audit_tol")
 
 
@@ -85,9 +103,11 @@ class CompositionReport:
     missing: list
     nearest: str | None = None
     kind: str = "catalog"           # "catalog" | "composed"
+    relative_to: str = ""           # what reused / adapted are measured against
 
     def to_json(self):
-        return {"kind": self.kind, "nearest": self.nearest, "reused": list(self.reused),
+        return {"kind": self.kind, "nearest": self.nearest, "relative_to": self.relative_to,
+                "reused": list(self.reused),
                 "adapted": [vars(a) for a in self.adapted], "missing": list(self.missing)}
 
 
@@ -99,8 +119,9 @@ class Result:
     errors: dict = field(default_factory=dict)
     notes: list = field(default_factory=list)
     route: str = "replica"
-    stable: bool | None = None
-    final: bool | None = False      # None: headline quantities only, no saddle to judge
+    stable: bool | None = None      # the saddle's computed flag (values["stable"]), if any
+    final: bool | None = False      # all values final (None: no physical values)
+    finality: dict = field(default_factory=dict)    # value key -> catalog.Stability
     statistical: tuple = ()         # value keys estimated by sampling (stderr in errors)
     report: CompositionReport = None
     params: dict = field(default_factory=dict)
@@ -141,26 +162,26 @@ def nearest_entry(spec: ModelSpec):
     return best
 
 
-def _not_final(stable, ansatz, detail=""):
-    why = "unstable" if stable is False else "unknown"
-    text = (f"the {ansatz.upper()} saddle is unstable here (stable=False)" if stable is False
-            else "its stability is unknown (stable=None: not established by this pipeline)")
-    return why, f"{ansatz.upper()} answer is NOT final: {text}" + (f"; {detail}" if detail else "")
-
-
-def _finalise(res: Result, require_final, detail=""):
-    ansatz = res.values.get("ansatz")
-    if ansatz is None:              # headline quantities only: no saddle to judge
-        res.final = res.stable = None
-        return res
+def _finalise(res: Result, finality, require_final):
+    res.finality = finality
     res.stable = res.values.get("stable")
-    res.final = res.stable is True
-    if not res.final:
-        why, text = _not_final(res.stable, ansatz, detail)
-        res.notes.append(text)
-        if require_final:
-            reason = "unstable" if why == "unstable" else "unknown-stability"
-            raise Refusal(f"{reason}:{ansatz}", text)
+    res.final = all(st.final for st in finality.values()) if finality else None
+    bad = {k: st for k, st in finality.items() if not st.final}
+    for k, st in bad.items():
+        res.notes.append(f"{k}: {st.ansatz.upper()} value is NOT final ({st.state}"
+                         + (f"; {st.note}" if st.note else "") + ")")
+    if require_final and bad:
+        states = [(st.state, st.ansatz) for st in bad.values()]
+        unstable = [a for st, a in states if st == "unstable"]
+        if unstable:
+            reason = f"unstable:{unstable[0]}"
+        elif any(a == "rs" for _, a in states):
+            reason = "unknown-stability:rs"
+        else:
+            reason = f"not-final:{states[0][1]}"
+        raise Refusal(reason, "; ".join(f"{k}: {st.ansatz} {st.state}" + (f" ({st.note})"
+                                                                           if st.note else "")
+                                        for k, st in bad.items()))
     return res
 
 
@@ -182,13 +203,11 @@ class ComposedCalculation:
                 if not (isinstance(v, sp.Basic) and v.free_symbols)}, **params}
         state, trace = self.entry.execute(self.route, **p)
         values = state["values"]
-        detail = (f"replicon {values['replicon']}" if values.get("replicon") is not None
-                  else "")
         res = Result(dict(values), trace, errors=dict(state["errors"]),
                      notes=[self.entry.caveats[self.route], *state["notes"]], route=self.route,
                      statistical=tuple(state["statistical"]), report=self.report, params=p,
                      entry=self.entry)
-        return _finalise(res, require_final, detail)
+        return _finalise(res, self.entry.finality_of(values), require_final)
 
     def _run_composed(self, require_final, params):
         # self.steps were built for self.spec; a numeric beta is lifted to the symbol
@@ -206,7 +225,10 @@ class ComposedCalculation:
                                             "quad_error": sol.quad_error},
                      notes=[sol.caveat, *lift, sol.note], route="replica", report=self.report,
                      params={**point, **knobs})
-        return _finalise(res, require_final)
+        rep = "" if sol.replicon is None else f"derived replicon {sol.replicon}"
+        fin = {k: from_flag(sol.stable, "rs", LEVEL_A_CITE, rep or "replicon not derived")
+               for k in values if k not in ("branch", "ansatz", "stable")}
+        return _finalise(res, fin, require_final)
 
 
 def level_a_steps(spec, point=None, knobs=None):
@@ -222,7 +244,7 @@ def level_a_steps(spec, point=None, knobs=None):
     return [D.replicate(spec, n), D.average_disorder(), D.introduce_order_parameters(),
             D.rs_ansatz(), D.replica_limit(), D.rs_stationarity(),
             Step("solve-derived", lambda s: [] if "rs_equations" in s else ["rs_equations"],
-                 solve, None, lambda s: s["solution"].trace.entries[-1].summary)]
+                 solve, LEVEL_A_CITE, lambda s: s["solution"].trace.entries[-1].summary)]
 
 
 # ---- compose ------------------------------------------------------------------------
@@ -270,7 +292,8 @@ def compose(spec: ModelSpec, route: str = "replica") -> ComposedCalculation:
                               f"{', '.join(sorted(e.routes))}")
             steps = list(e.route_steps[route])
             return ComposedCalculation(spec, route, steps, CompositionReport(
-                [s.name for s in steps], [], [], e.name, "catalog"), e)
+                [s.name for s in steps], [], [], e.name, "catalog",
+                f"catalog entry {e.name!r} itself ({route} pipeline)"), e)
     near = nearest_entry(spec)
     _check_hooks(spec, near)
     if route != "replica":
@@ -279,19 +302,26 @@ def compose(spec: ModelSpec, route: str = "replica") -> ComposedCalculation:
                       "only; the cavity pipelines exist for catalog entries "
                       "(cavity/dense.py, cavity/sparse.py), no generic cavity composer")
     adapted, reused = [], []
-    for step in LEVEL_A_STEPS:
-        diffs = [f for f in STEP_INPUTS[step]
-                 if near is not None and getattr(near.spec, f) != getattr(spec, f)]
-        for f in diffs:
-            adapted.append(Adaptation(step, f, getattr(near.spec, f), getattr(spec, f),
-                                      f"{_HOOK[f]}:{getattr(spec, f)}"))
-        if not diffs:
-            reused.append(step)
-    if near is None:            # a level-(a) family with no catalog entry: nothing reused
-        reused = []
-    report = CompositionReport(reused, adapted, [], near.name if near else None, "composed")
-    return ComposedCalculation(spec, route, level_a_steps(spec), report)
+    steps = level_a_steps(spec)
+    if near is None:            # a level-(a) family with no catalog entry: nothing to compare
+        relative = f"nothing (no catalog entry of family {spec.family!r})"
+    else:
+        relative = (f"level-(a) derivation of catalog entry {near.name!r} (spec "
+                    f"{dict(zip(FIELDS, _key(near.spec)))})")
+        theirs = level_a_steps(near.spec)
+        assert [s.name for s in theirs] == [s.name for s in steps] == list(LEVEL_A_STEPS)
+        for st in steps:
+            mine, other = hooks_used(st.name, spec), hooks_used(st.name, near.spec)
+            diffs = [f for f in mine if mine[f] != other[f]]
+            for f in diffs:
+                adapted.append(Adaptation(st.name, f, getattr(near.spec, f), getattr(spec, f),
+                                          f"{_HOOK[f]}:{getattr(spec, f)}"))
+            if not diffs:
+                reused.append(st.name)
+    report = CompositionReport(reused, adapted, [], near.name if near else None, "composed",
+                               relative)
+    return ComposedCalculation(spec, route, steps, report)
 
 
 __all__ = ["Adaptation", "CompositionReport", "ComposedCalculation", "LEVEL_A_STEPS",
-           "Result", "STEP_INPUTS", "compose", "level_a_steps", "nearest_entry"]
+           "Result", "compose", "hooks_used", "level_a_steps", "nearest_entry"]
