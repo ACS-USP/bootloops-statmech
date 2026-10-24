@@ -169,6 +169,11 @@ def _sum_u(rng, h, degs, jl, b, T, field):
 
 
 def _measure(rng, h, law, jl, b, T, field, cbar):
+    """(q, e, f) of an RS cavity-field population.  WARNING: f uses the simplified form
+    (cbar/2) ln Z_link - (d - 1) ln 2cosh(beta H_d), which equals the Bethe free energy
+    only when h is a BP (RS) fixed-point population; on any other population (e.g. noisy
+    1RSB barycentres) it is biased -- use the variational site/link form there
+    (cavity/rsb_sparse._bary_functional)."""
     m = len(h)
     H = _sum_u(rng, h, G.sample_degrees(law, m, rng), jl, b, T, field)
     d = G.sample_degrees(law, m, rng)                      # an independent site for f

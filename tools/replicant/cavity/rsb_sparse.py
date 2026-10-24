@@ -40,7 +40,7 @@ from . import graphs as G
 from ._rsb_common import (FACTORIZED_CAVEAT, MP01, MP03, RSB_CAVEAT,  # noqa: F401
                           STEP_NAMES, RSBResult,
                           check_sizes, pipeline, summarize)
-from .sparse import _beta, _ln2cosh, _measure, transfer
+from .sparse import _beta, _ln2cosh, transfer
 
 # ---- finite temperature ----------------------------------------------------------------
 LINK_PAIRS = 8   # link observables average over 8 * inner random state pairs (variance)
@@ -93,6 +93,27 @@ def _inputs(rng, h, d, jl, inner):
     return J, np.where(J != 0, fields, 0.0)
 
 
+def _bary_functional(rng, mb, law, jl, b, cbar, n):
+    """VARIATIONAL Bethe (f, e) of a population of cavity magnetisations mb (n samples):
+    -beta f = E ln Z_site(d) - (cbar/2) E ln Z_link, d ~ degree law,
+      Z_site = prod_i cosh(beta J_i) [prod_i (1 + t_i m_i) + prod_i (1 - t_i m_i)],
+      Z_link = cosh(beta J) (1 + t m1 m2),  t = tanh(beta J);
+    e = (cbar/2) E[-J (t + m1 m2) / (1 + t m1 m2)].  Unlike sparse._measure's simplified f,
+    this needs no BP fixed point (on one it is the RS Bethe f: same z's as _site/_link)."""
+    d = G.sample_degrees(law, n, rng)
+    dmax = max(int(d.max(initial=0)), 1)
+    J = np.where(np.arange(dmax) < d[:, None], G.sample_couplings(jl, (n, dmax), rng), 0.0)
+    tm = np.tanh(b * J) * mb[rng.integers(len(mb), size=(n, dmax))]
+    lzs = ((_ln2cosh(b * J) - math.log(2)).sum(1)
+           + np.log(np.prod(1 + tm, 1) + np.prod(1 - tm, 1)))
+    Jl = G.sample_couplings(jl, n, rng)
+    m1, m2 = mb[rng.integers(len(mb), size=(2, n))]
+    t = np.tanh(b * Jl)
+    lzl = _ln2cosh(b * Jl) - math.log(2) + np.log1p(t * m1 * m2)
+    f = -(np.mean(lzs) - cbar / 2 * np.mean(lzl)) / b
+    return float(f), float(cbar / 2 * np.mean(-Jl * (t + m1 * m2) / (1 + t * m1 * m2)))
+
+
 def _spread(x):
     """q1 - q0, with rounding noise of delta inner populations (|x| < 1e-12) set to 0."""
     return 0.0 if abs(x) < 1e-12 else float(x)
@@ -131,8 +152,7 @@ def _ft_run(p, rng):
         row = (f, e, float(np.mean(q0)), float(np.mean((ws * mag**2).sum(1))))
         if m == 1:                                 # exact m = 1 functional of barycentres
             mb = np.clip(np.tanh(b * h).mean(1), -1 + 1e-15, 1 - 1e-15)
-            _, e_b, f_b = _measure(rng, np.arctanh(mb) / b, law, jl, b, transfer, 0.0, cbar)
-            row += (f_b, e_b)
+            row += _bary_functional(rng, mb, law, jl, b, cbar, p["bary_samples"] * P)
         acc.append(row)
     collapsed = bool(np.max(np.abs(h)) < 1e-12)
     delta = bool(np.max(np.ptp(h, axis=1)) < 1e-12)
@@ -158,20 +178,26 @@ def _ft_solve(p):
 
 def pop_of_pops_1rsb(degree_law, J_law, beta, m, *, pop: int, inner: int, sweeps: int,
                      seed: int, burn_in=None, runs=4, init_field=0.0, init_spread=1.0,
-                     require_equilibrated=False, _reweight_sign=1) -> RSBResult:
+                     require_equilibrated=False, bary_samples=64,
+                     _reweight_sign=1) -> RSBResult:
     """Finite-T 1RSB population of populations (see module docstring).  Initial state:
     outer centres init_field + N(0, 1), inner members centre + init_spread N(0, 1)
     (init_spread = 0: delta inner populations, the RS solution).  burn_in defaults to
     max(2 sweeps, 20).  Drift diagnostic as Task 12 (cavity/_stats.drift) on q1 and on
     the inner spread q1 - q0 (a growing or collapsing spread is drift): a drifting run is
     "undetermined" or refused (require_equilibrated).
-    At m = 1 the result also carries f_bary, e_bary: the Bethe (RS) f and e of the
-    reweighted barycentres tanh(beta hbar) = E_states tanh(beta h) of each inner population
-    (Task 12's _measure on the barycentre population): the exact infinite-inner m = 1
-    functional, which isolates the identity f(m=1) = f_RS from finite-inner estimator bias.
+    At m = 1 the result also carries f_bary, e_bary: the variational Bethe f and e of the
+    reweighted barycentres m = E_states tanh(beta h) of each inner population
+    (_bary_functional, bary_samples * pop site and link samples per measured sweep;
+    sampling stderr ~2e-4 at the default 64, pop 1000): the m = 1 functional evaluated without finite-PAIR (ratio)
+    estimator bias.  It does NOT remove the dynamical bias of finite inner populations:
+    the stationary barycentre population is a fixed point of a NOISY BP (barycentre
+    sampling noise ~ (q1 - q0) / inner), which shifts e by ~+0.002-0.003 (k = 2, beta 1.5;
+    reproduced by injecting the same noise into RS PD, see tests).
     Reliable window: NOT mapped in (m, T) (cost).  Measured: a biased start at 0.95 beta_c
-    (k = 2) is flagged; m = 1 agrees with RS (pop 40000 reference) within the combined
-    99% Student-t band for f, e, q0, f_bary, e_bary (slow test); small inner populations (<~ 20)
+    (k = 2) is flagged; at m = 1 f, f_bary and q0 agree with RS (pop 40000 reference)
+    within the combined 99% Student-t band, e and e_bary carry the +0.002-0.003
+    noisy-BP offset (within the test's ~5-7e-3 e band); small inner populations (<~ 20)
     collapse towards q1 = q0 within ~60 sweeps at k = 2, beta = 1.5.
     _reweight_sign: test hook for planted errors (0 drops z^m, -1 uses z^-m)."""
     G.degree_law(degree_law)
@@ -190,7 +216,8 @@ def pop_of_pops_1rsb(degree_law, J_law, beta, m, *, pop: int, inner: int, sweeps
                   sweeps=sweeps, seed=seed, burn_in=burn_in, runs=runs,
                   init_field=float(init_field), init_spread=float(init_spread),
                   require_equilibrated=bool(require_equilibrated),
-                  reweight_sign=_reweight_sign, link_pairs=LINK_PAIRS)
+                  reweight_sign=_reweight_sign, link_pairs=LINK_PAIRS,
+                  bary_samples=int(bary_samples))
     planted = " [NON-DEFAULT REWEIGHTING]" if _reweight_sign != 1 else ""
     descs = (f"remove one link: cavity spin keeps excess degree law {degree_law}",
              f"population of {pop} inner populations of {inner} states each (cavity fields "

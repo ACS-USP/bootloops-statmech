@@ -84,7 +84,7 @@ def test_m_equal_one_reduces_to_rs():
     (spread 1.0), so this is not the trivial delta-inner solution."""
     beta = 1.5
     one = pop_of_pops_1rsb(K2, PM, beta, 1.0, pop=150, inner=16, sweeps=8, burn_in=16,
-                           runs=4, seed=21, init_spread=1.0)
+                           runs=4, seed=21, init_spread=1.0, bary_samples=2)
     rs = population_dynamics(K2, PM, beta, pop=1000, sweeps=10, burn_in=30, runs=4, seed=22)
     assert one.value["q1"] > one.value["q0"] + 0.02, one.value     # inner spread survives
     for obs in ("e", "f"):
@@ -93,13 +93,9 @@ def test_m_equal_one_reduces_to_rs():
     # and q0 (overlap of barycentres) equals the RS q = E tanh^2(beta H)
     ok, info = _band(one.value["q0"], one.stderr["q0"], rs.value["q"], rs.stderr["q"], 4)
     assert ok, ("q0", info)
-    # PLANTED ERROR at T > 0: wrong sign z^-m in the inner resampling; the barycentres no
-    # longer follow BP and q0 misses RS q by ~0.06, failing the same band (default tier;
-    # the dropped-reweighting control, a smaller effect, is the slow m = 1 test)
-    bad = pop_of_pops_1rsb(K2, PM, beta, 1.0, pop=100, inner=12, sweeps=6, burn_in=16,
-                           runs=4, seed=21, init_spread=1.0, _reweight_sign=-1)
-    ok, info = _band(bad.value["q0"], bad.stderr["q0"], rs.value["q"], rs.stderr["q"], 4)
-    assert not ok, ("planted q0", info)
+    # (a finite-T planted-reweighting control is NOT in the default tier: at this size the
+    # wrong-sign / dropped-reweighting shifts of q0, e, f_bary are 0.1-1.8 of the 99% band
+    # over seeds 21-25 -- not reliable; the control is the slow m = 1 test)
 
 
 def test_m_equal_one_poisson_gaussian_runs_and_matches_rs():
@@ -107,7 +103,7 @@ def test_m_equal_one_poisson_gaussian_runs_and_matches_rs():
     m = 1 vs Task 12 RS PD (seeds 23 / 24), 99% Student-t band on e and q0."""
     law, jl, beta = ("poisson", 3), ("gauss", 1.0), 1.2
     one = pop_of_pops_1rsb(law, jl, beta, 1.0, pop=60, inner=8, sweeps=4, burn_in=16,
-                           runs=3, seed=23, init_spread=1.0)
+                           runs=3, seed=23, init_spread=1.0, bary_samples=2)
     rs = population_dynamics(law, jl, beta, pop=500, sweeps=6, burn_in=20, runs=4, seed=24)
     for obs, ro in (("e", "e"), ("q0", "q")):
         ok, info = _band(one.value[obs], one.stderr[obs], rs.value[ro], rs.stderr[ro], 3)
@@ -306,19 +302,23 @@ def test_full_1rsb_lies_above_factorized_at_fixed_y():
 @slow
 def test_finite_t_m_one_reduces_to_rs_larger_population():
     """k = 2, beta = 1.5, m = 1, pop 1000, inner 160, 8 runs, vs Task 12 RS PD at pop 40000
-    (8 runs; its stderr is ~2e-4, so the reference is not the noise floor).  Every
-    comparison is a 99% Student-t band on the COMBINED stderr (1RSB runs and RS runs).
-    Checked: the estimators f, e, q0 and the exact m = 1 barycentre functional f_bary,
-    e_bary (Bethe f, e of the reweighted barycentres; isolates the identity from
-    finite-inner estimator bias).  Measured at this build (offsets from RS):
-    inner 160: e +0.0013(21), e_bary +0.0023(15), f -0.0013(22), q0 -0.0003(10).
-    OPEN ITEM (not hidden): e_bary sits above RS by about +0.003 in every configuration
-    measured -- inner 20: +0.0024(13); inner 40: +0.0029(20) (seed 31), +0.0071(8)
-    (seed 13); inner 80: +0.0030(20); inner 160: +0.0023(15) -- each 1.4-1.8 sigma except
-    seed 13 / inner 40 (9 sigma); RS PD at pop 1000 shows no such shift.  A candidate
-    cause is barycentre sampling noise (q1 - q0) / inner, which stays ~1e-3 over this range
-    because the inner spread grows with inner; not established.  The planted control
-    (reweighting dropped) is off by ~0.075 and must fail the same band."""
+    (8 runs; stderr ~2e-4).  Every comparison is a 99% Student-t band on the COMBINED
+    stderr (1RSB runs and RS runs).  Checked: the estimators f, e, q0 and the m = 1
+    barycentre functional f_bary, e_bary (variational Bethe f, e of the reweighted
+    barycentres; removes the finite-PAIR estimator bias, not the dynamical one below).
+    The free-energy identity is established tightly by f_bary: band ~1.0e-3, measured
+    offsets -0.0004(3) (inner 160) and -0.0005(3) (inner 40) -- a residual of ~1.3-1.5
+    sigma, plausibly finite population on either side.  Measured at this build (offsets
+    from RS, inner 160): f -0.0000(30), e +0.0025(26), q0 +0.0000(24), e_bary +0.0025(22).
+    e resolution of this test: the 99% e / e_bary bands are ~8-9e-3 (population-dominated
+    stderr ~2e-3), so it cannot see an e error below that.
+    OPEN ITEM, cause established by the reviewer: e_bary sits +0.002-0.003 above RS at
+    every inner (20: +0.0018(16), 40: +0.0041(11) / +0.0060(14), 160: +0.0023(13)) because
+    the stationary barycentre population is a fixed point of a NOISY BP (barycentre
+    sampling noise ~ (q1 - q0) / inner, ~1e-3 over this range as the spread grows with
+    inner); injecting that noise variance into RS PD reproduces the shift (inner 20:
+    +0.0024(3), 40: +0.0032(3), 160: +0.0027(2)).  The planted control (reweighting
+    dropped) is off by ~0.075 and must fail the e band."""
     rs = population_dynamics(K2, PM, 1.5, pop=40000, sweeps=20, burn_in=50, runs=8, seed=17)
     kw = dict(pop=1000, inner=160, sweeps=20, burn_in=40, runs=8, seed=13, init_spread=1.0)
     one = pop_of_pops_1rsb(K2, PM, 1.5, 1.0, **kw)
