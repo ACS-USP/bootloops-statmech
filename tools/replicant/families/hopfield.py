@@ -82,8 +82,10 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 import mpmath as mp
+import sympy as sp
 
 from ..core import Refusal
+from ..gauss import GaussE
 from .common import CAVEAT
 
 _DPS = 20
@@ -299,6 +301,18 @@ def hopfield_gradient(m, q, r, alpha, beta):
         t1, t2 = _moments(b, m, mp.sqrt(a * r))[:2]
         D = 1 - b * (1 - q)
         return (m - t1, a * b / 2 * (q / D**2 - r), a * b / 2 * (t2 - q))
+
+
+def rs_equations_symbolic():
+    """The stationarity equations of hopfield_free_energy that the solver and
+    _audit impose (hopfield_gradient = 0), in sympy form with the GaussE
+    placeholder: m = E tanh Xi, q = E tanh^2 Xi, r = q/(1 - beta(1 - q))^2."""
+    m, q, r = sp.Symbol("m", real=True), sp.Symbol("q", positive=True), sp.Symbol("r", positive=True)
+    alpha, beta = sp.Symbol("alpha", positive=True), sp.Symbol("beta", positive=True)
+    z = sp.Symbol("z", real=True)
+    xi = beta * (m + sp.sqrt(alpha * r) * z)
+    return [sp.Eq(m, GaussE(sp.tanh(xi), z)), sp.Eq(q, GaussE(sp.tanh(xi)**2, z)),
+            sp.Eq(r, q / (1 - beta * (1 - q))**2)]
 
 
 # ---- T = 0 reduction (AGS Eqs. (9)-(11)) ----------------------------------------

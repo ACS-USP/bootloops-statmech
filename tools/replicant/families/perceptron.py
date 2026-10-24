@@ -64,8 +64,10 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 
 import mpmath as mp
+import sympy as sp
 
 from ..core import Refusal
+from ..gauss import GaussE
 from . import _perceptron_float as F
 from .common import CAVEAT
 
@@ -187,6 +189,20 @@ def _ising_S(qhat, k):
     T = _T(q, omq, k)
     a = qhat * omq / T.eh2()
     return -qhat * omq / 2 + _gauss(lambda z: mp.log(2 * mp.cosh(g * z)), _zpts(g)) + a * T.elnh()
+
+
+def rs_equations_symbolic(variables="spherical"):
+    """The spherical saddle equation the solver uses, q/(1-q) = alpha E_t E(x)^2
+    (alpha(q) = q / ((1-q) _T.eh2()) in _alpha_of / gardner_rs_point), in sympy
+    form with the GaussE placeholder; E(x) = phi(x)/H(x) as in _E."""
+    if variables != "spherical":
+        raise Refusal("not-implemented:symbolic-equations",
+                      f"{variables!r}: only the spherical equation is written symbolically")
+    q, alpha = sp.Symbol("q", positive=True), sp.Symbol("alpha", positive=True)
+    kappa, t = sp.Symbol("kappa", real=True), sp.Symbol("t", real=True)
+    x = (kappa - sp.sqrt(q) * t) / sp.sqrt(1 - q)
+    E = (sp.exp(-x**2 / 2) / sp.sqrt(2 * sp.pi)) / (sp.erfc(x / sp.sqrt(2)) / 2)
+    return [sp.Eq(q / (1 - q), alpha * GaussE(E**2, t))]
 
 
 # ---- RS saddle, parametrised by the order parameter --------------------------

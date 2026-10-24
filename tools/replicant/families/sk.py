@@ -47,6 +47,7 @@ import sympy as sp
 
 from ..ansatz import n_to_zero, sum_offdiag_power
 from ..core import Refusal
+from ..gauss import GaussE
 from ..solve import fixed_point, gauss_expect
 from .common import CAVEAT, RSBSolution, RSSolution  # noqa: F401 (re-exported)
 
@@ -74,12 +75,25 @@ def _ge(g):
     return gauss_expect(g, dps=_DPS)
 
 
+def _rs_map(b, hh, q):
+    """The RS map the solver iterates: q -> E tanh^2(beta(h + sqrt(q) z))."""
+    return _ge(lambda z: mp.tanh(b * (hh + mp.sqrt(q) * z))**2)
+
+
+def rs_equations_symbolic():
+    """The equation _rs_q solves, q = _rs_map(beta, h, q), in sympy form
+    (GaussE placeholder); level (a) is compared with it in agree.py."""
+    beta, h = sp.Symbol("beta", positive=True), sp.Symbol("h", real=True)
+    q, z = sp.Symbol("q", positive=True), sp.Symbol("z", real=True)
+    return [sp.Eq(q, GaussE(sp.tanh(beta * (h + sp.sqrt(q) * z))**2, z))]
+
+
 @lru_cache(maxsize=256)
 def _rs_q(beta: str, h: str):
     """RS overlap: the q > 0 branch when it exists (always at h != 0), else 0."""
     with mp.workdps(_DPS):
         b, hh = mp.mpf(beta), mp.mpf(h)
-        F = lambda q: _ge(lambda z: mp.tanh(b * (hh + mp.sqrt(q) * z))**2)
+        F = lambda q: _rs_map(b, hh, q)
         try:
             return fixed_point(F, mp.mpf("0.5"), dps=_DPS, tol="1e-12",
                                branch="nontrivial").value
