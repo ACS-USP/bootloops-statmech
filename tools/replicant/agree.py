@@ -32,7 +32,8 @@ Canonical form.  Each side is a list of sympy.Eq.
     z-dependent factors of g (a Stein boundary term, E[z h - h'] = 0 when h phi
     -> 0 at +-infinity, checked at |z| = 12 at a random point).
     Route "numeric" (backup, or forced): |F_a - F_b| <= tol max(1, |F_b|) at
-    `npoints` (>= 3) random points, each parameter uniform in (0.2, 0.8),
+    `npoints` (>= 3) random points, each parameter uniform in (0.2, 0.8) (so
+    this route never samples kappa < 0, h < 0 or any value outside that box),
     expectations by solve.gauss_expect at 16 digits.  With route="auto" every
     pair first gets a one-point numeric screen: a pair that differs there is
     rejected without the (slower) symbolic attempt.
@@ -313,7 +314,8 @@ def _numeric_pair(fa, fb, syms, rng, npoints, tol):
             return False, "evaluation failed"
         if isinstance(va, mp.mpc) or isinstance(vb, mp.mpc):
             return False, "complex value"
-        d = abs(va - vb) / max(1, abs(vb))
+        with mp.workdps(_DPS):
+            d = abs(va - vb) / max(1, abs(vb))
         worst = max(worst, d)
         if not d <= tol:
             return False, f"relative residual {mp.nstr(d, 3)} at {pt}"

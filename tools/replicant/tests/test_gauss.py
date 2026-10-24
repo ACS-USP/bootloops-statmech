@@ -94,6 +94,31 @@ def test_exp_quadratic_rule():
         assert abs(mp.mpf(sp.N(r.subs(pt), 40)) - want) < mp.mpf("1e-20")
 
 
+def test_exp_quadratic_rule_refuses_non_integrable_and_notes_assumptions():
+    # A = 1 >= 1/2: E exp(z^2) diverges -- refuse, never return -I
+    assert _refusal(lambda: G.expect_closed(sp.exp(z**2), z)) == \
+        "precondition:gaussian-integrable"
+    notes = []
+    assert sp.simplify(G.expect_closed(sp.exp(z**2 / 4), z, notes) - sp.sqrt(2)) == 0
+    assert notes == []                       # 1 - 2A = 1/2 > 0 is decided, no assumption
+    q = sp.Symbol("q", positive=True)
+    G.expect_closed(sp.exp(a * (1 - q) * z**2 / 2), z, notes)
+    assert len(notes) == 1 and "assumed" in notes[0] and "> 0" in notes[0], notes
+    notes = []
+    G.expect_closed(sp.Heaviside(sp.sqrt(1 - q) * z + b), z, notes)
+    assert len(notes) == 1 and "assumed" in notes[0], notes
+
+
+def test_substitution_does_not_capture_the_bound_variable():
+    e = GaussE(sp.cos(a * z), z)
+    zz = sp.Symbol("z", real=True)            # an outside symbol, same name and object
+    s = e.subs(a, zz)
+    assert s.free_symbols == {zz}             # the outer z stays free, not integrated
+    with mp.workdps(20):
+        v = G.numeric(s, {zz: sp.Rational(7, 10)}, dps=16)
+        assert abs(v - mp.exp(-mp.mpf("0.49") / 2)) < 1e-13
+
+
 def test_hubbard_stratonovich_rule():
     S = sp.Symbol("S", real=True)
     hs = G.hubbard_stratonovich(a, S, z)          # exp(a S^2 / 2) = E_z exp(sqrt(a) z S)

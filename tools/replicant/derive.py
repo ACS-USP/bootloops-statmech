@@ -517,9 +517,11 @@ def _rs_reduce(F):
         g, c, nn = e.args
         q = free_of_indices(rs(c), "covariance")
         lam = gauss.rs_split(q, _T, _Z)
-        inner = gauss.expect_closed(g(lam), _Z)
+        assumed = []
+        inner = gauss.expect_closed(g(lam), _Z, assumed)
         rules.append(f"LnGaussProd: RS split lambda_a = {lam} (t, z_a iid N(0,1)), "
-                     f"product over replicas -> [E_z g]^n, E_z g = {inner}")
+                     f"product over replicas -> [E_z g]^n, E_z g = {inner}"
+                     + "".join(f" ({x})" for x in assumed))
         return sp.log(gauss.GaussE(inner**nn, _T))
 
     def rsum(S):

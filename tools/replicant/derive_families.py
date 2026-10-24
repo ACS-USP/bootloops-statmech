@@ -2,14 +2,18 @@
 
 Registered into derive.FAMILIES on import (derive.py imports this module last).
 Each hook is split into what is HAND-SUPPLIED (the model: its constraint or
-energy per pattern, the condensed-pattern term) and what it computes by a rule
-(the pattern average); the RS ansatz, n -> 0 and stationarity are then the
-generic steps of derive.py.  Only symbolic n is supported.
+energy per pattern, the condensed-pattern term) and the pattern average, which
+the hook ASSERTS and writes down as a formal LnGaussProd term (the Gaussian-law
+statement is not mechanised: no step proves it, the hook builds the term); the
+RS ansatz, n -> 0 and stationarity are then the generic steps of derive.py.
+`_perceptron_formal` / `_hopfield_formal` only build the displayed formal Z^n
+(the trace's `Zn`); nothing downstream reads them.  Only symbolic n.
 
 Perceptron (Gardner 1988), spec.params alpha, kappa; Gaussian patterns, J.J = N:
   hand-supplied: the storage constraint g(lambda) = Theta(lambda - kappa), and the
     spherical volume (derive._spherical_site: (1/2) ln det Q).
-  rule: lambda_a = J^a.xi/sqrt(N) is Gaussian with covariance Q_ab = J^a.J^b/N,
+  hook asserts (rule not mechanised): lambda_a = J^a.xi/sqrt(N) is Gaussian with
+    covariance Q_ab = J^a.J^b/N,
     exactly, for Gaussian xi at fixed J; P = alpha N independent patterns give
     (1/N) ln E V^n = (1/2) ln det Q + alpha ln E_lambda prod_a g(lambda_a)
     (the formal LnGaussProd(g, q_ab, n)).
@@ -19,10 +23,11 @@ Hopfield (Amit-Gutfreund-Sompolinsky 1987), spec.params alpha, beta; +-1 pattern
     decoupled by exp(N beta m^2/2) = int dm exp(N(-beta m^2/2 + beta m m_true)) at
     the saddle: -(beta/2) sum_a m_a^2 and the site field beta m_a; and the energy of
     one uncondensed pattern, g(y) = exp(beta y^2 / 2) per replica.
-  rule: y_a = sum_i xi_i s_i^a / sqrt(N) with the pattern law's cumulant series
-    (derive.LAWS["pm_one"]) kept to second order is Gaussian with covariance Q_ab;
-    the fourth cumulant is dropped and its order stated; p - 1 ~ alpha N patterns
-    give alpha LnGaussProd(g, q_ab, n).
+  computed: the pattern law's cumulant series (derive.LAWS["pm_one"]) is checked
+    to have mean 0 and variance 1/N per entry, and its dropped fourth cumulant and
+    order are stated.  hook asserts (rule not mechanised): with the series kept to
+    second order, y_a = sum_i xi_i s_i^a / sqrt(N) is Gaussian with covariance
+    Q_ab, and p - 1 ~ alpha N patterns give alpha LnGaussProd(g, q_ab, n).
 """
 from dataclasses import dataclass
 
@@ -64,6 +69,7 @@ def _no_annealed(spec, N):
 # ---- perceptron ---------------------------------------------------------------------
 
 def _perceptron_formal(n, beta, spec=None):
+    """Display only: the formal V^n stored as the trace's Zn."""
     kappa = spec.params.get("kappa", KAPPA) if spec else KAPPA
     J, xi = sp.IndexedBase("J"), sp.IndexedBase("xi")
     field = sp.Sum(J[_i, D._a] * xi[_mu, _i], (_i, 1, D.N_SYM)) / sp.sqrt(D.N_SYM)
@@ -76,8 +82,9 @@ def _perceptron_average(zn) -> PatternAverage:
     p = zn.spec.params
     kappa, alpha = p.get("kappa", KAPPA), p.get("alpha", ALPHA)
     g = sp.Lambda(_LAM, sp.Heaviside(_LAM - kappa))       # hand-supplied constraint
-    note = ("Gaussian patterns: lambda_a = J^a.xi/sqrt(N) jointly Gaussian, covariance "
-            "Q_ab = J^a.J^b/N (exact at fixed J); P = alpha N iid patterns -> "
+    note = ("Gaussian patterns (hook asserts, not mechanised): lambda_a = J^a.xi/sqrt(N) "
+            "jointly Gaussian, covariance Q_ab = J^a.J^b/N (exact at fixed J); "
+            "P = alpha N iid patterns -> "
             f"alpha ln E_lambda prod_a g(lambda_a), g = {g.expr} (hand-supplied)")
     return PatternAverage(zn.spec, zn.n, alpha, g, note)
 
@@ -95,6 +102,7 @@ def _perceptron_order_parameters(avg, n, sum_pairs):
 # ---- Hopfield -----------------------------------------------------------------------
 
 def _hopfield_formal(n, beta, spec=None):
+    """Display only: the formal Z^n stored as the trace's Zn."""
     s, xi = sp.IndexedBase("s"), sp.IndexedBase("xi")
     y = sp.Sum(xi[_mu, _i] * s[_i, D._a], (_i, 1, D.N_SYM))
     return D.Tr(sp.exp(beta / (2 * D.N_SYM)
@@ -115,7 +123,8 @@ def _hopfield_average(zn) -> PatternAverage:
     note = ("condensed pattern gauged to +1 and decoupled by m_a (hand-supplied); "
             "uncondensed: y_a = sum_i xi_i s_i^a/sqrt(N), pattern cumulant kept to "
             f"t^2/(2N), dropped {dropped} per site and pattern -> O(1/N) per spin; "
-            f"y ~ N(0, Q), alpha N patterns -> alpha ln E_y prod_a g(y_a), g = {g.expr}")
+            "then (hook asserts, not mechanised) y ~ N(0, Q), alpha N patterns -> "
+            f"alpha ln E_y prod_a g(y_a), g = {g.expr}")
     return PatternAverage(zn.spec, zn.n, alpha, g, note, dropped)
 
 

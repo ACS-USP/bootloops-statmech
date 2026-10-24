@@ -102,11 +102,11 @@ def test_agreement_detects_a_planted_sign_error():
     eq = b[0]
     tiny = [sp.Eq(eq.lhs, eq.rhs * (1 + sp.Rational(1, 10**6)))]
     assert not compare_equations(a, tiny, route="numeric").agree
-    assert compare_equations(a, b, route="numeric").agree
+    # (that the same forced route accepts the true system: slow tier, below)
 
 
 @slow
-def test_agreement_detects_planted_errors_in_hopfield_and_perceptron():
+def test_sk_symmetric_flip_is_not_an_error_and_symbolic_route_certifies_no_plant():
     a = derived_rs_equations(default_spec("sk"))
     b = pipeline_rs_equations("sk")
     # sign flip of the field: h -> -h is NOT an error (tanh^2 is even, z -> -z),
@@ -115,6 +115,13 @@ def test_agreement_detects_planted_errors_in_hopfield_and_perceptron():
     # a forced symbolic route never certifies a planted system
     tiny = [sp.Eq(b[0].lhs, b[0].rhs * (1 + sp.Rational(1, 10**6)))]
     assert not compare_equations(a, tiny, route="symbolic").agree
+    # the forced numeric route accepts the true system (the default-tier plant
+    # test shows it rejects the 1e-6 plant)
+    assert compare_equations(a, b, route="numeric").agree
+
+
+@slow
+def test_agreement_detects_planted_errors_in_hopfield_and_perceptron():
     a = derived_rs_equations(default_spec("hopfield"))
     b = pipeline_rs_equations("hopfield")
     beta = _sym(b, "beta")
@@ -132,6 +139,30 @@ def test_agreement_detects_planted_errors_in_hopfield_and_perceptron():
     G = next(iter(b[0].rhs.atoms(GaussE)))
     inside = [sp.Eq(b[0].lhs, alpha * GaussE(2 * G.f, G.z))]
     assert not compare_equations(a, inside, route="symbolic").agree
+
+
+def test_planted_error_in_a_level_a_hook_is_caught():
+    # A wrong MODEL piece on the derivation side (SK pair energy doubled in the
+    # family hook) must make level (a) disagree with level (b).
+    from dataclasses import replace
+    from replicant import derive as D
+    good = D.FAMILIES["sk"]
+
+    def doubled(avg, n, sum_pairs):
+        r = good.order_parameters(avg, n, sum_pairs)
+        return D.Reduction(2 * r.energy, r.correction, r.missing, r.field, r.extra)
+    D.FAMILIES["sk"] = replace(good, order_parameters=doubled)
+    try:
+        a = derived_rs_equations(default_spec("sk"))
+    finally:
+        D.FAMILIES["sk"] = good
+    assert compare_equations(a, pipeline_rs_equations("sk")).agree is False
+
+
+def test_hopfield_trace_states_the_gaussian_integrability_assumption():
+    _, _, trace = derive_rs(default_spec("hopfield"))
+    text = trace.render()
+    assert "assumed 1 - 2A = beta*q - beta + 1 > 0" in text, text
 
 
 # ---- the canonicalisation itself -------------------------------------------------
@@ -230,6 +261,7 @@ def test_sk_pipeline_equation_is_the_solved_map():
         assert abs(res) < 1e-11
 
 
+@slow
 def test_perceptron_pipeline_equation_is_the_solved_map():
     from replicant.families import perceptron as P
     (eq,) = pipeline_rs_equations("perceptron")
