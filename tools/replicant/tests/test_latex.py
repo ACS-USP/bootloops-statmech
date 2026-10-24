@@ -627,3 +627,19 @@ def test_cli_unwritable_out_is_an_error_not_a_traceback():
     out, err = io.StringIO(), io.StringIO()
     code = main(["run", "rem", "--out", "/nonexistent-dir/r.json"], stdout=out, stderr=err)
     assert code == 1 and "ERROR: --out: FileNotFoundError" in err.getvalue()
+
+
+def test_replicon_derivation_in_gauss_entry_documents():
+    # E1: the documents of the perceptron and Hopfield entries (and SK) show the level-(a)
+    # replicon, rendered from the sympy objects derive_replicon holds; the Gaussian-energy
+    # entries show the covariance-derivative pieces
+    for name in ("perceptron", "hopfield", "sk"):
+        subs = dict(_subsections(_doc(name, "replica")))
+        body = subs.get("Replicon of the RS saddle (level (a))")
+        assert body is not None and _has_math(body), (name, list(subs)[:12])
+        assert r"\lambda_{R}" in body and r"\chi_{R}" in body, name
+        if name != "sk":
+            assert "Price covariance derivative" in body and r"G_{0}" in body, name
+    blocks = document_blocks(_result("hopfield", "replica"))
+    rep = [b for b in blocks if b.title.startswith("Energy replicon eigenvalue with")]
+    assert rep and rep[0].expr is not None and not invented(rep[0])

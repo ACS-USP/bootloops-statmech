@@ -12,6 +12,12 @@
                    ValueError, a non-finite integrand at nodes of total weight
                    < 1e-25 (float underflow such as 0/0 far in the tail) counts as
                    0 there, elsewhere it raises ValueError
+    .fine(vals, method)  composite rule on 0.5-wide panels over [-14, 14] (plus the
+                   tails) at dps + 6, method "tanh-sinh" or "gauss-legendre": for
+                   integrands with features narrower than the fixed splits resolve
+  checked(num, vals, tol) -> (value, disagreement, rules): .mp if it agrees with .audit to tol,
+                   else .fine by both methods, which must agree to tol, else Refusal
+                   no-convergence:quadrature (a value is never returned unchecked)
   safe(expr)       erfc kept as written (Erfc): sympy rewrites erfc(-x) as
                    2 - erfc(x) (e.g. once kappa = 0 is substituted), which loses
                    every digit where erfc(x) -> 0 and divides by 0 in phi/H.
@@ -32,6 +38,7 @@ from .gauss import GaussE, _merge_linear
 from .solve import gauss_expect
 
 AUDIT_SPLIT = (-mp.inf, -7, -2, 2, 7, mp.inf)
+FINE_SPLIT = (-mp.inf,) + tuple(mp.mpf(k) / 2 for k in range(-28, 29)) + (mp.inf,)
 _TAIL_W = 1e-25     # float path: non-finite nodes allowed only where the weight sums below
 
 
@@ -91,6 +98,13 @@ class Num:
                          method="gauss-legendre") for f in self.inner]
             return self._clean(self.outer(*g, *vals))
 
+    def fine(self, vals, method="tanh-sinh"):
+        with mp.workdps(self.dps + 6):
+            c = 1 / mp.sqrt(2 * mp.pi)
+            g = [mp.quad(lambda z, f=f: f(z, *vals) * c * mp.exp(-z * z / 2), FINE_SPLIT,
+                         method=method) for f in self.inner]
+            return self._clean(self.outer(*g, *vals))
+
     def fast(self, vals):
         if self._fast is None:
             x, w = _gh(self.gh)
@@ -117,3 +131,18 @@ class Num:
         if isinstance(v, complex) or not math.isfinite(v):
             raise ValueError(f"non-finite or complex value {v}")
         return v
+
+
+def checked(num, vals, tol):
+    """(value, |disagreement|, rules) of num at vals, cross-checked by two quadrature rules."""
+    a, b = num.mp(vals), num.audit(vals)
+    if abs(a - b) <= tol:
+        return a, abs(a - b), "main vs independent"
+    c, d = num.fine(vals, "tanh-sinh"), num.fine(vals, "gauss-legendre")
+    if abs(c - d) <= tol:
+        return c, abs(c - d), (f"fine panels (main vs independent differed by "
+                               f"{mp.nstr(abs(a - b), 3)})")
+    raise Refusal("no-convergence:quadrature",
+                  f"main {mp.nstr(a, 12)} vs independent {mp.nstr(b, 12)}; fine panels "
+                  f"{mp.nstr(c, 12)} vs {mp.nstr(d, 12)}: no two rules agree to "
+                  f"{mp.nstr(tol, 3)}")

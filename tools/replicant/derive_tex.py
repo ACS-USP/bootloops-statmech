@@ -100,6 +100,13 @@ def solve_derived(old, new):
                  + (sol.note or ""))]
 
 
+def replicon_blocks(rep):
+    """Blocks of a derive_replicon.Replicon: its rules (text), then each display piece the
+    derivation holds (the slot weight, the slot ratios, E''_R, chi_R, lambda_R)."""
+    out = [text("Replicon (level (a))", rep.note)]
+    return out + [sym(title, obj) for title, obj in rep.parts]
+
+
 HOOKS = {"replicate": replicate, "average-disorder": average_disorder,
          "introduce-order-parameters": introduce_order_parameters,
          "saddle-equations": saddle_equations, "rs-ansatz": rs_ansatz,

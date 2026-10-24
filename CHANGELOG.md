@@ -24,6 +24,13 @@ All notable changes to BootLoops are recorded here. The format follows
   checked, small-N enumeration is coarse, the +-J agreement tests the adapted step and not
   universality). Results are physics-level, not proofs; population-dynamics results are
   statistical. Battery: `python3 tools/replicant/selftest.py` (about 16 s; `--full` about 6 min).
+- `replicant` (E1): the replicon at level (a) for Gaussian-integral energies. The derived RS
+  solution of the spherical and Ising perceptron and of Hopfield now carries a computed replicon
+  (Price covariance derivative, RS split, n -> 0, eigenvector projection; the spherical volume by an
+  explicit-n projection), so `solve_derived_rs` returns `stable` True/False for them and composed
+  Ising-perceptron values get computed finality; `derived_replicon(spec, solution)`; the replicon
+  derivation appears in the LaTeX documents. Checked against the families' replicons (perceptron,
+  Hopfield) at 12 points to 1e-8 and at the Ising AT root; planted hook errors move it.
 
 ## 1.0.1 (2026-10-09)
 

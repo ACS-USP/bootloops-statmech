@@ -10,7 +10,9 @@ is rendered with the reason).  Sections, in order: Model (spec, conventions, the
 coupling law); Method and route (replica | cavity, the honest caveat, for a composed
 model what was reused / adapted and relative to what); Derivation (catalog replica
 entries: the level-(a) derivation of the same spec when a derive.FAMILIES hook exists,
-rendered from the sympy objects in its State, then the equations the family code
+rendered from the sympy objects in its State, and its derived replicon (derive_replicon:
+the rules, then the slot weight, E''_R, chi_R and lambda_R as the code holds them, or the
+reason it is not derived), then the equations the family code
 implements, latex_entries / latex_cavity; composed models: the level-(a) trace itself);
 Calculation (the run's trace, in order); Solution (values with per-key finality);
 Stability; Reference check (key, computed, banked, tolerance, verdict; statistical rows
@@ -98,20 +100,23 @@ def _entry(k, e, bib, blocks, fallback_cite=None):
 
 @lru_cache(maxsize=None)
 def _level_a(key):
-    """(trace, None) of the symbolic level-(a) derivation of a catalog spec, or
-    (None, reason) when level (a) has no hook for it."""
+    """(trace, replicon blocks, None) of the symbolic level-(a) derivation of a spec, or
+    (None, [], reason) when level (a) has no hook for it."""
     from . import compose as C
     from . import derive as D
+    from .derive_replicon import replicon
+    from .derive_tex import replicon_blocks
     from .spec import ModelSpec
     *fields, params = key
     spec = ModelSpec(*fields, params=dict(params))
     if spec.family not in D.FAMILIES:
-        return None, f"derive.FAMILIES has no level-(a) hook for family {spec.family!r}"
+        return None, [], f"derive.FAMILIES has no level-(a) hook for family {spec.family!r}"
     try:
         C._check_hooks(spec, None)
-        return run_pipeline(C.level_a_steps(spec)[:6], State())[1], None
+        state, trace = run_pipeline(C.level_a_steps(spec)[:6], State())
+        return trace, replicon_blocks(replicon(state)), None
     except Refusal as r:
-        return None, f"{r.reason}: {r.detail}"
+        return None, [], f"{r.reason}: {r.detail}"
 
 
 def _spec_key(spec):
@@ -140,11 +145,17 @@ def report_blocks(report):
 def _derivation(res):
     """[(trace entry or None, title, blocks)] of the Derivation section."""
     from .compose import LEVEL_A_CITE
+    from .solve_derived import lift_numeric_beta
+    rep_title = "Replicon of the RS saddle (level (a))"
     if res.report is not None and res.report.kind == "composed":
-        return [(e, None, e.tex) for e in res.trace.entries], LEVEL_A_CITE, None
-    trace, why = (None, "cavity route") if res.route != "replica" else \
+        rows = [(e, None, e.tex) for e in res.trace.entries]
+        _, rep, _ = _level_a(_spec_key(lift_numeric_beta(res.spec, {})[0]))
+        return rows + ([(None, rep_title, rep)] if rep else []), LEVEL_A_CITE, None
+    trace, rep, why = (None, [], "cavity route") if res.route != "replica" else \
         _level_a(_spec_key(res.entry.spec))
     rows = [(e, None, e.tex) for e in trace.entries] if trace else []
+    if rep:
+        rows.append((None, rep_title, rep))
     rows.append((None, "Equations implemented by the family code"
                  if res.route == "replica" else "The cavity argument",
                  res.entry.derivation(res.route)))

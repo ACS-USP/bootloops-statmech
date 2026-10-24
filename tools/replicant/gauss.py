@@ -22,6 +22,12 @@ Rules used by the RS derivation (each tested on its own in tests/test_gauss.py):
   replica_limit(T, n)           lim_{n->0} T(n)/n for T(0) = 0: polynomial part by
                                 ansatz.n_to_zero, the rest by T'(0), so that
                                 (1/n) ln E[f^n] -> E ln f (f > 0)
+Rules used by the replicon (derive_replicon_gauss.py):
+  price(F, lam, pairs)          d/dC_ab E_lambda F = E[d^2 F/dlambda_a dlambda_b], a != b
+                                (Price's theorem: the Gaussian law solves the heat
+                                equation in its covariance), once per pair
+  slot_moments(g, lam, z, k)    E_z g^(j)(lam), j = 0..k, for lam = h + s z (s free of h):
+                                d^j/dh^j of the closed form E_z g(h + s z) (expect_closed)
 
 A GaussE of a polynomial in z evaluates itself (E z^k = (k-1)!! for even k).
 Honest label: the rules are exact identities where their stated conditions hold;
@@ -240,6 +246,34 @@ def rs_split(q, t, z):
 def rs_logdet(d, c, n):
     """ln det(d on the diagonal, c off it): eigenvalues d - c (n - 1 times), d + (n-1) c."""
     return (n - 1) * sp.log(d - c) + sp.log(d + (n - 1) * c)
+
+
+def price(F, lam, pairs):
+    """The integrand of d^k/dC_{p1}...dC_{pk} E_lambda F(lambda), lambda ~ N(0, C): one mixed
+    derivative d^2/dlambda_a dlambda_b per pair p = (a, b) (1-based into lam), a != b, with
+    C_ab = C_ba moved together.  Exact for F of moderate growth (Price 1958; the Gaussian
+    density satisfies d/dC_ab = d^2/dlambda_a dlambda_b)."""
+    order = []
+    for a, b in pairs:
+        if a == b:
+            raise Refusal("precondition:off-diagonal-pair",
+                          f"pair ({a}, {b}): the rule is for off-diagonal covariances")
+        order += [lam[a - 1], lam[b - 1]]
+    return sp.diff(F, *order)
+
+
+def slot_moments(g, lam, z, k, notes=None):
+    """[E_z g^(j)(lam) for j = 0..k] in closed form, lam = h + s z with h, s free of z:
+    E_z g^(j)(h + s z) = d^j/dh^j E_z g(h + s z) (differentiation in the mean passes under
+    the expectation; for a step g the derivatives are distributions, and the closed form
+    is smooth).  E_z g(h + s z) by expect_closed (its preconditions apply; `notes`)."""
+    lam = sp.expand(lam)
+    if not (lam.is_polynomial(z) and sp.degree(lam, z) == 1):
+        raise Refusal("precondition:linear-in-z", f"{lam} is not h + s z")
+    h = lam.coeff(z, 0)
+    H = sp.Dummy("h", real=True)
+    inner = expect_closed(g(H + lam.coeff(z, 1) * z), z, notes)
+    return [sp.diff(inner, H, j).subs(H, h) for j in range(k + 1)]
 
 
 def _log_clean(f):

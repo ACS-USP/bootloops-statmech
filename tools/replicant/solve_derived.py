@@ -55,14 +55,19 @@ derive_replicon.replicon(state).
  7. Outputs.  free_energy = phi at the solution, phi = lim (1/(N n)) ln E Z^n
     (RS): -beta f for a thermal model, the entropy (log volume / log count per
     variable) for the perceptron.  entropy = phi - beta d phi/d beta when phi
-    depends on beta, else phi.  replicon: derive_replicon (SK-type pair-
-    separable energy with an Ising site), else None.
+    depends on beta, else phi.  replicon: derive_replicon (pair-separable or
+    LnGaussProd energy; Ising site, or a site without conjugate: SK, the spherical
+    and Ising perceptron, Hopfield), else None; replicon_route names the rules.  Its
+    value is _derived_num.checked (two quadrature rules agree to audit_tol, or two
+    fine-panel rules do, else Refusal no-convergence:quadrature).
     STABILITY CONTRACT: stable is True only when the replicon was derived and is
     > 0 (and the entropy check below passes); False when the replicon is < 0, or
     when the variables are discrete (spec.variables "ising": counting measure)
     and the RS entropy is < 0; None means UNKNOWN (replicon not derived for this
     family): a composer must treat None as unknown and never present that RS
-    answer as final.  No capacity or threshold is computed.
+    answer as final.  The replicon is the RS saddle's local stability toward
+    replica-symmetry breaking only (the Hopfield m-mode is not part of it).  No
+    capacity or threshold is computed.
 
 Numerics: mpmath under mp.workdps (the caller's precision is restored).  The
 main quadrature is not validated for sharply varying integrands (perceptron at
@@ -77,7 +82,7 @@ import sympy as sp
 
 from . import agree
 from . import derive as D
-from ._derived_num import Num, safe
+from ._derived_num import Num, checked, safe
 from .core import Refusal, Trace, TraceEntry
 from .derive_replicon import replicon as derive_replicon
 from .families.common import CAVEAT
@@ -109,6 +114,7 @@ class DerivedRSSolution:
     quad_error: object = None    # max |main - independent quadrature| (equations, phi)
     replicon: object = None      # derived lambda_R at the solution, or None
     roots: list = field(default_factory=list)   # every audited root: dicts
+    replicon_route: str = ""     # derive_replicon's rules ("" when not derived)
 
 
 def _masked(e, fn):
@@ -488,7 +494,8 @@ class _Solver:
         else:
             ent, ent_note = fe, "entropy = phi (no temperature: log count / volume per variable)"
         rep = derive_replicon(self.state)
-        lam = None if rep.expr is None else self.num(rep.expr.subs(self.point)).mp(vals)
+        lam = None if rep.expr is None else checked(
+            self.num(safe(rep.expr).subs(self.point)), vals, self.tol)[0]
         neg_ent = self.spec.variables in _DISCRETE and ent < 0
         if lam is None:
             stable = False if neg_ent else None
@@ -511,4 +518,5 @@ class _Solver:
         return DerivedRSSolution(
             pick["values"], fe, pick["residual"], list(self.eqs), out, stable, CAVEAT,
             pick["name"], ent, self.method, note,
-            {k: self.params[k] for k in self.by_name}, pick["quad_error"], lam, table)
+            {k: self.params[k] for k in self.by_name}, pick["quad_error"], lam, table,
+            rep.route)

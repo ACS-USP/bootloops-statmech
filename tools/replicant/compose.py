@@ -41,13 +41,15 @@ The detail wraps the underlying step's own refusal reason where there is one.
 Results.  Result.rigor is always "physics-level".  Finality is per value
 (Result.finality: key -> catalog.Stability): catalog values carry their entry's
 declaration; composed values the solver's computed flag (True -> stable, False ->
-unstable, None -> not-computed).  Only "stable" and "exact-by-literature" are final;
+unstable, None -> not-computed), with a note naming the derived replicon and its rules
+(derive_replicon: SK, the spherical and Ising perceptron and Hopfield have one).  Only "stable" and "exact-by-literature" are final;
 every other value gets a "NOT final (<state>)" note, Result.final = all values final,
 and run(require_final=True) refuses if ANY value is not final: unstable:<ansatz>, else
 unknown-stability:rs (RS, stability not computed), else not-final:<ansatz>.
 """
 from dataclasses import dataclass, field
 
+import mpmath as mp
 import sympy as sp
 
 from . import derive as D
@@ -241,10 +243,20 @@ class ComposedCalculation:
                                             "quad_error": sol.quad_error},
                      notes=[sol.caveat, *lift, sol.note], route="replica", report=self.report,
                      params={**point, **knobs}, spec=self.spec)
-        rep = "" if sol.replicon is None else f"derived replicon {sol.replicon}"
-        fin = {k: from_flag(sol.stable, "rs", LEVEL_A_CITE, rep or "replicon not derived")
+        fin = {k: from_flag(sol.stable, "rs", LEVEL_A_CITE, _stability_note(sol))
                for k in values if k not in ("branch", "ansatz", "stable")}
         return _finalise(res, fin, require_final)
+
+
+def _stability_note(sol):
+    """What the composed finality rests on: the derived replicon (and its rules) and, for
+    discrete variables, the sign of the RS entropy."""
+    if sol.replicon is None:
+        return "replicon not derived for this family (stability UNKNOWN)"
+    out = f"derived replicon {mp.nstr(sol.replicon, 8)} ({sol.replicon_route})"
+    if sol.stable is False and sol.replicon > 0:
+        out += "; unstable because the RS entropy is negative for discrete variables"
+    return out
 
 
 def level_a_steps(spec, point=None, knobs=None):

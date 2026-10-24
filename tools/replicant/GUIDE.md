@@ -83,6 +83,8 @@ Python API (put `tools/` on `sys.path`):
 **params) -> Result`; `from replicant.spec import ModelSpec`;
 `from replicant.solve_derived import solve_derived_rs` (solve the DERIVED RS equations of a spec at a
 state point: all roots found from seeded searches, an audit residual, a computed replicon where derived);
+`from replicant.derive_replicon import derived_replicon` (`derived_replicon(spec, solution_or_mapping)`:
+the level-(a) replicon at an RS solution, a mapping first checked to be a root of the derived equations);
 `from replicant.latex import render_latex, write_latex` (`write_latex(result, path, pdf=False)`; a
 `Refusal` is also accepted and writes its partial derivation).
 
@@ -111,7 +113,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
   needs a cite). Only `stable` and `exact-by-literature` are FINAL; every other value gets a
   "NOT final" note and `final` is false. `run(require_final=True)` refuses if any value is not final.
 - A value that is not `stable` or `exact-by-literature` is a CANDIDATE, not an answer. `stable: null`
-  means UNKNOWN, not "fine" (a composed Ising perceptron or Hopfield RS value has no derived replicon).
+  means UNKNOWN, not "fine" (a composed model whose energy or site has no replicon rule).
 - CHECKS: `references` compares the entry's non-slow banked values within their stated tolerances;
   statistical keys use a 99% Student-t band on hypot(stderr, tol); slow and statistical comparisons
   (`references_skipped_slow`) run only through `Result.reference_checks(slow=True)` or `--full`.
@@ -169,11 +171,11 @@ banked in `reference/perceptron.json` as independent targets. Honest limits:
 - The annealed bound does not detect the spherical-site swap (the other checks do).
 - Enumeration slack c/N with c = 1 is an assumption of the test.
 
-ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 247 tests, about 17 s on a
+ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 253 tests, about 19 s on a
 laptop; also `python3 run_selftests.py replicant`) covers the core and refusal paths, the symbolic
 derivation against independent expressions, level agreement (a)=(b) for every family where both exist,
 every catalog entry against its banked non-slow values, the cavity routes, the composer and the held-out
-models, the CLI and the LaTeX writer (displayed equations re-checked numerically). `--full` adds 68
+models, the CLI and the LaTeX writer (displayed equations re-checked numerically). `--full` adds 72
 `@slow` tests (full-RSB Parisi up to K = 9, population dynamics at reference sizes, the Hopfield replicon
 scans, the p-spin T -> 0 energy, solver-based composed and LaTeX checks, a PDF compile when a TeX engine
 is present) and takes about 6-7 minutes on a laptop (measured 6 min 42 s); run it before merging a
@@ -186,8 +188,20 @@ KNOWN HAZARDS:
 - Rigor: PHYSICS-LEVEL, not proven. `rigor` says so on every result; the n -> 0 continuation and the
   RS/RSB ansaetze are assumptions. Do not quote a result as a theorem.
 - An RS answer whose stability is NOT computed (`stable: null`, `not-computed`) is NOT final. `stable:
-  null` means UNKNOWN. Level (a) derives the replicon only for the SK site; for composed perceptrons it
-  is reported unknown (False only if the discrete-variable entropy is negative), and `final` is false.
+  null` means UNKNOWN. Level (a) derives the replicon for SK (pair-separable energy, Ising site), the
+  spherical perceptron (Gaussian-integral energy, conjugate-free site), the Ising perceptron and Hopfield
+  (Gaussian-integral energy, Ising site): `derive_replicon.py` and `derive_replicon_gauss.py` (Price
+  covariance derivative, RS split, n -> 0 of the replica measure, replicon-eigenvector projection; the
+  spherical site by an explicit-n projection of its registered trace at n = 4, checked equal at n = 5).
+  A composed model whose energy is anything else (a LogDet energy, a covariance other than `q_ab`) or
+  whose site has no rule is reported UNKNOWN (False only if the discrete-variable entropy is negative),
+  and `final` is false. A composed RS value labelled `stable` means: derived replicon > 0 and (discrete
+  variables) RS entropy >= 0 at that point; it is LOCAL stability toward RSB, not a proof that RS is
+  exact, and for Hopfield it does not include the m-mode (the m_a are not varied: their decoupling from
+  the replicon sector is argued, not mechanised). The Ising-site susceptibility chi_R = E sech^4 is a
+  stated identity (the code differentiates the recorded site factor). The replicon value is accepted
+  only when two quadrature rules agree (else fine-panel rules, else `no-convergence:quadrature`): at
+  large beta the fixed splits alone can be off by 1e-3 (Hopfield beta ~ 43).
 - Root searches are seeded: a saddle may be missed; the solver refuses with `ambiguous:several-saddles`
   when it sees more than one, but absence of that refusal is not a proof there is only one.
 - Population dynamics near `T_c`: the spin-glass label is trustworthy only for `beta/beta_c <~ 0.95` or
@@ -198,8 +212,12 @@ KNOWN HAZARDS:
   inner populations (<~ 20) collapse towards `q1 = q0`. The banked 1RSB values are reproduction targets.
 - The Ising perceptron RS solution is unphysical above alpha ~ 0.83 (negative entropy; the RS curve ends
   at 4/pi, the 1RSB frozen threshold 0.8330786 is the capacity); the replicon crosses zero near
-  alpha ~ 1.015, which agrees with the commonly quoted Gardner-Derrida value but is unsourced here and
-  NOT banked; Gyorgyi's "AT-stable up to 4/pi" is believed to be a slip.
+  alpha ~ 1.015 (the level-(a) derived replicon and the family code locate the same root,
+  `tests/test_replicon_derived.py`, slow), which agrees with the commonly quoted Gardner-Derrida value but
+  is unsourced here and NOT banked; Gyorgyi's "AT-stable up to 4/pi" is believed to be a slip. The
+  composed Ising perceptron is `stable` and final below the entropy zero (e.g. alpha = 0.5), `unstable`
+  by the negative entropy between 0.833 and the AT point (its replicon is still positive there; the
+  finality note says so) and `unstable` by the replicon above it.
 - SK full-RSB ground energy (slow tier) is a K-level extrapolation with an empirical power law and a free
   exponent, still drifting at K = 8: -0.7631663 +- 6.8e-6 (the stated band is the whole extrapolated
   tail); `sk_ground_energy("fullrsb")` returns a bare value, use `parisi_ground_energy` for the band.

@@ -31,7 +31,8 @@ compile the derivation.
   `reference/_schema.md`).
 - `derive*.py`, `gauss.py`, `ansatz.py`, `agree.py`, `solve.py`, `solve_derived.py`: level (a),
   the symbolic derivation (replicate, average, order parameters, RS ansatz, n -> 0,
-  stationarity) and the solver for the derived equations.
+  stationarity), the derived replicon (`derive_replicon*.py`: SK, perceptrons, Hopfield) and the
+  solver for the derived equations.
 - `families/`: level (b), the published pipelines (SK, REM, p-spin, perceptron, teacher-student,
   Hopfield, Parisi full RSB).
 - `cavity/`: dense cavity, sparse BP / population dynamics, sparse 1RSB.
@@ -42,9 +43,9 @@ compile the derivation.
 
 ## Test tiers
 
-- Default: `python3 tools/replicant/selftest.py` (247 tests, about 17 s). Also
+- Default: `python3 tools/replicant/selftest.py` (253 tests, about 19 s). Also
   `python3 run_selftests.py replicant` from the repository root.
-- Full: `python3 tools/replicant/selftest.py --full` adds the 68 `@slow` tests (full RSB,
+- Full: `python3 tools/replicant/selftest.py --full` adds the 72 `@slow` tests (full RSB,
   population dynamics at reference sizes, solver-based checks); about 6-7 minutes on a laptop.
 - `@slow` is a plain function attribute honoured by `selftest.py` only. pytest ignores the
   marker and would run every test, slow ones included.

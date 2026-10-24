@@ -159,3 +159,45 @@ def test_replica_limit_rule():
         small = (nv * (nv - 1) / 6 + mp.log(Ef)) / nv
         assert abs(small - G.numeric(lim, pt)) < mp.mpf("1e-7")
     assert _refusal(lambda: G.replica_limit(T + 1, n)) == "precondition:vanishes-at-n-zero"
+
+
+def test_price_covariance_derivative_rule():
+    # lambda = (z1, c z1 + sqrt(1 - c^2) z2): C_11 = C_22 = 1, C_12 = c.  d/dc E[F]
+    # must equal E[d^2 F / dl1 dl2] (and d^2/dc^2 the fourth mixed derivative)
+    z1, z2, l1, l2 = sp.symbols("z1 z2 l1 l2", real=True)
+    cc = sp.Symbol("c", real=True)
+    lam = (z1, cc * z1 + sp.sqrt(1 - cc**2) * z2)
+    E = lambda f: sp.expand(GaussE(GaussE(sp.expand(f.subs({l1: lam[0], l2: lam[1]})), z1), z2))
+    for F in (l1**2 * l2**2, l1**3 * l2 + l2**4 * l1**2):
+        one = G.price(F, (l1, l2), [(1, 2)])
+        two = G.price(F, (l1, l2), [(1, 2), (1, 2)])
+        assert sp.expand(sp.diff(E(F), cc) - E(one)) == 0, F
+        assert sp.expand(sp.diff(E(F), cc, 2) - E(two)) == 0, F
+    # a wrong rule (one derivative only) is caught by the same comparison
+    assert sp.expand(sp.diff(E(l1**2 * l2**2), cc) - E(sp.diff(l1**2 * l2**2, l1))) != 0
+    assert _refusal(lambda: G.price(l1, (l1, l2), [(1, 1)])) == "precondition:off-diagonal-pair"
+
+
+def test_mean_derivative_rule():
+    # E_z g^(k)(h + s z) = d^k/dh^k E_z g(h + s z): Theta (distributional) and exp-quadratic
+    q, kap, bb = sp.Symbol("q", positive=True), sp.Symbol("kappa", real=True), sp.Rational(3, 5)
+    lam_ = sp.Symbol("lam", real=True)
+    split = G.rs_split(q, t, z)
+    M = G.slot_moments(sp.Lambda(lam_, sp.Heaviside(lam_ - kap)), split, z, 2)
+    s, h = sp.sqrt(1 - q), sp.sqrt(q) * t
+    dens = sp.exp(-((kap - h) / s)**2 / 2) / sp.sqrt(2 * sp.pi) / s     # E_z delta(h + s z - kappa)
+    pt = {q: sp.Rational(2, 5), kap: sp.Rational(1, 3), t: sp.Rational(-7, 10)}
+    assert abs(sp.N((M[1] - dens).subs(pt), 30)) < 1e-25
+    assert abs(sp.N((M[0] - G.H((kap - h) / s)).subs(pt), 30)) < 1e-25
+    g = sp.Lambda(lam_, sp.exp(bb * lam_**2 / 2))
+    M = G.slot_moments(g, split, z, 2)
+    with mp.workdps(30):
+        qv, tv = mp.mpf(2) / 5, mp.mpf(3) / 10
+        mean, sd = mp.sqrt(qv) * tv, mp.sqrt(1 - qv)
+        b_ = mp.mpf(3) / 5
+        d2 = lambda x: (b_ + b_**2 * x * x) * mp.exp(b_ * x * x / 2)      # g''
+        direct = mp.quad(lambda u: d2(mean + sd * u) * mp.exp(-u * u / 2), [-mp.inf, mp.inf]) \
+            / mp.sqrt(2 * mp.pi)
+        rule = mp.mpf(str(sp.N(M[2].subs({q: sp.Rational(2, 5), t: sp.Rational(3, 10)}), 30)))
+        assert abs(rule - direct) < mp.mpf("1e-20"), (rule, direct)
+    assert _refusal(lambda: G.slot_moments(g, z**2, z, 1)) == "precondition:linear-in-z"

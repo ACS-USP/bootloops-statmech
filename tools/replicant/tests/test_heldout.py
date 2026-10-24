@@ -358,15 +358,15 @@ def test_ising_perceptron_composed_matches_independent_routes():
         with np.errstate(divide="ignore"):
             med = float(np.median(np.log(c) / ENUM_N))
         assert med <= math.log(2) * (1 - P / ENUM_N + 1 / ENUM_N), (P, med)
-    # (e) not final: stable UNKNOWN below the zero, False (negative entropy) beyond it
+    # (e) finality computed (E1): replicon-stable with S > 0 below the zero (final),
+    # False (negative entropy) beyond it
     below = calc.run(alpha="0.5", kappa=0, dps=15)
-    assert below.stable is None and not below.final
+    assert below.stable is True and below.final and below.values["replicon"] > 0
     above = calc.run(alpha="1.0", kappa=0, dps=15)
     assert above.values["entropy"] < 0 and above.stable is False and not above.final
     assert _refusal(lambda: calc.run(alpha="1.0", kappa=0, dps=15,
                                      require_final=True)).reason == "unstable:rs"
-    assert _refusal(lambda: calc.run(alpha="0.5", kappa=0, dps=15,
-                                     require_final=True)).reason == "unknown-stability:rs"
+    assert calc.run(alpha="0.5", kappa=0, dps=15, require_final=True).final
 
 
 # ---- 3. positive controls -----------------------------------------------------------
@@ -537,7 +537,10 @@ def test_heldout_documents_render():
             assert escape(a.hook) in doc and escape(a.step) in doc, (name, a)
         for s in res.report.reused:
             assert escape(s) in doc, (name, s)
-        assert "NOT final" in doc, name
+        # E1: the Ising perceptron at alpha = 0.5 is replicon-stable with S > 0 (final);
+        # +-J SK at beta = 1.5 is AT-unstable (NOT final); both show the derived replicon
+        assert ("NOT final" in doc) == (name == "sk_pm_one"), name
+        assert "Replicon of the RS saddle (level (a))" in doc, name
     if not (shutil.which("tectonic") or shutil.which("pdflatex")):
         print("SKIP test_heldout_documents_render (compile): no TeX engine on PATH")
         return

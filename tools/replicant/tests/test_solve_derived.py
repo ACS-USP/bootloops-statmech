@@ -155,10 +155,12 @@ def test_solve_derived_ising_perceptron_matches_gardner_rs():
     assert abs(pt.S - s.free_energy) < 1e-9
     assert abs(gardner_entropy("0.5", "ising") - s.free_energy) < 1e-9   # its own solve
     assert s.entropy == s.free_energy > 0
-    # replicon not derived for an LnGaussProd energy: UNKNOWN, said so
-    assert s.stable is None and s.replicon is None and "no capacity" in s.note
-    assert "stable=None means UNKNOWN" in s.note and "replicon not derived" in s.note
-    assert "UNKNOWN" in s.trace.entries[-1].summary
+    # E1: the replicon is derived for the LnGaussProd energy with the Ising site and
+    # equals the family's (target); RS is replicon-stable and S > 0 here
+    assert abs(s.replicon - pt.replicon) < 1e-9 and s.replicon > 0
+    assert s.stable is True and "no capacity" in s.note
+    assert s.replicon_route == "gauss-covariance+ising-site"
+    assert "replicon" in s.trace.entries[-1].summary and "UNKNOWN" not in s.note
 
 
 @slow
@@ -167,6 +169,7 @@ def test_solve_derived_ising_perceptron_negative_entropy_is_unstable():
     # equations still have a solution, but its entropy is negative
     s = solve_derived_rs(default_spec("perceptron_ising"), alpha="1.0", kappa=0)
     assert s.entropy < 0 and s.stable is False and "RS is wrong" in s.note
+    assert s.replicon > 0               # below the AT point: unstable by the entropy only
 
 
 @slow
@@ -177,7 +180,9 @@ def test_solve_derived_spherical_perceptron_matches_gardner():
     pt = gardner_rs_point("spherical", s.values["q"], 0)
     assert abs(pt.alpha - 1) < 1e-9 and abs(pt.S - s.free_energy) < 1e-9
     assert abs(gardner_entropy(1, "spherical") - s.free_energy) < 1e-9
-    assert s.stable is None              # continuous variables: no entropy-sign test
+    # E1: derived replicon (no entropy-sign test for continuous variables) = the family's
+    assert abs(s.replicon - pt.replicon) < 1e-9 and s.stable is True
+    assert s.replicon_route == "gauss-covariance+explicit-n-site"
 
 
 @slow
@@ -192,6 +197,7 @@ def test_solve_derived_hopfield_matches_hopfield_rs():
     assert abs(s.values["qhat"] - al * be**2 * ref.r) < 1e-10
     f = hopfield_free_energy(ref.m, ref.q, ref.r, al, be)
     assert abs(s.free_energy - al * be / 2 - (-be * f)) < 1e-10
+    assert abs(s.replicon - ref.replicon) < 1e-10 and s.stable is (ref.replicon > 0)
 
 
 @slow

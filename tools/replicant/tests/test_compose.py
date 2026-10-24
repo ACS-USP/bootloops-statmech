@@ -463,12 +463,14 @@ def test_hooks_used_names_every_registry_a_step_consults():
 # ---- slow: composed solves -------------------------------------------------------------
 @slow
 def test_composed_ising_perceptron_is_not_presented_as_final():
-    res = compose(_ising_perceptron()).run(alpha="0.5", kappa=0, dps=15)
-    assert res.stable is not True and not res.final
+    # beyond the frozen-1RSB capacity (alpha = 1.0): replicon > 0 but S < 0, not final
+    res = compose(_ising_perceptron()).run(alpha="1.0", kappa=0, dps=15)
+    assert res.stable is False and not res.final and res.values["replicon"] > 0
     assert any("NOT final" in n for n in res.notes), res.notes
-    r = _refusal(lambda: compose(_ising_perceptron()).run(alpha="0.5", kappa=0, dps=15,
+    assert all("entropy is negative" in f.note for f in res.finality.values())
+    r = _refusal(lambda: compose(_ising_perceptron()).run(alpha="1.0", kappa=0, dps=15,
                                                           require_final=True))
-    assert r.reason in ("unknown-stability:rs", "unstable:rs"), r
+    assert r.reason == "unstable:rs", r
 
 
 @slow
