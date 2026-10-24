@@ -87,10 +87,12 @@ def test_planted_error_in_ising_site_hook_is_caught():
         a = derived_rs_equations(default_spec("perceptron_ising"))
     finally:
         D.SITES["ising"] = good
-    res = compare_equations(a, pipeline_rs_equations("perceptron_ising"))
-    assert res.agree is False, res
-    # and the registry is restored: the true derivation agrees again (cheap screen)
-    assert D.SITES["ising"] is good
+    # a site-only plant changes the d/dqhat equation; listing it first lets the
+    # one-point numeric screen reject it before the (slow) symbolic proof of the
+    # untouched d/dq pair (the verdict does not depend on the order)
+    res = compare_equations(a[::-1], pipeline_rs_equations("perceptron_ising"))
+    assert res.agree is False and res.route == "numeric", res
+    assert D.SITES["ising"] is good         # the registry is restored
 
 
 def test_perceptron_refuses_unsupported_variables_with_reason():
