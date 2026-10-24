@@ -15,19 +15,19 @@
     "value": "1.33333333333333333333",
     "tol": "2e-3",
     "cite": "de Almeida & Thouless, J. Phys. A 11, 983 (1978), doi:10.1088/0305-4470/11/5/028 (original, paywalled, not fetched); coefficient read from Singh & Young, Phys. Rev. E 96, 012127 (2017), arXiv:1705.01164, Fig. 3 (asymptotic SK AT line h = (4/3)^(1/2) (Tc - T)^(3/2), J = Tc = 1). Meaning: h_AT^2 = c (1 - T)^3 + ... as h -> 0",
-    "independent_route": "replicant's own AT line: root in beta of the replicon 1 - beta^2 E sech^4(beta(h + sqrt(q) z)) at h = 0.01, 0.02, 0.04, ratio h^2/(1-T)^3 extrapolated to 1-T = 0 (slow test); tol covers the extrapolation error"
+    "independent_route": "replicant's own AT line: root in beta of the replicon 1 - beta^2 E sech^4(beta(h + sqrt(q) z)) at h = 0.01, 0.02, 0.04, ratio h^2/(1-T)^3 extrapolated to 1-T = 0 (slow test). The value 4/3 is exact; tol measures the quality of our 3-point extrapolation (it gives 1.33191), not disagreement between sources"
   },
   "rsb1_ground_energy": {
     "value": "-0.76526",
     "tol": "1e-5",
-    "cite": "Stojnic, arXiv:2507.09247 (2025), Table 3, row '2 (full)' (one-step RSB, q0 = 0.4768, q1 -> 1): 0.76526, reported as -E0. Original 1RSB: Parisi, J. Phys. A 13, L115 (1980), doi:10.1088/0305-4470/13/4/009 (not fetched: publisher blocked the download)",
+    "cite": "Stojnic, arXiv:2507.09247 (2025), Table 3: level-2 fully-lifted RDT row '2 (full)' (q2 = 0.4768, q1 -> 1): 0.76526, reported as -E0; identified with 1RSB with free q0 (identification confirmed by our own solve: q0 = 0.47678, E = -0.7652594). Original 1RSB: Parisi, J. Phys. A 13, L115 (1980), doi:10.1088/0305-4470/13/4/009 (not fetched: publisher blocked the download)",
     "independent_route": "replicant's own T = 0 1RSB solve: stationary point in (q0, mu = beta m) of E(q0, mu) = mu(1-q0^2)/4 - (1/mu) E_z ln E_y exp(mu |sqrt(q0) z + sqrt(1-q0) y|), derived here from the finite-T 1RSB functional (q1 -> 1, m -> 0 at fixed beta m); does not use the paper's number"
   },
   "fullrsb_ground_energy": {
     "value": "-0.7631667265",
-    "tol": "1e-4",
+    "tol": "2e-4",
     "cite": "Oppermann, Schmidt & Sherrington, Phys. Rev. Lett. 98, 127201 (2007), arXiv:cond-mat/0608581: E_inf = -0.7631667265(6) (k-RSB extrapolation); same digits in Schmidt & Oppermann, arXiv:0801.1756 (2008): -0.763166726566547",
-    "independent_route": "reference only (used in Task 16): not yet computed by replicant. Two independent published methods agree to 5e-5 (Crisanti-Rizzo infinite-RSB PDE vs Oppermann et al. high-order k-RSB); Task 16's own Parisi solve is the planned replicant route",
+    "independent_route": "tol 2e-4 covers the spread of the sources below (largest gap 1.33e-4, Parisi 1980). Reference only (used in Task 16): not yet computed by replicant. Two independent published methods agree to 5e-5 (Crisanti-Rizzo infinite-RSB PDE vs Oppermann et al. high-order k-RSB); Task 16's own Parisi solve is the planned replicant route",
     "sources_disagree": [
       {"value": "-0.76321", "cite": "Crisanti & Rizzo, Phys. Rev. E 65, 046137 (2002), arXiv:cond-mat/0111037: E0 = -0.76321 +- 0.00003"},
       {"value": "-0.7633", "cite": "Parisi, J. Phys. A 13, L115 (1980): -0.7633 +- 0.0001, as quoted in Crisanti & Rizzo (2002), arXiv:cond-mat/0111037 (original not fetched)"}

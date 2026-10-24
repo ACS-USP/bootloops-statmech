@@ -110,3 +110,28 @@ def test_non_finite_numbers_refuse():
         _malformed({**_GOOD, "tol": bad})
         _malformed({**_GOOD, "value": bad})
         _malformed({**_GOOD, "sources_disagree": [{"value": bad, "cite": "c"}]})
+
+
+def assert_tolerance_covers_spread(entry, *, root=None):
+    """Data rule: every sources_disagree value lies within tol of the main value."""
+    import mpmath as mp
+    for key, ref in load(entry, root=root).items():
+        with mp.workdps(30):
+            main, tol = mp.mpf(ref.value), mp.mpf(ref.tol)
+            for s in ref.sources_disagree:
+                gap = abs(mp.mpf(s["value"]) - main)
+                assert gap <= tol, f"{entry}/{key}: {s['value']} is {gap} from {ref.value} > tol {ref.tol}"
+
+
+def test_banked_tolerances_cover_spread():
+    for f in sorted((Path(__file__).parent.parent / "reference").glob("*.json")):
+        assert_tolerance_covers_spread(f.stem)
+
+
+def test_spread_helper_catches_narrow_tol():
+    e = {**_GOOD, "sources_disagree": [{"value": "0.7634", "cite": "Other 2001"}]}
+    try:
+        assert_tolerance_covers_spread("t", root=_bank(e))
+    except AssertionError:
+        return
+    raise AssertionError("helper accepted a tol narrower than the spread")

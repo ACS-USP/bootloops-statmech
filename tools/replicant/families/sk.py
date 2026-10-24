@@ -106,13 +106,14 @@ def _rs_q(beta: str, h: str):
             return fixed_point(F, mp.mpf("0.5"), dps=_DPS, tol="1e-12",
                                branch="nontrivial").value
         except Refusal:
-            if hh != 0:
+            if hh != 0 or b > 1:   # below T_c a missing q > 0 branch is a failure
                 raise
-            return mp.mpf(0)    # h = 0 and no q > 0 branch: paramagnet
+            return mp.mpf(0)    # h = 0, beta <= 1: paramagnet
 
 
-def _key(x):
-    return mp.nstr(mp.mpf(x), 30)
+def _key(x):   # cache key; a float goes through repr so 0.9 and "0.9" share it
+    with mp.workdps(_DPS):   # independent of the caller's global precision
+        return mp.nstr(mp.mpf(repr(x) if isinstance(x, float) else x), 30)
 
 
 def sk_replicon(beta, h=0, *, q=None):
@@ -231,10 +232,35 @@ def _rsb(b: float, h: float):
             cands.append((0.0, *v))
     cands = [c for c in cands if c[1] - c[0] > 1e-6]       # q1 = q0 is just RS
     if not cands:
-        raise Refusal("no-solution", f"no 1RSB stationary point with q1 > q0 at beta={b}, h={h}")
+        lam = sk_replicon(b, h)
+        if lam >= 0:
+            raise Refusal("no-solution", f"1RSB collapses to RS: RS is stable here "
+                          f"(replicon = {mp.nstr(lam, 6)} >= 0 at beta={b}, h={h})")
+        raise Refusal("no-solution", f"solver: no 1RSB stationary point with q1 > q0 "
+                      f"at beta={b}, h={h} although RS is unstable")
     best = max(cands, key=lambda c: -_rsb_phi_e(b, h, *c)[0] / b)
+    eigs = _rsb_hessian_eigs(b, h, *best)
+    if max(eigs) >= 0:
+        raise Refusal("no-solution", f"selected 1RSB point {best} is not a local maximum "
+                      f"of f (Hessian eigenvalues {eigs})")
     phi, e = _rsb_phi_e(b, h, *best)
     return (*best, -phi / b, e)
+
+
+def _rsb_hessian_eigs(b, h, q0, q1, m, d=1e-4):
+    """Eigenvalues of the central-difference Hessian of f in (q0, q1, m).
+
+    The selection rule (largest f) is audited by requiring a local maximum
+    (all eigenvalues < 0); the chosen point has q0 > d in every case tested.
+    """
+    f = lambda v: -_rsb_phi_e(b, h, *v)[0] / b
+    v0, H = np.array([q0, q1, m]), np.empty((3, 3))
+    for i in range(3):
+        for j in range(3):
+            ei, ej = np.eye(3)[i] * d, np.eye(3)[j] * d
+            H[i, j] = (f(v0 + ei + ej) - f(v0 + ei - ej) - f(v0 - ei + ej)
+                       + f(v0 - ei - ej)) / (4 * d * d)
+    return tuple(np.linalg.eigvalsh((H + H.T) / 2))
 
 
 def sk_1rsb(beta, h=0) -> RSBSolution:
@@ -258,15 +284,38 @@ def _e0_1rsb(q0, mu):
 
 
 @lru_cache(maxsize=None)
-def _ground_1rsb():
+def _ground_1rsb_points():
+    """T = 0 stationary points [(q0, mu, E, d2E/dq0^2)] from a q0 > 0 seed and
+    from the exact q0 = 0 subspace (q0 = 0 solves the q0 equation at h = 0)."""
     d = 1e-5
-    grad = lambda v: np.array([(_e0_1rsb(v[0] + d, v[1]) - _e0_1rsb(v[0] - d, v[1])) / (2 * d),
-                               (_e0_1rsb(v[0], v[1] + d) - _e0_1rsb(v[0], v[1] - d)) / (2 * d)])
-    v = _newton(grad, (0.5, 1.0), lambda v: 0.01 < v[0] < 0.99 and 0.05 < v[1] < 20,
-                tol=1e-9, eps=1e-4)
-    if v is None:
+    dE = lambda q0, mu, k: ((_e0_1rsb(q0 + d, mu) - _e0_1rsb(q0 - d, mu)) if k == 0 else
+                            (_e0_1rsb(q0, mu + d) - _e0_1rsb(q0, mu - d))) / (2 * d)
+    pts = []
+    v = _newton(lambda v: np.array([dE(v[0], v[1], 0), dE(v[0], v[1], 1)]), (0.5, 1.0),
+                lambda v: 0.01 < v[0] < 0.99 and 0.05 < v[1] < 20, tol=1e-9, eps=1e-4)
+    if v is not None:
+        pts.append((float(v[0]), float(v[1])))
+    v = _newton(lambda v: np.array([dE(0.0, v[0], 1)]), (1.0,),
+                lambda v: 0.05 < v[0] < 20, tol=1e-9, eps=1e-4)
+    if v is not None:
+        pts.append((0.0, float(v[0])))
+    dq, out = 1e-3, []
+    for q0, mu in pts:      # central 2nd difference; forward one at the q0 = 0 edge
+        e = [_e0_1rsb(q0 + k * dq, mu) for k in ((0, 1, 2) if q0 == 0 else (-1, 0, 1))]
+        out.append((q0, mu, e[1] if q0 else e[0], (e[0] - 2 * e[1] + e[2]) / dq**2))
+    return tuple(out)
+
+
+@lru_cache(maxsize=None)
+def _ground_1rsb():
+    pts = _ground_1rsb_points()
+    if not pts:
         raise Refusal("no-solution", "T = 0 1RSB stationary point not found")
-    return _e0_1rsb(*v)
+    best = max(pts, key=lambda p: p[2])       # replica rule: largest E (f at T = 0)
+    if best[3] >= 0:
+        raise Refusal("no-solution", f"T = 0 1RSB point {best[:2]} is not a maximum in q0 "
+                      f"(d2E/dq0^2 = {best[3]})")
+    return best[2]
 
 
 def sk_ground_energy(ansatz: str):
