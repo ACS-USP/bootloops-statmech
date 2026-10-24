@@ -23,14 +23,32 @@
     "cite": "Stojnic, arXiv:2507.09247 (2025), Table 3: level-2 fully-lifted RDT row '2 (full)' (q2 = 0.4768, q1 -> 1): 0.76526, reported as -E0; identified with 1RSB with free q0 (identification confirmed by our own solve: q0 = 0.47678, E = -0.7652594). Original 1RSB: Parisi, J. Phys. A 13, L115 (1980), doi:10.1088/0305-4470/13/4/009 (not fetched: publisher blocked the download)",
     "independent_route": "replicant's own T = 0 1RSB solve: stationary point in (q0, mu = beta m) of E(q0, mu) = mu(1-q0^2)/4 - (1/mu) E_z ln E_y exp(mu |sqrt(q0) z + sqrt(1-q0) y|), derived here from the finite-T 1RSB functional (q1 -> 1, m -> 0 at fixed beta m); does not use the paper's number"
   },
+  "rsb2_ground_energy": {
+    "value": "-0.76361",
+    "tol": "1e-5",
+    "cite": "Stojnic, arXiv:2507.09247 (2025), Table 3 ('rr-sfl RDT parameters; CLUP SK model; rx=1', c1 -> 1, n, beta -> oo): row '3 (full)' (q = 0.3215, 0.8496, q -> 1): 0.76361, reported as -E0; identified with 2RSB (two free overlaps below q = 1), the identification confirmed by our own solve (q = 0.32140, 0.84950)",
+    "independent_route": "replicant's own T = 0 2-step Parisi staircase (families/parisi.py krsb_ground_energy(2)): maximum over (q0, q1, mu1, mu2) of the K-step functional, Newton on the adjoint gradient; does not use the paper's number. tol 1e-5 = the table's last digit"
+  },
+  "rsb3_ground_energy": {
+    "value": "-0.76331",
+    "tol": "1e-5",
+    "cite": "Stojnic, arXiv:2507.09247 (2025), Table 3 ('rr-sfl RDT parameters; CLUP SK model; rx=1', c1 -> 1, n, beta -> oo): row '4 (full)' (q = 0.2462, 0.7031, 0.9410, q -> 1): 0.76331, reported as -E0; identified with 3RSB",
+    "independent_route": "replicant's own T = 0 3-step Parisi staircase (families/parisi.py krsb_ground_energy(3)); does not use the paper's number. Our point has E = -0.7633135 and q = (0.2439, 0.6989, 0.9396): the energy agrees to the table's digits, the overlaps only to ~4e-3 (the functional is flat along those directions: Hessian eigenvalues down to -2e-5), so only the energy is banked. tol 1e-5 = the table's last digit"
+  },
   "fullrsb_ground_energy": {
     "value": "-0.7631667265",
     "tol": "2e-4",
     "cite": "Oppermann, Schmidt & Sherrington, Phys. Rev. Lett. 98, 127201 (2007), arXiv:cond-mat/0608581: E_inf = -0.7631667265(6) (k-RSB extrapolation); same digits in Schmidt & Oppermann, arXiv:0801.1756 (2008): -0.763166726566547",
-    "independent_route": "tol 2e-4 covers the spread of the sources below (largest gap 1.33e-4, Parisi 1980). Reference only (used in Task 16): not yet computed by replicant. Two independent published methods agree to 5e-5 (Crisanti-Rizzo infinite-RSB PDE vs Oppermann et al. high-order k-RSB); Task 16's own Parisi solve is the planned replicant route",
+    "independent_route": "replicant's own Parisi solve (families/parisi.py): T = 0 K-step staircases K = 1..8 maximised over (q, mu), audited (gradient, Hessian, grid refinement), extrapolated in K with a fitted power law E_K = E_inf - C K^-s from K = 6, 7, 8; error estimate = the whole extrapolated tail (6.9e-6) plus grid and optimiser terms. Does not use the banked number (it is the test's target). tol 2e-4 covers the spread of the sources below (largest gap 1.33e-4, Parisi 1980); two independent published methods agree to 5e-5 (Crisanti-Rizzo infinite-RSB PDE vs Oppermann et al. high-order k-RSB)",
     "sources_disagree": [
-      {"value": "-0.76321", "cite": "Crisanti & Rizzo, Phys. Rev. E 65, 046137 (2002), arXiv:cond-mat/0111037: E0 = -0.76321 +- 0.00003"},
-      {"value": "-0.7633", "cite": "Parisi, J. Phys. A 13, L115 (1980): -0.7633 +- 0.0001, as quoted in Crisanti & Rizzo (2002), arXiv:cond-mat/0111037 (original not fetched)"}
+      {
+        "value": "-0.76321",
+        "cite": "Crisanti & Rizzo, Phys. Rev. E 65, 046137 (2002), arXiv:cond-mat/0111037: E0 = -0.76321 +- 0.00003"
+      },
+      {
+        "value": "-0.7633",
+        "cite": "Parisi, J. Phys. A 13, L115 (1980): -0.7633 +- 0.0001, as quoted in Crisanti & Rizzo (2002), arXiv:cond-mat/0111037 (original not fetched)"
+      }
     ]
   }
 }

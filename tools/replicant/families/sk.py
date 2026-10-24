@@ -4,7 +4,8 @@
   sk_replicon(beta, h=0, *, q=None)         -> lambda_AT (negative = RS unstable)
   sk_at_temperature(h)                      -> T on the AT line (h != 0)
   sk_1rsb(beta, h=0)                        -> RSBSolution(q0, q1, m, f, e)
-  sk_ground_energy("rs" | "1rsb")           -> T = 0 energy per spin
+  sk_ground_energy("rs" | "1rsb" | "fullrsb") -> T = 0 energy per spin ("fullrsb": the
+                                            Parisi solve of families/parisi.py, slow)
 
 Replica free energy (n -> 0 of (1/n) ln E Z^n, Parisi matrix q_ab):
   -beta f = ln 2 + beta^2/4 [1 - lim (1/n) sum_{a!=b} q_ab^2] + (1/n) ln Tr e^{...}
@@ -53,6 +54,7 @@ from .common import CAVEAT, RSBSolution, RSSolution  # noqa: F401 (re-exported)
 
 _DPS = 15
 _BETA_MAX_1RSB = 3.0
+FULLRSB_GRID = 8      # parisi_ground_energy(grid=8): levels 6, 7, 8 extrapolated
 
 
 def quadratic_term(kind):
@@ -316,6 +318,7 @@ def sk_ground_energy(ansatz: str):
             return -gauss_expect(abs, dps=30)
     if ansatz == "1rsb":
         return mp.mpf(_ground_1rsb())
-    if ansatz == "fullrsb":
-        raise Refusal("not-implemented:fullrsb", "banked in reference/sk.json; Task 16 solves it")
+    if ansatz == "fullrsb":   # slow (~30 s): K-step staircases K = 1..8, extrapolated
+        from .parisi import parisi_ground_energy
+        return parisi_ground_energy(grid=FULLRSB_GRID).value
     raise Refusal("precondition:known-ansatz", f"{ansatz!r}: use 'rs', '1rsb' or 'fullrsb'")

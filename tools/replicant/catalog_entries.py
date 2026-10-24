@@ -28,7 +28,8 @@ from .families.hopfield import hopfield_alpha_c, hopfield_rs, hopfield_t0
 from .families.perceptron import gardner_capacity, gardner_entropy
 from .families.pspin import pspin_critical_temperature, pspin_spherical_1rsb
 from .families.rem import rem_1rsb, rem_critical_beta, rem_free_energy
-from .families.sk import sk_1rsb, sk_ground_energy, sk_replicon, sk_rs
+from .families.parisi import PARISI_CITE, krsb_ground_energy, parisi_ground_energy
+from .families.sk import FULLRSB_GRID, sk_1rsb, sk_ground_energy, sk_replicon, sk_rs
 from .families.teacher_student import asymptotic_constant, teacher_student_error
 from .spec import ModelSpec
 
@@ -137,6 +138,15 @@ def _sk_e0(p):
                "(the h = 0 AT line is T = 1: RS is unstable at all T < 1)")
 
 
+def _sk_frsb(p):
+    r = parisi_ground_energy(grid=FULLRSB_GRID)
+    return Out({"fullrsb_ground_energy": r.value,
+                "rsb2_ground_energy": mp.mpf(krsb_ground_energy(2).E),
+                "rsb3_ground_energy": mp.mpf(krsb_ground_energy(3).E)},
+               f"T = 0 full RSB: {r.note}; error estimate {mp.nstr(r.error_estimate, 3)}",
+               errors={"fullrsb_ground_energy": r.error_estimate})
+
+
 def _sk_rs(p):
     s = sk_rs(p["beta"], p.get("h", 0))
     return Out(_saddle("rs", s.stable, q=s.q, f=s.f, e=s.e, replicon=s.replicon),
@@ -154,6 +164,9 @@ def sk():
                    when=lacks("beta"), skip="beta given (state point)"),
              fstep("sk-ground-energy", SK_CITE.split(";")[0] + " (RS); Parisi, PRL 43, 1754 "
                    "(1979) (1RSB)", _sk_e0, when=lacks("beta"), skip="beta given (state point)"),
+             fstep("sk-fullrsb-ground-energy", PARISI_CITE, _sk_frsb,
+                   when=lambda p: p.get("fullrsb") and p.get("beta") is None,
+                   skip="full RSB is behind the fullrsb=True flag (slow), at T = 0 only"),
              fstep("sk-rs-saddle", "; ".join(SK_CITE.split("; ")[:2]), _sk_rs,
                    when=_ansatz_is("rs"), skip="no beta, or ansatz != rs"),
              fstep("sk-1rsb-saddle", "Parisi, PRL 43, 1754 (1979)", _sk_1rsb,
@@ -162,7 +175,9 @@ def sk():
         "rs", s.stable, q=s.q, f=s.f, e=s.e, replicon=s.replicon), MPV)
     refs = [RefCheck("sk", "tc", lambda v: v["tc"]),
             RefCheck("sk", "rs_ground_energy", lambda v: v["rs_ground_energy"]),
-            RefCheck("sk", "rsb1_ground_energy", lambda v: v["rsb1_ground_energy"])]
+            RefCheck("sk", "rsb1_ground_energy", lambda v: v["rsb1_ground_energy"])] + [
+            RefCheck("sk", k, lambda v, k=k: v[k], params={"fullrsb": True}, slow=True)
+            for k in ("rsb2_ground_energy", "rsb3_ground_energy", "fullrsb_ground_energy")]
     fin = {"tc": Stability("stable", "rs", AT_CITE, "paramagnet replicon 1 - beta^2 > 0 above "
                            "T_c (computed); T_c is where it vanishes"),
            "rs_ground_energy": lambda v: from_flag(
@@ -171,10 +186,20 @@ def sk():
            "rsb1_ground_energy": Stability(
                "not-computed", "1rsb", "Parisi, PRL 43, 1754 (1979); J. Phys. A 13, L115 (1980)",
                "1RSB is not the exact SK solution (full RSB is); its stability is not computed"),
+           "fullrsb_ground_energy": lambda v: Stability(
+               "exact-by-literature", "fullrsb", PARISI_CITE,
+               "the Parisi formula is a theorem for SK; this number is its K-step staircase "
+               f"extrapolated in K (levels {FULLRSB_GRID - 2}..{FULLRSB_GRID}), numerical "
+               "error estimate +- " + mp.nstr(parisi_ground_energy(
+                   grid=FULLRSB_GRID).error_estimate, 3) + " (also in the run's errors)"),
+           **{k: Stability("not-computed", k[:4], "Parisi, J. Phys. A 13, L115 (1980)",
+                           "a finite-K staircase is not the exact SK solution; its value is "
+                           "a variational bound below the full-RSB one")
+              for k in ("rsb2_ground_energy", "rsb3_ground_energy")},
            **{k: saddle(AT_CITE) for k in ("q", "f", "e", "replicon", "q0", "q1", "m")}}
     return entry("sk", default_spec("sk"), SK_CITE, {"replica": steps, "cavity": cav}, refs,
                  {"replica": CAVEAT, "cavity": CAVITY_CAVEAT},
-                 "Sherrington-Kirkpatrick: RS, AT stability, 1RSB", finality=fin,
+                 "Sherrington-Kirkpatrick: RS, AT stability, 1RSB, full RSB (flag)", finality=fin,
                  meta=("rs_replicon_T0p5",))
 
 

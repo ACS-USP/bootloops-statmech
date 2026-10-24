@@ -158,9 +158,9 @@ def test_quadratic_term_from_ansatz():
     assert sp.expand(quadratic_term("rsb").subs({q0: q, q1: q}) - (1 - q)**2) == 0  # q0 = q1: RS
 
 
-def test_fullrsb_is_banked_not_computed():
+def test_unknown_ground_energy_ansatz_is_refused():
+    """("fullrsb" is computed now: tests/test_parisi.py, slow.)"""
     assert "fullrsb_ground_energy" in REF
-    _refuses(lambda: sk_ground_energy("fullrsb"), "not-implemented:fullrsb")
     _refuses(lambda: sk_ground_energy("2rsb"), "precondition:known-ansatz")
 
 

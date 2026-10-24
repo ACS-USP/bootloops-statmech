@@ -223,9 +223,6 @@ _HELD_OUT_SK = ("+-J SK: held out of the catalog (Task 16); the composed level-(
 UNCLAIMED = {
     ("heldout", "sk_pm_one_tc"): _HELD_OUT_SK,
     ("heldout", "sk_pm_one_rs_ground_energy"): _HELD_OUT_SK,
-    ("sk", "fullrsb_ground_energy"):
-        "literature-only full-RSB (Parisi) value: no full-RSB solver in the catalog until "
-        "Task 17 (families/parisi.py)",
     ("sk", "at_small_field_coefficient"):
         "an h -> 0 extrapolation of h^2/(1 - T_AT)^3 over three AT-line points, done in "
         "tests/test_sk.py (slow): not the output of any pipeline step",

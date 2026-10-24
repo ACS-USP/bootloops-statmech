@@ -158,7 +158,22 @@ def sk(route):
         cited("1RSB at T = 0 (q1 -> 1, m -> 0, mu = beta m fixed)",
               r"E(q_0, \mu) = \frac{\mu(1 - q_0^2)}{4} - \frac{1}{\mu}\,\mathbb{E}_z \ln "
               r"\mathbb{E}_y\, e^{\mu\left|\sqrt{q_0}\, z + \sqrt{1 - q_0}\, y\right|}", _PARISI),
+        cited("Full RSB at T = 0: K-step Parisi staircase (families/parisi.py; maximised "
+              "over q_0 < ... < q_{K-1} < q_K = 1 and 0 < mu_1 < ... < mu_K, mu_0 = 0)",
+              r"E_K = \frac{1}{4}\sum_{k=0}^{K-1}(\mu_{k+1}-\mu_k)(1-q_k^2) - \mathbb{E}_z\,"
+              r"\Phi_0\!\left(\sqrt{q_0}\,z\right),\quad \Phi_K(h) = |h|,\quad \Phi_{k-1}(h)"
+              r" = \frac{1}{\mu_k}\ln \mathbb{E}_z\, e^{\mu_k \Phi_k\left(h + \sqrt{q_k - "
+              r"q_{k-1}}\, z\right)}", _PARISI),
+        text("Full RSB: numerical method", "K = 1 is the 1RSB T = 0 functional above. Each "
+             "level is maximised (Newton, adjoint gradient, audited Hessian) on a uniform "
+             "h-grid; E_K rises with K to the Parisi value, a theorem for SK. E_inf is fitted "
+             "as E_K + C K^-s to K = 6, 7, 8, with error estimate = the whole extrapolated "
+             "tail plus grid and optimiser terms", _FRSB),
     ]
+
+
+_FRSB = ("Parisi, J. Phys. A 13, L115 (1980); Talagrand, Ann. Math. 163, 221 (2006); "
+         "Panchenko, The Sherrington-Kirkpatrick Model (2013)")
 
 
 # ---- REM -------------------------------------------------------------------------------
