@@ -16,7 +16,8 @@ Top level is an object mapping key -> record:
 }
 ```
 
-- `value`, `tol`: decimal strings, parsed with mpmath (never floats).
+- `value`, `tol` (and `sources_disagree` values): finite decimal strings,
+  parsed with mpmath (never floats); `inf`/`nan` -> `unbanked:malformed`.
 - `cite`: required; values come from the cited paper, never from memory.
   Missing or empty -> `Refusal("unbanked:no-citation")`.
 - `independent_route`: required; a second route to the same number.

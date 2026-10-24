@@ -2,7 +2,7 @@
 
 `load("entry")` reads `reference/<entry>.json` (see reference/_schema.md).
 An entry with no citation or no independent route is refused, never used.
-Values and tolerances are decimal strings parsed with mpmath, not floats.
+Values and tolerances are finite decimal strings parsed with mpmath, not floats.
 """
 import json
 from dataclasses import dataclass
@@ -45,9 +45,12 @@ def _num(entry, key, field, text):
         raise _bad(entry, key, f"{field} must be a decimal string")
     try:
         with mp.workdps(_DPS):
-            return mpf(text)
+            x = mpf(text)
     except (ValueError, TypeError):
         raise _bad(entry, key, f"{field} is not a number: {text!r}")
+    if not mp.isfinite(x):   # tol="inf" would let check() accept anything
+        raise _bad(entry, key, f"{field} must be finite: {text!r}")
+    return x
 
 
 def load(entry: str, *, root: Path | None = None) -> dict[str, RefValue]:

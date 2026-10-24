@@ -102,3 +102,11 @@ def test_modelspec_equality():
     a = ModelSpec("sk", "ising", "gaussian", params={"beta": "1"})
     assert a == ModelSpec("sk", "ising", "gaussian", params={"beta": "1"})
     assert a != ModelSpec("sk", "spherical", "gaussian")
+
+
+def test_non_finite_numbers_refuse():
+    # tol="inf" would make check() accept anything; nan never compares.
+    for bad in ("inf", "+inf", "-inf", "nan"):
+        _malformed({**_GOOD, "tol": bad})
+        _malformed({**_GOOD, "value": bad})
+        _malformed({**_GOOD, "sources_disagree": [{"value": bad, "cite": "c"}]})
