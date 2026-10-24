@@ -164,6 +164,10 @@
   "cmd": "python3 -m pytest tools/ratfit -x -q -p no:cacheprovider",
   "cwd": "root"
  },
+ "replicant": {
+  "cmd": "python3 tools/replicant/selftest.py",
+  "cwd": "root"
+ },
  "seedling": {
   "cmd": "python3 -m pytest tools/seedling -x -q -rs -p no:cacheprovider",
   "cwd": "root"

@@ -93,6 +93,7 @@ clone differs by package:
 | `qinvert/` | exact consistency certificates for published summary statistics over partially released entity-level tables | selftest |
 | `rankscreen/` | multi-prime parallel rank + inconsistency screen for exact-Q eliminations | selftest |
 | `ratfit/` | exact rational-function reconstruction and gating suite for sampled path-DE data (Thiele/Newton/mod-p core, thiele_gate, li2close, design_grid), now with degree_alias: failure-axis triage for reconstruction failures, grid alias vs CRT height | partial |
+| `replicant/` | published replica/cavity calculations as typed, recorded steps (core, trace, battery runner) | selftest |
 | `seedling/` | pre-reduction front door for kira: certified predictive staging (pin/run/preflight/certify/census) + family preflight (`audit` symmetry group, `identity` transcription check) | partial |
 | `subtropica/` | SubTropica — no-Wolfram pipeline over the HyperFLINT hyperlogarithm engine (one GPL-3.0 file, see its NOTICE) | partial (build the engine first) |
 | `surd/` | Surd — exact hyperlogarithm integration of three-fold Cheng-Wu integrals on a one-parameter kinematic slice with radical (square- and cube-root) last-variable letters carried exactly: a-priori-alphabet fibration in Q[x,t,j]/(j²+1), function-level third step in Q(i)(t)[ρ]/(L), weight ≤ 3 hyperlogs with exact coefficients, structure tools and certified Arb reference evaluators (LO QCD/N=4 collinear four-point energy correlator as the worked case) | partial |
