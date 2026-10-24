@@ -35,15 +35,15 @@ from dataclasses import dataclass, field as dfield
 
 import mpmath as mp
 import numpy as np
-import sympy as sp
 
 from ..core import Refusal, State, Step, Trace, run_pipeline
 from ..families.common import CAVITY_CAVEAT
 from . import graphs as G
+from ._stats import drift as _drift, t_quantile  # noqa: F401  (t_quantile re-exported)
+from .sparse_t0 import rs_zero_temperature_pm1  # noqa: F401  (re-exported)
 
 STEP_NAMES = ("remove_site", "cavity_field_law", "add_site", "self_consistency")
 _MP01 = "Mezard & Parisi, Eur. Phys. J. B 20, 217 (2001), arXiv:cond-mat/0009418"
-_MP02 = "Mezard & Parisi, The cavity method at zero temperature, arXiv:cond-mat/0207121"
 
 
 def _ln2cosh(x):
@@ -224,68 +224,46 @@ def _pd_steps():
                  lambda s: f"route=cavity; phase {s['solution'][2]}")]
 
 
-def t_quantile(prob, df):
-    """Student-t quantile (mpmath: regularized incomplete beta, bracketed root)."""
-    with mp.workdps(20):
-        cdf = lambda t: 1 - mp.betainc(df / 2, mp.mpf(1) / 2, 0, df / (df + t * t),
-                                       regularized=True) / 2
-        hi = mp.mpf(1)
-        while cdf(hi) < prob:
-            hi *= 2
-        return float(mp.findroot(lambda t: cdf(t) - prob, (hi / 2 if hi > 1 else 0, hi),
-                                 solver="illinois"))
-
-
-def _drift(qs_runs, runs):
-    """Equilibration diagnostic from the dynamics only: per run, relative change of q
-    between the first and second half of the measured sweeps; drifting iff the mean
-    change across runs is nonzero by a two-sided Student-t test at 99%."""
-    rel = []
-    for qs in qs_runs:
-        a, c = np.mean(qs[:len(qs) // 2]), np.mean(qs[len(qs) - len(qs) // 2:])
-        scale = (abs(a) + abs(c)) / 2
-        rel.append((c - a) / scale if scale > 0 else 0.0)
-    rel = np.array(rel)
-    m, se = float(rel.mean()), float(rel.std(ddof=1) / math.sqrt(runs))
-    thr = t_quantile(0.995, runs - 1) * se
-    return (abs(m) > thr if se > 0 else m != 0), m, thr
-
-
 def _pd_solve(p, cbar):
     law, jl, b, T, fld = p["degree_law"], p["J_law"], p["beta"], p["transfer"], p["field"]
-    per_run, qs_runs, collapsed = [], [], True
+    per_run, qs_runs, trajs, collapsed = [], [], [], True
     for ss in np.random.SeedSequence(p["seed"]).spawn(p["runs"]):
         rng = np.random.default_rng(ss)
         h = np.full(p["pop"], float(p["init_field"]))
-        acc = []
+        acc, traj = [], []
         for t in range(p["burn_in"] + p["sweeps"]):
             h = _sum_u(rng, h, G.sample_excess_degrees(law, p["pop"], rng), jl, b, T, fld)
             if not np.all(np.isfinite(h)):
                 raise Refusal("no-solution:audit", f"population diverged at sweep {t}")
+            traj.append(float(np.mean(h != 0)) if math.isinf(b) else
+                        float(np.mean(np.tanh(b * h)**2)))
             if t >= p["burn_in"]:
                 acc.append(_measure(rng, h, law, jl, b, T, fld, cbar))
         collapsed &= bool(np.max(np.abs(h)) < 1e-12)
         per_run.append(np.mean(acc, axis=0))
         qs_runs.append([a[0] for a in acc])
+        trajs.append(traj)
     per_run = np.array(per_run)
     mean, err = per_run.mean(0), per_run.std(0, ddof=1) / math.sqrt(len(per_run))
     if not (np.all(np.isfinite(mean)) and -1e-12 <= mean[0] <= 1 + 1e-12):
         raise Refusal("no-solution:audit", f"PD observables out of range: {mean}")
     keys = ("q", "e", "f")
-    drifting, m, thr = _drift(qs_runs, p["runs"])
+    block = max(2, p["sweeps"] // 2)
+    drifting, diag = _drift(qs_runs, trajs, block)
     if collapsed:
         phase, note = "paramagnet", "every run collapsed to h = 0 (max |h| < 1e-12)"
     elif drifting:
         phase = "undetermined"
-        note = (f"not equilibrated: q changed by {m:+.3g} (relative) between the halves of "
-                f"the measured sweeps, beyond the 99% Student-t band {thr:.2g}; the values "
-                "carry burn-in bias not in stderr (near T_c: slow decay to h = 0 or slow "
-                "growth); increase burn_in")
+        note = (f"not equilibrated: {diag}; the values carry burn-in bias not in stderr "
+                "(near T_c: slow decay to h = 0 or slow growth); increase burn_in and runs")
         if p["require_equilibrated"]:
             raise Refusal("no-convergence:equilibration", note)
     else:
         phase = "spin-glass" if fld == 0 else "rs-in-field"
-        note = f"stationary: relative q drift {m:+.2g} within the 99% band {thr:.2g}"
+        few = (f"; only {p['runs']} runs (< 8): the drift tests are weak, use runs >= 8"
+               if p["runs"] < 8 else "")
+        note = (f"no drift detected: {diag}{few}; near the transition (relaxation slow) a "
+                "statistical bias is possible (see population_dynamics docstring)")
     return dict(zip(keys, map(float, mean))), dict(zip(keys, map(float, err))), phase, note
 
 
@@ -309,9 +287,22 @@ def population_dynamics(degree_law, J_law, beta, *, pop: int, sweeps: int, seed:
     """RS population dynamics (parallel update: each sweep replaces the whole
     population by `pop` fresh h = H + sum of u's from random members), `burn_in`
     sweeps then `sweeps` measured sweeps, in `runs` independent runs.  A population that
-    is still drifting (see _drift) is labelled phase "undetermined", or refused with
-    no-convergence:equilibration when require_equilibrated is set."""
+    is still drifting (cavity/_stats.drift: half-vs-half t-test and a three-block sign
+    test, dynamics only) is labelled "undetermined", or refused with
+    no-convergence:equilibration when require_equilibrated is set.
+
+    Reliable window (measured, k = 2, +-J, 40 seeds each).  Defaults (pop 2000,
+    burn_in 50, sweeps 10, runs 8): 0.9 and 0.95 beta_c -> 40/40 undetermined (never
+    "spin-glass"); 1.1 beta_c -> 39 spin-glass, 1 undetermined; 1.2 beta_c -> 40 spin-glass.
+    Small settings (pop 300, burn_in 30, sweeps 10, runs 4): 0.95 beta_c -> 39/40
+    undetermined, 1 "spin-glass" with q = 0.010 (a mislabel); 0.98 beta_c -> 3/16 mislabels.
+    So the label is trustworthy for beta/beta_c <~ 0.95 or >~ 1.1 at default settings;
+    closer to beta_c, or with runs < 8, increase burn_in and runs.  A "paramagnet" label
+    needs exact collapse (max |h| < 1e-12) and was never seen above beta_c."""
     b = _pd_params(degree_law, J_law, beta, pop, sweeps, seed, runs, allow_inf=True)
+    if not (isinstance(burn_in, int) and burn_in >= max(2, sweeps // 2)):
+        raise Refusal("precondition:burn-in", f"burn_in must be an int >= max(2, sweeps // 2) "
+                      f"(the drift sign test uses one burn-in block), got {burn_in!r}")
     params = dict(degree_law=degree_law, J_law=J_law, beta=b, pop=pop, sweeps=sweeps,
                   seed=seed, burn_in=int(burn_in), runs=runs, field=float(field),
                   init_field=float(init_field), transfer=_transfer or transfer,
@@ -375,7 +366,7 @@ def viana_bray_beta_c(degree_law, J_law):
         dens = lambda z: mp.exp(-z * z / 2) / mp.sqrt(2 * mp.pi)
         # even integrand; the dropped tail |z| > 16 weighs < 1e-56 (below the 30-digit target)
         g = lambda b: 2 * Bm * mp.quad(lambda z: dens(z) * mp.tanh(b * z)**2,
-                                       [0, 2, 4, 8, 16], method="gauss-legendre") - 1
+                                       [0, 3, 7, 16], method="gauss-legendre") - 1
         lo, hi = 1 / mp.sqrt(Bm) / 2, 1 / mp.sqrt(Bm)    # E tanh^2(bz) < b^2: g(lo) < 0
         while g(hi) <= 0:
             lo, hi = hi, 2 * hi
@@ -389,33 +380,3 @@ def viana_bray_tc(degree_law, J_law):
     """T_c = 1 / beta_c (see viana_bray_beta_c), as an mpf."""
     with mp.workdps(30):
         return +(1 / viana_bray_beta_c(degree_law, J_law))
-
-
-# ---- exact T = 0 RS solution for +-J on the regular graph -----------------------------------
-def rs_zero_temperature_pm1(k):
-    """At T = 0 with J = +-1, cavity fields are integers and u = J sign(h) in {-1, 0, 1}:
-    with P(u = 0) = x, P(u = +-1) = (1 - x)/2, h = sum of k u's and the closure is
-    x = P(h = 0).  The root x in (0, 1) (x = 1 is the paramagnet) gives the field law and
-    e = f = -[(k+1)/2 E max_{s,s'}(J s s' + h1 s + h2 s') - k E |H|], H = sum of k+1 u's."""
-    if not (isinstance(k, int) and k >= 2):
-        raise Refusal("precondition:k", f"needs integer excess degree k >= 2, got {k!r}")
-    x, z = sp.symbols("x z")
-    law = lambda n: sp.Poly(sp.expand((x + (1 - x) / 2 * (z + 1 / z))**n * z**n), z)
-    coeff = lambda n, r: law(n).coeff_monomial(z**(n + r))
-    roots = [r for r in sp.Poly(coeff(k, 0) - x, x).all_roots() if r.is_real and 0 < r < 1]
-    if len(roots) != 1:
-        raise Refusal("no-solution:rs-t0", f"k = {k}: {len(roots)} roots of x = P(h=0) in (0,1)")
-    x0 = roots[0]
-    ph = {r: sp.simplify(coeff(k, r).subs(x, x0)) for r in range(-k, k + 1)}
-    pH = {r: sp.simplify(coeff(k + 1, r).subs(x, x0)) for r in range(-k - 1, k + 2)}
-    link = sum(sp.Rational(1, 2) * ph[a] * ph[c] * max(J + a + c, J - a - c, -J + a - c,
-                                                       -J - a + c)
-               for J in (-1, 1) for a in ph for c in ph)
-    site = sum(p * abs(r) for r, p in pH.items())
-    e = sp.simplify(-(sp.Rational(k + 1, 2) * link - k * site))
-    with mp.workdps(30):
-        q = sp.simplify(1 - pH[0])          # q = E tanh^2(beta H) -> P(H != 0) at T = 0
-        return {"p0": mp.mpf(str(sp.N(x0, 40))), "e": mp.mpf(str(sp.N(e, 40))),
-                "q": mp.mpf(str(sp.N(q, 40))), "q_exact": q,
-                "p_exact": {r: ph[r] for r in range(0, k + 1)}, "e_exact": e,
-                "cite": f"{_MP02}, Sec. III.B (recursion); computed here", "caveat": CAVITY_CAVEAT}

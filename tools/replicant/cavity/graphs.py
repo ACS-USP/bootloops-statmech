@@ -50,7 +50,7 @@ def j_law(law):
         raise Refusal("unsupported:J-law", f"{law!r}: scale must be a number")
     if not scale > 0:
         raise Refusal("unsupported:J-law", f"{law!r}: scale must be > 0")
-    return law[0], float(law[1])
+    return law[0], scale
 
 
 def sample_couplings(law, size, rng):
