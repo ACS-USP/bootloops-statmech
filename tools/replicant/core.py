@@ -48,6 +48,9 @@ class Step:
     requires: Callable[[State], list[str]]
     apply: Callable[[State], State]
     cite: str | None = None
+    # Optional: a sentence for the trace, computed from the new state
+    # (e.g. which order an expansion dropped).
+    note: Callable[[State], str] | None = None
 
 
 @dataclass(frozen=True)
@@ -87,8 +90,10 @@ def run_pipeline(steps: Sequence[Step], state: State) -> tuple[State, Trace]:
         new = step.apply(state)
         added = sorted(set(new) - set(state))
         changed = sorted(k for k in state if k in new and new[k] is not state[k])
-        trace.add(TraceEntry(step.name, step.cite,
-                             "set " + ", ".join(added + changed) if added or changed
-                             else "no change"))
+        summary = ("set " + ", ".join(added + changed) if added or changed
+                   else "no change")
+        if step.note:
+            summary += "; " + step.note(new)
+        trace.add(TraceEntry(step.name, step.cite, summary))
         state = new
     return state, trace
