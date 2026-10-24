@@ -38,7 +38,7 @@
   "alpha_global_T0": {
     "value": "0.051",
     "tol": "1.1e-3",
-    "cite": "Amit, Gutfreund & Sompolinsky, PRL 55, 1530 (1985) (gwern.net copy): 'Comparing the energies of the SG and the FM states we find that the SG energy is lower for 0.051 < alpha < 0.138, whereas the FM state becomes the absolute minimum below 0.051'. Tol 1.1e-3 covers the spread with the 1987 abstract (0.05) and the reading of 0.051 as truncated: replicant's T = 0 RS route gives 0.05185 (stated, not hidden)",
+    "cite": "Amit, Gutfreund & Sompolinsky, PRL 55, 1530 (1985) (gwern.net copy): 'Comparing the energies of the SG and the FM states we find that the SG energy is lower for 0.051 < alpha < 0.138, whereas the FM state becomes the absolute minimum below 0.051'. AGS quote 0.051; their RS equations solved here give 0.05185. Tol 1.1e-3 covers the spread with the 1987 abstract (0.05) and our value. RS-vs-RS comparison: the SG state is AT-unstable (AGS)",
     "independent_route": "replicant's T = 0 energies: retrieval E_R(alpha) = alpha (1 - r)/2 - m^2/2 from the erf equation (upper root) and spin glass E_SG(alpha) = alpha (1 - r_SG)/2 with r_SG = (1 + sqrt(2/(pi alpha)))^2 (m = 0 solution of the same T = 0 equations); root of E_R - E_SG by mpmath",
     "sources_disagree": [
       {
@@ -62,13 +62,7 @@
   "alpha_c_rs_max_over_T": {
     "value": "0.1381885",
     "tol": "1e-6",
-    "cite": "Steffan & Kuehn (1994), arXiv:cond-mat/9404036, Sec. 4.1: 'alpha_c^RS(T)_max ~ 0.138 188 5' (RS retrieval boundary is reentrant: backbending for T <= T(alpha_max) = 0.024, credited there to Naef & Canning, their ref. [4], not fetched)",
+    "cite": "Steffan & Kuehn (1994), arXiv:cond-mat/9404036, Sec. 4.1: 'alpha_c^RS(T)_max ~ 0.138 188 5' (RS retrieval boundary is reentrant: backbending for T <= T(alpha_max) = 0.024, credited there to Naef & Canning, their ref. [4], not fetched). Location of the maximum NOT banked: S&K state T(alpha_max) = 0.024; replicant's RS curve gives alpha_c(0.0229) = 0.13818851 and alpha_c(0.024) = 0.13818783, curvature about 0.56, so a 7-digit alpha_max = 0.1381885 resolves the location only to about +-4e-4 in T; the quoted 0.024 looks like a coarse value credited to Naef-Canning (not fetched). Banking our own 0.0229 would make the check certify itself, so the key was dropped",
     "independent_route": "replicant's finite-temperature fold: maximum over m of alpha(m) along the retrieval curve (m fixed, sigma from m = E tanh(beta(m + sigma z)), alpha = sigma^2 (1 - beta(1 - q))^2/q), at T = 0.024 (slow test); does not use this number"
-  },
-  "T_at_alpha_c_rs_max": {
-    "value": "0.024",
-    "tol": "1.5e-3",
-    "cite": "Steffan & Kuehn (1994), arXiv:cond-mat/9404036, Sec. 4.1: 'backbending of the transition line for T <= T(alpha_max) = 0.024, previously discovered by Naef and Canning' (their ref. [4], not fetched). Tol: replicant's vertex is T = 0.0229, 1.1e-3 below the quoted 0.024 (the maximum is flat: alpha_c changes by 7e-7 between the two), so tol was widened from rounding (5e-4) to 1.5e-3 to cover it; flagged, not resolved",
-    "independent_route": "replicant's finite-temperature fold alpha_c(T) at T = 0.020, 0.023, 0.026 (slow test): the middle one is the largest and the vertex of the parabola through the three points is compared with the quoted T"
   }
 }

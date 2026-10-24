@@ -24,7 +24,8 @@ RS free energy per spin (AGS PRL Eq. (5), one condensed pattern, C = beta(1 - q)
   Eqs. (6)-(8)).  The domain needs 1 - C > 0 (the log); every returned point has it.
 
 Branches (all three are stationary points of the same f; never substituted):
-  "retrieval"  m > 0: the larger-m solution, the one AGS call locally stable in m.
+  "retrieval"  m > 0: the larger-m solution, the one AGS call locally stable in m
+               (m-mode; see Stability for the replicon).
                Unknowns (m, sigma = sqrt(alpha r)); equations m = E tanh Xi and
                sigma (1 - C) = sqrt(alpha q); Newton with the analytic Jacobian
                (Stein: d/dsigma E h(Xi) = beta^2 sigma E h''(Xi)), seeded from the T = 0
@@ -37,13 +38,22 @@ Branches (all three are stationary points of the same f; never substituted):
                q = beta^2 alpha q/(1 - beta)^2 + O(q^2)).
   "paramagnet" m = q = r = 0: only inside the domain for T > 1 (1 - C = 1 - beta).
 
-Stability ("stable" field).  m-mode: with q, r held at their stationary values for each
-m, d f_red/dm = m - E tanh Xi, and d^2 f_red/dm^2 = -det J / J22 (J the Jacobian of the
-two retrieval equations in (m, sigma)); stable iff > 0.  At m = 0 this is 1 - C, so the
-spin glass is always m-stable (AGS: 'stable to the development of finite overlaps').
-The paramagnet is reported stable iff T > T_g (the spin-glass mode).  NOT computed: the
-replicon (AT) eigenvalue; AGS find RS broken in the spin-glass phase for all T < T_g and
-in the retrieval phase only below a very low T_R(alpha).
+Stability.  Three labels on every HopfieldSolution:
+  mode_eig / mode_stable: the order-parameter mode of the branch.  Retrieval and spin
+    glass: the m-mode, d^2 f_red/dm^2 = -det J / J22 with q, r held stationary at each m
+    (J the Jacobian of the two retrieval equations in (m, sigma)); at m = 0 it equals
+    1 - C, so the spin glass is always m-stable (AGS: 'stable to the development of
+    finite overlaps').  Paramagnet: the q-mode, the linearisation slope of the spin-glass
+    equation at q = 0, 1 - alpha beta^2/(1 - beta)^2 (computed, not the banked T_g).
+  replicon: the AT eigenvalue of the RS saddle, AGS PRL Eq. (13),
+    [1 - beta(1 - q)]^2 - alpha beta^2 E sech^4 Xi > 0, reported normalised as
+    lambda_AT = 1 - alpha beta^2 E sech^4 Xi / (1 - C)^2 (same sign).  At q = 0 it equals
+    the paramagnet's q-mode, so it vanishes at T_g; AGS find it negative for the spin
+    glass at all T < T_g and for retrieval only at very low T (Steffan & Kuehn: the AT
+    line meets the retrieval boundary just above T(alpha_max), so the reentrant sliver
+    is RS-unacceptable).
+  stable = mode_stable and replicon > 0.  AT-unstable RS points are still returned
+  (this is the RS family) but never labelled stable.
 
 Retrieval boundary alpha_c(T) (hopfield_alpha_c).  T = 0 (AGS Eqs. (9)-(10)): with
 C = lim beta(1 - q), y = m/sqrt(2 alpha r): m = erf(y), C = (2/sqrt(pi)) (y/m) e^{-y^2},
@@ -58,8 +68,8 @@ is explicit; alpha_c(T) = max over m, located by a scan down from the Mattis val
 and a bracketed root of d alpha/dm (implicit differentiation, analytic).  This is the
 fold connected to the alpha = 0 Mattis state.
 
-Numerics: mpmath tanh-sinh quadrature with breakpoints [-8, -m/sigma, 0, 8] at 20 digits
-(or the caller's precision if higher); returned points satisfy the three equations to
+Numerics: composite Gauss-Legendre quadrature (below) at 20 digits (or the caller's
+precision if higher); returned points satisfy the three equations to
 < 1e-14 (re-evaluated after the solve) and the analytic gradient < 1e-8, or the call
 refuses.  Quadrature: composite 24-point Gauss-Legendre on |z| < 9 with panel cuts at
 the kink -m/sigma and at the tanh step width 1/(beta sigma), all moments in one pass.
@@ -89,9 +99,12 @@ class HopfieldSolution:
     r: object
     branch: str
     f: object = None
-    stable: bool = None
+    stable: bool = None            # mode_stable and replicon > 0
     residual: object = None        # max |equation| over (m, q, r)
-    grad: tuple = ()               # numerical (df/dm, df/dq, df/dr) at the point
+    grad: tuple = ()               # analytic (df/dm, df/dq, df/dr) at the point
+    mode_stable: bool = None       # m-mode (retrieval, spin glass) or q-mode (paramagnet)
+    mode_eig: object = None
+    replicon: object = None        # lambda_AT = 1 - alpha beta^2 E sech^4 / (1 - C)^2
     note: str = ""
     caveat: str = CAVEAT
 
@@ -384,6 +397,22 @@ def _m_stability(a, b, m, s):
     return -(J[0][0] * J[1][1] - J[0][1] * J[1][0]) / J[1][1]
 
 
+def _replicon(a, b, m, q, r):
+    """lambda_AT = 1 - alpha beta^2 E sech^4 Xi / (1 - C)^2 (AGS PRL Eq. (13) / (1-C)^2)."""
+    _, t2, _, t4 = _moments(b, m, mp.sqrt(a * r))
+    return 1 - a * b**2 * (1 - 2 * t2 + t4) / (1 - b * (1 - q))**2
+
+
+def _labels(lam_mode, lam_at):
+    return dict(mode_stable=bool(lam_mode > 0), mode_eig=lam_mode, replicon=lam_at,
+                stable=bool(lam_mode > 0 and lam_at > 0))
+
+
+def _at_note(lam):
+    return (f"replicon lambda_AT = {mp.nstr(lam, 6)}: "
+            + ("RS locally stable" if lam > 0 else "RS AT-unstable (RSB needed; RS kept as RS)"))
+
+
 # ---- finite-T fold: the retrieval curve parametrised by m ---------------------------
 def _sigma_at_m(b, m):
     """sigma > 0 with E tanh(b(m + sigma z)) = m (requires m < Mattis value)."""
@@ -510,9 +539,11 @@ def _retrieval(a, b):
     q = _moments(b, m, s)[1]
     r = s**2 / a
     res, g, f = _audit(a, b, m, q, r)
-    return HopfieldSolution(m, q, r, "retrieval", f, True, res, g,
-                            "larger-m retrieval solution, m-stable (d2f/dm2 = "
-                            f"{mp.nstr(_m_stability(a, b, m, s), 6)} > 0); replicon not computed")
+    lm, lat = _m_stability(a, b, m, s), _replicon(a, b, m, q, r)
+    return HopfieldSolution(m, q, r, "retrieval", f, residual=res, grad=g,
+                            note=f"larger-m retrieval solution, m-stable (d2f/dm2 = "
+                                 f"{mp.nstr(lm, 6)} > 0); {_at_note(lat)}",
+                            **_labels(lm, lat))
 
 
 def _spinglass(a, b):
@@ -548,10 +579,10 @@ def _spinglass(a, b):
     q = roots[0]
     r = q / (1 - b * (1 - q))**2
     res, g, f = _audit(a, b, mp.mpf(0), q, r)
-    return HopfieldSolution(mp.mpf(0), q, r, "spinglass", f, True, res, g,
-                            f"m-stable (d2f/dm2 = 1 - beta(1 - q) = "
-                            f"{mp.nstr(1 - b * (1 - q), 6)} > 0); RS replicon not computed "
-                            "(AGS 1985: negative for the SG at all T < T_g)")
+    lm, lat = 1 - b * (1 - q), _replicon(a, b, mp.mpf(0), q, r)
+    return HopfieldSolution(mp.mpf(0), q, r, "spinglass", f, residual=res, grad=g,
+                            note=f"m-mode d2f/dm2 = 1 - beta(1 - q) = {mp.nstr(lm, 6)}; "
+                                 f"{_at_note(lat)}", **_labels(lm, lat))
 
 
 def _paramagnet(a, b):
@@ -562,12 +593,13 @@ def _paramagnet(a, b):
                       "ln(1 - beta(1 - q)) undefined")
     z = mp.mpf(0)
     res, g, f = _audit(a, b, z, z, z)
-    tg = 1 + mp.sqrt(a)
-    st = bool(1 / b > tg)
-    return HopfieldSolution(z, z, z, "paramagnet", f, st, res, g,
-                            f"T = {mp.nstr(1 / b, 8)} {'>' if st else '<='} T_g = 1 + sqrt(alpha)"
-                            f" = {mp.nstr(tg, 8)}: q-mode "
-                            f"{'stable' if st else 'unstable (spin-glass branch exists)'}")
+    lq = 1 - a * b**2 / (1 - b)**2            # q-mode: slope of the SG equation at q = 0
+    lat = _replicon(a, b, z, z, z)
+    return HopfieldSolution(z, z, z, "paramagnet", f, residual=res, grad=g,
+                            note=f"q-mode 1 - alpha beta^2/(1 - beta)^2 = {mp.nstr(lq, 6)}: "
+                                 + ("stable" if lq > 0 else "unstable, a spin-glass branch "
+                                    "bifurcates (T below T_g)") + f"; {_at_note(lat)}",
+                            **_labels(lq, lat))
 
 
 @lru_cache(maxsize=128)

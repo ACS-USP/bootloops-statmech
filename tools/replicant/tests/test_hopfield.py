@@ -71,11 +71,13 @@ def test_paramagnet_boundary():
     sg = hopfield_rs(alpha, below, branch="spinglass")
     assert sg.branch == "spinglass" and sg.m == 0 and 0 < sg.q < mp.mpf("0.2"), sg
     pm = hopfield_rs(alpha, below, branch="paramagnet")
-    assert pm.m == pm.q == pm.r == 0 and pm.stable is False and "T_g" in pm.note
+    assert pm.m == pm.q == pm.r == 0 and pm.stable is False and pm.mode_eig < 0
+    assert pm.replicon == pm.mode_eig           # at q = 0 the AT mode is the q-mode
+    assert sg.mode_stable and sg.replicon < 0 and not sg.stable     # AGS: SG AT-unstable
     r = _refuses(lambda: hopfield_rs(alpha, above, branch="spinglass"), "no-solution:spinglass")
     assert "T_g" in r.detail and "paramagnet" in r.detail, r.detail
     pm = hopfield_rs(alpha, above, branch="paramagnet")
-    assert pm.stable is True
+    assert pm.stable is True and pm.mode_eig > 0
 
 
 def test_alpha_c_matches_reference():
@@ -107,7 +109,10 @@ def test_branch_is_named_and_selectable():
     s = hopfield_rs("0.1", BIG_BETA, branch="spinglass")
     assert (r.branch, s.branch) == ("retrieval", "spinglass")
     assert r.m > mp.mpf("0.9") and s.m == 0 and s.q > mp.mpf("0.9"), (r, s)
-    assert r.stable and s.stable
+    # labels: retrieval RS-stable (replicon > 0); spin glass m-stable but AT-unstable.
+    # Cross-check values computed independently by the reviewer: +0.97, -11.2
+    assert r.stable and r.mode_stable and abs(r.replicon - mp.mpf("0.969398")) < mp.mpf("1e-5")
+    assert s.mode_stable and not s.stable and abs(s.replicon - mp.mpf("-11.2201")) < mp.mpf("1e-3")
     assert hopfield_rs("0.1", BIG_BETA) == r          # default branch is retrieval
     # below T = 1 the q = 0 point is outside the RS functional's domain (ln(1 - beta))
     d = _refuses(lambda: hopfield_rs("0.1", BIG_BETA, branch="paramagnet"),
@@ -144,7 +149,8 @@ def test_retrieval_above_alpha_c_refuses():
 def test_free_energy_ordering():
     """AGS PRL (1985): 'the SG energy is lower for 0.051 < alpha < 0.138, whereas the
     FM state becomes the absolute minimum below 0.051' (T = 0).  Checked at T = 1/20
-    with the finite-beta solver and at T = 0 with the erf reduction."""
+    with the finite-beta solver and at T = 0 with the erf reduction.  This is an RS-vs-RS
+    comparison involving an AT-unstable spin-glass state (the same caveat as AGS)."""
     for a, retrieval_lower in (("0.1", False), ("0.03", True)):
         fr = hopfield_rs(a, BIG_BETA).f
         fs = hopfield_rs(a, BIG_BETA, branch="spinglass").f
@@ -160,7 +166,9 @@ def test_free_energy_ordering():
 def test_free_energy_ordering_near_alpha_c():
     fr = hopfield_rs("0.135", BIG_BETA).f
     fs = hopfield_rs("0.135", BIG_BETA, branch="spinglass").f
-    assert fs < fr, (fr, fs)
+    assert fs < fr, (fr, fs)          # RS-vs-RS, SG AT-unstable (as in AGS)
+    r = hopfield_rs("0.13", BIG_BETA)     # reviewer's cross-check value +0.80
+    assert r.stable and abs(r.replicon - mp.mpf("0.800172")) < mp.mpf("1e-4"), r.replicon
 
 
 # ---- every returned point is a genuine stationary point -------------------------
@@ -253,13 +261,22 @@ def test_alpha_c_finite_T_is_reentrant():
         num = (t1 - t0)**2 * (a1 - a2) - (t1 - t2)**2 * (a1 - a0)
         den = (t1 - t0) * (a1 - a2) - (t1 - t2) * (a1 - a0)
         tmax = t1 - num / (2 * den)
-    assert check(REF["T_at_alpha_c_rs_max"], tmax, label="T at max alpha_c").ok, tmax
+    # location NOT banked (see the alpha_c_rs_max_over_T cite): S&K quote 0.024, the
+    # 7-digit maximum resolves it only to ~ +-4e-4; we record ours
+    assert mp.mpf("0.022") < tmax < mp.mpf("0.024"), tmax      # ours: 0.0229
     # inside the reentrant sliver (alpha above the T = 0 alpha_c) retrieval exists at
     # T = 0.023 but not at T = 0.  Second route to the same point: the m-parametrised
     # curve alpha(m) (the solver's fallback), bracketed on the upper branch.
     a, b = mp.mpf("0.13815"), 1 / Ts[1]
     sol = hopfield_rs(a, b)
-    assert sol.branch == "retrieval" and sol.stable and sol.residual < mp.mpf("1e-14")
+    assert sol.branch == "retrieval" and sol.residual < mp.mpf("1e-14")
+    # S&K: the AT line meets the RS boundary just above T(alpha_max), so the sliver is
+    # RS-unacceptable: m-stable, replicon < 0 (reviewer's value -0.028); just above, at
+    # T = 0.026 next to the boundary, the replicon is positive again
+    assert sol.mode_stable and not sol.stable
+    assert abs(sol.replicon - mp.mpf("-0.0281095")) < mp.mpf("1e-4"), sol.replicon
+    above = hopfield_rs("0.13818", 1 / mp.mpf("0.026"))
+    assert above.stable and above.replicon > 0, above.replicon
     with mp.workdps(20):
         _, mf = H._fold_finite(H._key(b))
         m_alt = H._root(lambda x: H._alpha_of_m(b, x)[0] - a, mf,
@@ -274,6 +291,8 @@ def test_retrieval_at_moderate_temperature():
     sol = hopfield_rs("0.05", 3)
     t0 = hopfield_t0("0.05", "retrieval")
     assert sol.stable and mp.mpf("0.8") < sol.m < t0.m and sol.residual < mp.mpf("1e-14"), sol
+    sg = hopfield_rs("0.05", 3, branch="spinglass")     # reviewer's value -1.03
+    assert not sg.stable and abs(sg.replicon - mp.mpf("-1.03323")) < mp.mpf("1e-4")
 
 
 @slow
@@ -292,4 +311,6 @@ def test_tg_by_bisection_on_existence():
         coef = ((lo + hi) / 2 - 1) / mp.sqrt(a)
         q_near = hopfield_rs(a, 1 / lo, branch="spinglass").q      # continuous: q -> 0
         assert 0 < q_near < mp.mpf("1e-5"), q_near
+        lam = hopfield_rs(a, 1 / lo, branch="spinglass").replicon   # marginal at T_g
+        assert lam < 0 and abs(lam) < mp.mpf("1e-4"), lam
         assert check(REF["tg_sqrt_alpha_coefficient"], coef, label="T_g").ok, (a, coef)
