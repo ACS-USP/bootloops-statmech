@@ -72,14 +72,16 @@ def _beta(beta, *, allow_inf):
 @dataclass(frozen=True)
 class BPResult:
     """messages[2e] = u_{i->j}, messages[2e+1] = u_{j->i} for graph.edges[e] = (i, j):
-    the field (in units of J's energy scale, not times beta) that i sends to j."""
+    the field (in units of J's energy scale, not times beta) that i sends to j.
+    marginals and log_z are None when converged is False: the last iterate is not a
+    fixed point, so Bethe quantities computed from it would mean nothing."""
     messages: np.ndarray
     converged: bool
     iterations: int
     residual: float
     graph: G.Graph
-    marginals: np.ndarray            # <s_i> = tanh(beta H_i)
-    log_z: float                     # Bethe ln Z (exact on trees)
+    marginals: np.ndarray | None     # <s_i> = tanh(beta H_i); None if not converged
+    log_z: float | None              # Bethe ln Z (exact on trees); None if not converged
     caveat: str = CAVITY_CAVEAT
 
 
@@ -133,7 +135,9 @@ def bp_fixed_point(graph_degree_law, beta, J_law, *, seed: int, n=None, field=0.
     log_z = float(lz_link.sum() - ((d - 1) * _ln2cosh(b * H)).sum())
     if not (np.all(np.isfinite(u)) and math.isfinite(log_z)):
         raise Refusal("no-solution:audit", f"non-finite BP messages or ln Z at beta = {b}")
-    return BPResult(u, conv, it, res, g, np.tanh(b * H), log_z)
+    if not conv:
+        return BPResult(u, False, it, res, g, None, None)
+    return BPResult(u, True, it, res, g, np.tanh(b * H), log_z)
 
 
 # ---- population dynamics -------------------------------------------------------------
@@ -143,7 +147,10 @@ class PDResult:
     value: dict
     stderr: dict
     label: str = "statistical"
-    phase: str = ""     # "paramagnet" (all runs collapsed to h = 0), "spin-glass", "rs-in-field"
+    # "paramagnet" (all runs collapsed to h = 0), "spin-glass" / "rs-in-field" (stationary
+    # within the drift test), or "undetermined" (q still drifting: not equilibrated)
+    phase: str = ""
+    note: str = ""
     params: dict = dfield(default_factory=dict)
     trace: Trace = None
     caveat: str = CAVITY_CAVEAT
@@ -217,9 +224,36 @@ def _pd_steps():
                  lambda s: f"route=cavity; phase {s['solution'][2]}")]
 
 
+def t_quantile(prob, df):
+    """Student-t quantile (mpmath: regularized incomplete beta, bracketed root)."""
+    with mp.workdps(20):
+        cdf = lambda t: 1 - mp.betainc(df / 2, mp.mpf(1) / 2, 0, df / (df + t * t),
+                                       regularized=True) / 2
+        hi = mp.mpf(1)
+        while cdf(hi) < prob:
+            hi *= 2
+        return float(mp.findroot(lambda t: cdf(t) - prob, (hi / 2 if hi > 1 else 0, hi),
+                                 solver="illinois"))
+
+
+def _drift(qs_runs, runs):
+    """Equilibration diagnostic from the dynamics only: per run, relative change of q
+    between the first and second half of the measured sweeps; drifting iff the mean
+    change across runs is nonzero by a two-sided Student-t test at 99%."""
+    rel = []
+    for qs in qs_runs:
+        a, c = np.mean(qs[:len(qs) // 2]), np.mean(qs[len(qs) - len(qs) // 2:])
+        scale = (abs(a) + abs(c)) / 2
+        rel.append((c - a) / scale if scale > 0 else 0.0)
+    rel = np.array(rel)
+    m, se = float(rel.mean()), float(rel.std(ddof=1) / math.sqrt(runs))
+    thr = t_quantile(0.995, runs - 1) * se
+    return (abs(m) > thr if se > 0 else m != 0), m, thr
+
+
 def _pd_solve(p, cbar):
     law, jl, b, T, fld = p["degree_law"], p["J_law"], p["beta"], p["transfer"], p["field"]
-    per_run, collapsed = [], True
+    per_run, qs_runs, collapsed = [], [], True
     for ss in np.random.SeedSequence(p["seed"]).spawn(p["runs"]):
         rng = np.random.default_rng(ss)
         h = np.full(p["pop"], float(p["init_field"]))
@@ -232,13 +266,27 @@ def _pd_solve(p, cbar):
                 acc.append(_measure(rng, h, law, jl, b, T, fld, cbar))
         collapsed &= bool(np.max(np.abs(h)) < 1e-12)
         per_run.append(np.mean(acc, axis=0))
+        qs_runs.append([a[0] for a in acc])
     per_run = np.array(per_run)
     mean, err = per_run.mean(0), per_run.std(0, ddof=1) / math.sqrt(len(per_run))
     if not (np.all(np.isfinite(mean)) and -1e-12 <= mean[0] <= 1 + 1e-12):
         raise Refusal("no-solution:audit", f"PD observables out of range: {mean}")
     keys = ("q", "e", "f")
-    return (dict(zip(keys, map(float, mean))), dict(zip(keys, map(float, err))),
-            "paramagnet" if collapsed else ("spin-glass" if fld == 0 else "rs-in-field"))
+    drifting, m, thr = _drift(qs_runs, p["runs"])
+    if collapsed:
+        phase, note = "paramagnet", "every run collapsed to h = 0 (max |h| < 1e-12)"
+    elif drifting:
+        phase = "undetermined"
+        note = (f"not equilibrated: q changed by {m:+.3g} (relative) between the halves of "
+                f"the measured sweeps, beyond the 99% Student-t band {thr:.2g}; the values "
+                "carry burn-in bias not in stderr (near T_c: slow decay to h = 0 or slow "
+                "growth); increase burn_in")
+        if p["require_equilibrated"]:
+            raise Refusal("no-convergence:equilibration", note)
+    else:
+        phase = "spin-glass" if fld == 0 else "rs-in-field"
+        note = f"stationary: relative q drift {m:+.2g} within the 99% band {thr:.2g}"
+    return dict(zip(keys, map(float, mean))), dict(zip(keys, map(float, err))), phase, note
 
 
 def _pd_params(degree_law, J_law, beta, pop, sweeps, seed, runs, allow_inf):
@@ -249,24 +297,29 @@ def _pd_params(degree_law, J_law, beta, pop, sweeps, seed, runs, allow_inf):
         raise Refusal("precondition:population-size", f"pop must be an int >= 100, got {pop!r}")
     if not (isinstance(runs, int) and runs >= 2):
         raise Refusal("precondition:runs", f"runs must be >= 2 for a stderr, got {runs!r}")
-    if not (isinstance(sweeps, int) and sweeps >= 1):
-        raise Refusal("precondition:sweeps", f"sweeps must be an int >= 1, got {sweeps!r}")
+    if not (isinstance(sweeps, int) and sweeps >= 4):
+        raise Refusal("precondition:sweeps", f"sweeps must be an int >= 4 (the drift test "
+                      f"compares halves of the measured sweeps), got {sweeps!r}")
     return b
 
 
 def population_dynamics(degree_law, J_law, beta, *, pop: int, sweeps: int, seed: int,
-                        burn_in=50, runs=8, field=0.0, init_field=1.0, _transfer=None):
+                        burn_in=50, runs=8, field=0.0, init_field=1.0,
+                        require_equilibrated=False, _transfer=None):
     """RS population dynamics (parallel update: each sweep replaces the whole
     population by `pop` fresh h = H + sum of u's from random members), `burn_in`
-    sweeps then `sweeps` measured sweeps, in `runs` independent runs."""
+    sweeps then `sweeps` measured sweeps, in `runs` independent runs.  A population that
+    is still drifting (see _drift) is labelled phase "undetermined", or refused with
+    no-convergence:equilibration when require_equilibrated is set."""
     b = _pd_params(degree_law, J_law, beta, pop, sweeps, seed, runs, allow_inf=True)
     params = dict(degree_law=degree_law, J_law=J_law, beta=b, pop=pop, sweeps=sweeps,
                   seed=seed, burn_in=int(burn_in), runs=runs, field=float(field),
-                  init_field=float(init_field), transfer=_transfer or transfer)
+                  init_field=float(init_field), transfer=_transfer or transfer,
+                  require_equilibrated=bool(require_equilibrated))
     state, trace = run_pipeline(_pd_steps(), State(params=params))
-    value, err, phase = state["solution"]
+    value, err, phase, note = state["solution"]
     shown = {k: v for k, v in params.items() if k != "transfer"}
-    return PDResult(value, err, "statistical", phase, shown, trace)
+    return PDResult(value, err, "statistical", phase, note, shown, trace)
 
 
 def pd_growth_factor(degree_law, J_law, beta, *, pop: int, sweeps: int, seed: int, runs=4,
@@ -291,7 +344,7 @@ def pd_growth_factor(degree_law, J_law, beta, *, pop: int, sweeps: int, seed: in
         raise Refusal("no-solution:audit", f"non-finite growth factors {r}")
     return PDResult({"growth": float(r.mean())},
                     {"growth": float(r.std(ddof=1) / math.sqrt(len(r)))},
-                    params=dict(degree_law=degree_law, J_law=J_law, beta=b, pop=pop))
+                    note="linear growth of a tiny-amplitude population", params=dict(degree_law=degree_law, J_law=J_law, beta=b, pop=pop))
 
 
 def pd_transition_beta(degree_law, J_law, *, lo, hi, pop, sweeps, seed, iters=12):
@@ -361,6 +414,8 @@ def rs_zero_temperature_pm1(k):
     site = sum(p * abs(r) for r, p in pH.items())
     e = sp.simplify(-(sp.Rational(k + 1, 2) * link - k * site))
     with mp.workdps(30):
+        q = sp.simplify(1 - pH[0])          # q = E tanh^2(beta H) -> P(H != 0) at T = 0
         return {"p0": mp.mpf(str(sp.N(x0, 40))), "e": mp.mpf(str(sp.N(e, 40))),
+                "q": mp.mpf(str(sp.N(q, 40))), "q_exact": q,
                 "p_exact": {r: ph[r] for r in range(0, k + 1)}, "e_exact": e,
                 "cite": f"{_MP02}, Sec. III.B (recursion); computed here", "caveat": CAVITY_CAVEAT}

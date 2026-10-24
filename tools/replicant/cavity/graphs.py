@@ -26,6 +26,10 @@ def degree_law(law, *, allow_tree=False):
     if not (isinstance(law, tuple) and len(law) == 2 and law[0] in kinds):
         raise Refusal("unsupported:degree-law", f"{law!r}: supported {kinds} as (kind, param)")
     kind, p = law
+    try:
+        float(p)
+    except (TypeError, ValueError):
+        raise Refusal("unsupported:degree-law", f"{law!r}: parameter must be a number")
     if kind in ("regular", "tree"):
         if isinstance(p, bool) or not float(p).is_integer() or int(p) < 1:
             raise Refusal("unsupported:degree-law", f"{law!r}: {kind} needs an integer >= 1 "
@@ -40,7 +44,11 @@ def j_law(law):
     """Validate a coupling law -> (kind, scale)."""
     if not (isinstance(law, tuple) and len(law) == 2 and law[0] in J_LAWS):
         raise Refusal("unsupported:J-law", f"{law!r}: supported {J_LAWS} as (kind, scale)")
-    if not float(law[1]) > 0:
+    try:
+        scale = float(law[1])
+    except (TypeError, ValueError):
+        raise Refusal("unsupported:J-law", f"{law!r}: scale must be a number")
+    if not scale > 0:
         raise Refusal("unsupported:J-law", f"{law!r}: scale must be > 0")
     return law[0], float(law[1])
 

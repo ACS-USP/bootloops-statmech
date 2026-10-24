@@ -15,7 +15,7 @@
     "value": "0.333333333333333333333333333333",
     "tol": "1e-20",
     "cite": "Mezard & Parisi, The cavity method at zero temperature, arXiv:cond-mat/0207121 (2002; journal reference not verified here), Sec. III.B, after Eq. (18): 'for k = 2, the solution is p0 = 1/3, p1 = 2/9, p2 = 1/9' (RS, T = 0, +-1 couplings, fixed connectivity k + 1 = 3); read from the arXiv PDF during this build",
-    "independent_route": "replicant's exact T = 0 RS recursion on the integer cavity-field law (sympy roots of p0 = P(sum of k u's = 0), u = J sign(h)), sparse.rs_zero_temperature_pm1, and T = 0 population dynamics (statistical) within stderr"
+    "independent_route": "replicant's exact T = 0 RS recursion on the integer cavity-field law (sympy roots of p0 = P(sum of k u's = 0), u = J sign(h)), sparse.rs_zero_temperature_pm1; and T = 0 population dynamics (statistical, slow tier test_pd_zero_temperature_large_population): its q = P(H != 0) matches 1 - P(H = 0) = 20/27 computed from p0 within a 99% Student-t band"
   },
   "e0_rs_regular_pm1_k2": {
     "value": "-1.27777777777777777777777777778",

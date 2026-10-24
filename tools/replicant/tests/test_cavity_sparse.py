@@ -48,10 +48,12 @@ def _refuses(fn, reason):
     raise AssertionError(f"expected Refusal {reason}")
 
 
-def _band(got, err, ref, n_sigma=3.0):
-    """Statistical comparison: |got - ref| <= n_sigma sqrt(err^2 + tol_ref^2)."""
-    want, tol = float(ref.value), float(ref.tol)
-    return abs(got - want) <= n_sigma * np.hypot(err, tol), (got, err, want, tol)
+def _band(got, err, want, tol, runs, conf=0.99):
+    """Statistical comparison: |got - want| <= t_{runs-1} sqrt(err^2 + tol^2), with the
+    two-sided Student-t quantile at `conf` (our stderr comes from only `runs` runs, so
+    normal quantiles would be too narrow)."""
+    t = S.t_quantile(1 - (1 - conf) / 2, runs - 1)
+    return abs(got - want) <= t * np.hypot(err, tol), (got, err, want, tol, t)
 
 
 # ---- BP on trees vs exhaustive enumeration (independent route) -----------------------
@@ -106,6 +108,7 @@ def test_bp_reports_non_convergence_and_refuses_on_request():
     args = (("regular", 2), 3.0, ("pm1", 1.0))
     r = bp_fixed_point(*args, seed=1, n=200, max_iter=30)
     assert not r.converged and r.residual > 1e-6, r.residual
+    assert r.marginals is None and r.log_z is None     # no Bethe quantities off a fixed point
     e = _refuses(lambda: bp_fixed_point(*args, seed=1, n=200, max_iter=30,
                                         require_converged=True), "no-convergence")
     assert "damping" in e.detail and "residual" in e.detail
@@ -144,6 +147,9 @@ def test_viana_bray_refusals():
     _refuses(lambda: viana_bray_tc(("scale-free", 3), ("pm1", 1)), "unsupported:degree-law")
     _refuses(lambda: viana_bray_tc(("regular", 2), ("cauchy", 1)), "unsupported:J-law")
     _refuses(lambda: viana_bray_tc(("regular", 2.5), ("pm1", 1)), "unsupported:degree-law")
+    _refuses(lambda: viana_bray_tc(("regular", "two"), ("pm1", 1)), "unsupported:degree-law")
+    _refuses(lambda: viana_bray_tc(("poisson", None), ("pm1", 1)), "unsupported:degree-law")
+    _refuses(lambda: viana_bray_tc(("regular", 2), ("pm1", "one")), "unsupported:J-law")
 
 
 # ---- population dynamics -------------------------------------------------------------
@@ -187,7 +193,11 @@ def test_pd_paramagnet_above_tc_and_spin_glass_below():
 
 def test_pd_transition_location_from_linear_growth():
     """PD's own transition (no closed form): a tiny-amplitude population grows iff
-    beta > beta_c.  Checked on both graph laws against the banked beta_c."""
+    beta > beta_c.  Checked on both graph laws against the banked beta_c.  Note: at tiny
+    amplitude this measures the linearisation u ~ tanh(beta J) h, the same one the closed
+    form comes from, so it is a WEAK independent route for beta_c (it checks the code, not
+    the physics); the stronger evidence is the slow bisection with Gaussian J and the
+    equilibrated PD phases below."""
     for law, key in ((("regular", 2), "beta_c_regular_pm1_k2"),
                      (("poisson", 3), "beta_c_poisson_pm1_c3")):
         bc = float(_ref()[key].value)
@@ -223,11 +233,46 @@ def test_rs_zero_temperature_exact_matches_bank():
 
 
 def test_pd_zero_temperature_matches_exact_rs():
+    """T = 0 PD (small pop) vs the exact integer-field RS solution: q = P(H != 0) = 20/27
+    and e = -23/18, within 99% Student-t bands (4 runs)."""
     sol = rs_zero_temperature_pm1(2)
+    assert sol["q_exact"] == sp.Rational(20, 27)
     r = population_dynamics(("regular", 2), ("pm1", 1.0), mp.inf, pop=500, sweeps=10,
                             burn_in=40, runs=4, seed=5)
-    assert abs(r.value["e"] - float(sol["e"])) <= 4 * r.stderr["e"] + 1e-3, (r, sol["e"])
-    assert abs(r.value["f"] - r.value["e"]) < 1e-12        # T = 0: f = e
+    for obs in ("q", "e"):
+        ok, info = _band(r.value[obs], r.stderr[obs], float(sol[obs]), 0.0, 4)
+        assert ok, (obs, info)
+    assert r.stderr["q"] < 0.005 and r.phase == "spin-glass", r
+
+
+def test_pd_near_tc_is_never_a_confident_spin_glass():
+    """0.9 beta_c (k = 2, +-1), short burn-in: the biased start is still decaying to h = 0.
+    The drift diagnostic (dynamics only) must not report a spin glass with q > 0."""
+    bc = float(_ref()["beta_c_regular_pm1_k2"].value)
+    for seed in range(4):
+        r = population_dynamics(("regular", 2), ("pm1", 1.0), 0.9 * bc, seed=seed, **_SMALL)
+        assert r.phase in ("paramagnet", "undetermined"), (seed, r.phase, r.value)
+        assert r.phase == "paramagnet" or "not equilibrated" in r.note, r.note
+    _refuses(lambda: population_dynamics(("regular", 2), ("pm1", 1.0), 0.9 * bc, seed=0,
+                                         require_equilibrated=True, **_SMALL),
+             "no-convergence:equilibration")
+    # well below beta_c with enough burn-in: the paramagnet
+    r = population_dynamics(("regular", 2), ("pm1", 1.0), 0.6 * bc, seed=0,
+                            **{**_SMALL, "burn_in": 150})
+    assert r.phase == "paramagnet" and r.value["q"] < 1e-12, r
+
+
+def test_pd_above_tc_is_a_spin_glass_with_the_right_q():
+    """1.5 beta_c (k = 2): spin glass, stationary, for several seeds; and k = 5 at T = 0.8
+    (beta = 2.6 beta_c) small pop vs Mezard-Parisi RS q (Student-t band, 4 runs)."""
+    bc = float(_ref()["beta_c_regular_pm1_k2"].value)
+    for seed in range(3):
+        r = population_dynamics(("regular", 2), ("pm1", 1.0), 1.5 * bc, seed=seed, **_SMALL)
+        assert r.phase == "spin-glass" and r.value["q"] > 0.4, (seed, r)
+    ref = _ref()["q_rs_regular_pm1_k5_T0p8"]
+    r = population_dynamics(("regular", 5), ("pm1", 1.0), 1.25, seed=0, **_SMALL)
+    ok, info = _band(r.value["q"], r.stderr["q"], float(ref.value), float(ref.tol), 4)
+    assert ok and r.phase == "spin-glass", info
 
 
 def test_pd_refusals():
@@ -242,6 +287,10 @@ def test_pd_refusals():
                                          seed=0), "precondition:population-size")
     _refuses(lambda: population_dynamics(("regular", 2), ("pm1", 1), 1.0, pop=300, sweeps=2,
                                          seed=0, runs=1), "precondition:runs")
+    _refuses(lambda: population_dynamics(("regular", 2), ("pm1", 1), 1.0, pop=300, sweeps=3,
+                                         seed=0), "precondition:sweeps")
+    _refuses(lambda: population_dynamics(("regular", "k"), ("pm1", 1), 1.0, **ok),
+             "unsupported:degree-law")
 
 
 def test_sparse_leaves_mpmath_precision_unchanged():
@@ -259,9 +308,11 @@ def test_pd_reproduces_mezard_parisi_rs_k5():
     ref = _ref()
     r = population_dynamics(("regular", 5), ("pm1", 1.0), 1.25, pop=10000, sweeps=40,
                             burn_in=150, runs=8, seed=11)
+    assert r.phase == "spin-glass", r.note
     for obs, key in (("q", "q_rs_regular_pm1_k5_T0p8"), ("e", "e_rs_regular_pm1_k5_T0p8"),
                      ("f", "f_rs_regular_pm1_k5_T0p8")):
-        ok, info = _band(r.value[obs], r.stderr[obs], ref[key])
+        ok, info = _band(r.value[obs], r.stderr[obs], float(ref[key].value),
+                         float(ref[key].tol), 8)
         assert ok, (obs, info)
     assert time.time() - t0 < 120
 
@@ -283,8 +334,14 @@ def test_pd_zero_temperature_large_population():
     sol = rs_zero_temperature_pm1(2)
     r = population_dynamics(("regular", 2), ("pm1", 1.0), mp.inf, pop=20000, sweeps=30,
                             burn_in=100, runs=8, seed=6)
-    assert abs(r.value["e"] - float(sol["e"])) <= 4 * r.stderr["e"], (r, sol["e"])
-    assert r.stderr["e"] < 2e-3
+    ok, info = _band(r.value["e"], r.stderr["e"], float(sol["e"]), 0.0, 8)
+    assert ok and r.stderr["e"] < 2e-3, info
+    # the banked p0 = 1/3, through PD: q = P(H != 0) = 1 - P(H = 0) computed from p0
+    p0 = mp.mpf(_ref()["p0_rs_T0_regular_pm1_k2"].value)
+    q_from_p0 = float(1 - (p0**3 + 3 * p0 * ((1 - p0) / 2)**2 * 2))  # H = sum of 3 u's
+    assert abs(q_from_p0 - 20 / 27) < 1e-12
+    ok, info = _band(r.value["q"], r.stderr["q"], q_from_p0, 0.0, 8)
+    assert ok and r.stderr["q"] < 5e-4 and r.phase == "spin-glass", info
 
 
 @slow
