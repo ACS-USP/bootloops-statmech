@@ -1,0 +1,74 @@
+{
+  "alpha_c_T0": {
+    "value": "0.137905566",
+    "tol": "1e-4",
+    "cite": "Steffan & Kuehn, 'Replica symmetry breaking in attractor neural network models', arXiv:cond-mat/9404036 (1994; submitted to Z. Phys. B, journal version not fetched), Table 1, row RS: alpha_c = 0.137 905 566 (T = 0 replica-symmetric retrieval boundary of the standard Hopfield model, a = 1/2). Original: Amit, Gutfreund & Sompolinsky, Phys. Rev. Lett. 55, 1530 (1985), doi:10.1103/PhysRevLett.55.1530, read from the copy at gwern.net/doc/ai/nn/1985-amit.pdf: 'For alpha > alpha_c = 0.138, there is no solution with m != 0'. Not banked here: 0.144 (Crisanti-Amit-Gutfreund 1RSB, disputed by Steffan & Kuehn, who find 1RSB 0.138186) and 0.145 +- 0.009 (AGS simulations): different quantities. The 1987 Ann. Phys. abstract (doi:10.1016/0003-4916(87)90092-3) rounds it to 'alpha_c = 0.14' (2 digits; not treated as a disagreement)",
+    "independent_route": "replicant's own T = 0 reduction of the AGS equations (Eqs. (9)-(10) of the PRL): m = erf(y), y = m/sqrt(2 alpha r), y (sqrt(2 alpha) + (2/sqrt(pi)) e^{-y^2}) = erf(y); alpha_c is where this equation in y gets a double root, solved with mpmath (no finite-beta solver, no banked number). The test also counts sign changes of the equation on a grid just below and just above the value",
+    "sources_disagree": [
+      {
+        "value": "0.138",
+        "cite": "Amit, Gutfreund & Sompolinsky, PRL 55, 1530 (1985), text after Eq. (10) (read from gwern.net copy)"
+      }
+    ]
+  },
+  "m_at_alpha_c_T0": {
+    "value": "0.967417",
+    "tol": "5e-4",
+    "cite": "Steffan & Kuehn (1994), arXiv:cond-mat/9404036, Table 1, row RS: m_1 = 0.967 417 at alpha_c, T = 0",
+    "independent_route": "m = erf(y*) at the double root y* of the T = 0 erf equation (replicant's own solve)",
+    "sources_disagree": [
+      {
+        "value": "0.967",
+        "cite": "Amit, Gutfreund & Sompolinsky, PRL 55, 1530 (1985): 'The maximum deviation occurs at alpha = alpha_c, where m = 0.967, implying a 1.5% error' (gwern.net copy)"
+      }
+    ]
+  },
+  "energy_at_alpha_c_T0": {
+    "value": "-0.501445395",
+    "tol": "1e-4",
+    "cite": "Steffan & Kuehn (1994), arXiv:cond-mat/9404036, Table 1, row RS, column f = u: -0.501 445 395 (T = 0 energy per spin of the retrieval state at alpha_c). AGS convention: E = alpha (1 - r)/2 - m^2/2, PRL 55, 1530 (1985), Eq. (11)",
+    "independent_route": "replicant's T = 0 limit of the AGS free energy f (Eq. (5) of the PRL, derived and checked against the finite-beta functional in the tests) evaluated at the erf double root: E = alpha (1 - r)/2 - m^2/2 with r = (1 - C)^-2",
+    "sources_disagree": [
+      {
+        "value": "-0.5014",
+        "cite": "Amit, Gutfreund & Sompolinsky, PRL 55, 1530 (1985), after Eq. (11): 'At alpha = alpha_c, E = -0.5014' (gwern.net copy)"
+      }
+    ]
+  },
+  "alpha_global_T0": {
+    "value": "0.051",
+    "tol": "1.1e-3",
+    "cite": "Amit, Gutfreund & Sompolinsky, PRL 55, 1530 (1985) (gwern.net copy): 'Comparing the energies of the SG and the FM states we find that the SG energy is lower for 0.051 < alpha < 0.138, whereas the FM state becomes the absolute minimum below 0.051'. Tol 1.1e-3 covers the spread with the 1987 abstract (0.05) and the reading of 0.051 as truncated: replicant's T = 0 RS route gives 0.05185 (stated, not hidden)",
+    "independent_route": "replicant's T = 0 energies: retrieval E_R(alpha) = alpha (1 - r)/2 - m^2/2 from the erf equation (upper root) and spin glass E_SG(alpha) = alpha (1 - r_SG)/2 with r_SG = (1 + sqrt(2/(pi alpha)))^2 (m = 0 solution of the same T = 0 equations); root of E_R - E_SG by mpmath",
+    "sources_disagree": [
+      {
+        "value": "0.05",
+        "cite": "Amit, Gutfreund & Sompolinsky, Ann. Phys. 173, 30 (1987), doi:10.1016/0003-4916(87)90092-3, abstract (read from cris.huji.ac.il): 'As alpha decreases below 0.05 the FM retrieval states become ground states of the system'"
+      }
+    ]
+  },
+  "tg_sqrt_alpha_coefficient": {
+    "value": "1",
+    "tol": "1e-6",
+    "cite": "Amit, Gutfreund & Sompolinsky, PRL 55, 1530 (1985) (gwern.net copy), 'Finite temperature': 'Expansion of Eqs. (9) and (10) for small q and zero m yields for the SG transition temperature the value T_g = 1 + sqrt(alpha)'. Meaning: (T_g - 1)/sqrt(alpha) = 1",
+    "independent_route": "linearisation of q = E tanh^2(beta sqrt(alpha r) z), r = q/(1 - beta(1 - q))^2 at q -> 0: q = beta^2 alpha q/(1 - beta)^2, so a q > 0 branch bifurcates at beta sqrt(alpha) = 1 - beta; tests check replicant's own spin-glass solver finds q > 0 just below 1 + sqrt(alpha) and refuses just above, and locate T_g by bisection on existence (slow)"
+  },
+  "low_alpha_error_prefactor": {
+    "value": "0.79788456080286535588",
+    "tol": "1e-3",
+    "cite": "Amit, Gutfreund & Sompolinsky, PRL 55, 1530 (1985) (gwern.net copy), Eq. (12): 'As alpha -> 0, Eq. (9) gives m ~ 1 - (2 alpha/pi)^(1/2) exp(-1/2alpha)'. Value = sqrt(2/pi), the decimal of the stated prefactor: lim (1 - m) e^{1/(2 alpha)} / sqrt(alpha) as alpha -> 0 at T = 0",
+    "independent_route": "replicant's T = 0 erf solve at alpha = 0.01, 0.02 (no asymptotics used), ratio (1 - m) e^{1/(2 alpha)}/sqrt(alpha) linearly extrapolated to alpha = 0; finite-beta retrieval at small alpha gives m -> 1"
+  },
+  "alpha_c_rs_max_over_T": {
+    "value": "0.1381885",
+    "tol": "1e-6",
+    "cite": "Steffan & Kuehn (1994), arXiv:cond-mat/9404036, Sec. 4.1: 'alpha_c^RS(T)_max ~ 0.138 188 5' (RS retrieval boundary is reentrant: backbending for T <= T(alpha_max) = 0.024, credited there to Naef & Canning, their ref. [4], not fetched)",
+    "independent_route": "replicant's finite-temperature fold: maximum over m of alpha(m) along the retrieval curve (m fixed, sigma from m = E tanh(beta(m + sigma z)), alpha = sigma^2 (1 - beta(1 - q))^2/q), at T = 0.024 (slow test); does not use this number"
+  },
+  "T_at_alpha_c_rs_max": {
+    "value": "0.024",
+    "tol": "1.5e-3",
+    "cite": "Steffan & Kuehn (1994), arXiv:cond-mat/9404036, Sec. 4.1: 'backbending of the transition line for T <= T(alpha_max) = 0.024, previously discovered by Naef and Canning' (their ref. [4], not fetched). Tol: replicant's vertex is T = 0.0229, 1.1e-3 below the quoted 0.024 (the maximum is flat: alpha_c changes by 7e-7 between the two), so tol was widened from rounding (5e-4) to 1.5e-3 to cover it; flagged, not resolved",
+    "independent_route": "replicant's finite-temperature fold alpha_c(T) at T = 0.020, 0.023, 0.026 (slow test): the middle one is the largest and the vertex of the parabola through the three points is compared with the quoted T"
+  }
+}
