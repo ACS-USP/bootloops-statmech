@@ -21,8 +21,13 @@ Counting ordered pairs: replica a has m_j - m_{j+1} partners at level j, so
 a polynomial in n and the m's: RS gives n(n-1) q^k, 1RSB gives
 n(m-1) q1^k + n(n-m) q0^k.  Validated by brute force in the tests (integer n,
 divisible block sizes); the continuation to n -> 0 substitutes the polynomial.
+The RS/RSB ansatze and the n -> 0 continuation itself are physics-level
+prescriptions (Parisi), not proven here: the tests validate the integer-n
+counting, not the analytic continuation.
 """
 import sympy as sp
+
+from .core import Refusal
 
 
 def rs_matrix(n, q):
@@ -35,13 +40,28 @@ def _check_hierarchy(ms, qs):
         raise ValueError(f"need len(qs) == len(ms) + 1, got {len(qs)}, {len(ms)}")
 
 
+def _check_numeric_ms(ms):
+    """Numeric block sizes must be positive and non-increasing (symbolic pass)."""
+    nums = [m for m in ms if sp.sympify(m).is_number]
+    if any(sp.sympify(m) <= 0 for m in nums):
+        raise Refusal("precondition:positive-integer-block-sizes", f"ms = {list(ms)!r}")
+    if len(nums) == len(ms) and any(a < b for a, b in zip(ms, ms[1:])):
+        raise Refusal("precondition:non-increasing-block-sizes", f"ms = {list(ms)!r}")
+
+
 def rsb_matrix(ms, qs, n):
     """Explicit Parisi matrix for integer n and integer, nested ms (m_{j+1} | m_j | n)."""
     _check_hierarchy(ms, qs)
+    if not (isinstance(n, int) and n >= 1):
+        raise Refusal("precondition:positive-integer-n", f"n = {n!r}")
+    _check_numeric_ms(ms)
     sizes = [n, *ms, 1]
     for big, small in zip(sizes, sizes[1:]):
+        if not (isinstance(small, int) and small >= 1):
+            raise Refusal("precondition:positive-integer-block-sizes", f"ms = {list(ms)!r}")
         if big % small:
-            raise ValueError(f"block sizes must nest: {small} does not divide {big}")
+            raise Refusal("precondition:nested-block-sizes",
+                          f"{small} does not divide {big}")
 
     def entry(a, b):
         if a == b:
@@ -64,6 +84,7 @@ def sum_offdiag_power(kind, ms, qs, k, n):
         if not ms:
             raise ValueError('kind "rsb" needs at least one m')
         _check_hierarchy(ms, qs)
+        _check_numeric_ms(ms)
     else:
         raise ValueError(f'unknown ansatz kind {kind!r} (use "rs" or "rsb")')
     sizes = [n, *ms, 1]
@@ -72,6 +93,15 @@ def sum_offdiag_power(kind, ms, qs, k, n):
 
 
 def n_to_zero(expr, n):
-    """lim_{n->0} expr / n.  The 1/n is part of the rule: the bare a != b sum
-    vanishes at n = 0, its per-replica limit does not (RS: -q^k)."""
-    return sp.expand(sp.limit(sp.cancel(sp.expand(expr) / n), n, 0))
+    """lim_{n->0} expr / n, for expr a polynomial in n with expr(0) = 0.
+
+    The 1/n is part of the rule: the bare a != b sum vanishes at n = 0, its
+    per-replica limit does not (RS: -q^k).  Anything else (not divisible by n,
+    constant, non-polynomial) is a Refusal rather than an infinity or a
+    silently different limit.  The continuation n -> 0 is a physics-level
+    prescription, not proven here.
+    """
+    e = sp.expand(expr)
+    if not e.is_polynomial(n) or e.subs(n, 0) != 0:
+        raise Refusal("precondition:polynomial-divisible-by-n", f"expr = {expr}")
+    return sp.expand(sp.cancel(e / n).subs(n, 0))

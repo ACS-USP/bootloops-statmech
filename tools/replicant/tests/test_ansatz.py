@@ -4,6 +4,7 @@ import sys
 import sympy as sp
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from replicant.core import Refusal
 from replicant.ansatz import n_to_zero, rs_matrix, rsb_matrix, sum_offdiag_power
 
 n = sp.Symbol("n")
@@ -105,8 +106,51 @@ def test_n_to_zero_of_unordered_sum_is_half_of_ordered():
     # lim (1/n) sum_{a<b} q^k = -q^k/2, half of the a != b value -q^k.
     k = 3
     ordered = sum_offdiag_power("rs", [], [q], k, n)
-    unordered = ordered / 2                       # sum_{a<b}, by symmetry
+    # a<b polynomial in n by interpolating the explicit a<b loop over the
+    # explicit matrix (degree 2 in n, so 4 points are ample), independent of
+    # the closed form.
+    unordered = sp.interpolate([(nn, _brute(rs_matrix(nn, q), k, ordered=False))
+                                for nn in range(1, 5)], n)
     assert sp.expand(n_to_zero(unordered, n) + q**k/2) == 0
     assert sp.expand(2*n_to_zero(unordered, n) - n_to_zero(ordered, n)) == 0
     # the 1/n scale matters: n_to_zero(ordered) is not the bare sum at n=0
     assert ordered.subs(n, 0) == 0 and n_to_zero(ordered, n) == -q**k
+
+
+def _reason(fn):
+    try:
+        fn()
+    except Refusal as r:
+        return r.reason
+    raise AssertionError("expected Refusal")
+
+
+def test_n_to_zero_refuses_bad_input():
+    want = "precondition:polynomial-divisible-by-n"
+    assert _reason(lambda: n_to_zero(q + n*q, n)) == want      # not divisible by n
+    assert _reason(lambda: n_to_zero(sp.Integer(1), n)) == want  # constant
+    assert _reason(lambda: n_to_zero(sp.exp(n) - 1, n)) == want  # non-polynomial
+
+
+def test_rsb_matrix_refuses_bad_block_sizes():
+    pos = "precondition:positive-integer-block-sizes"
+    assert _reason(lambda: rsb_matrix([0], [q0, q1], 4)) == pos
+    assert _reason(lambda: rsb_matrix([-2], [q0, q1], 4)) == pos
+    assert _reason(lambda: rsb_matrix([sp.Rational(1, 2)], [q0, q1], 4)) == pos
+    assert _reason(lambda: rsb_matrix([m], [q0, q1], 4)) == pos       # symbolic m
+    assert _reason(lambda: rsb_matrix([3], [q0, q1], 4)) == \
+        "precondition:nested-block-sizes"
+    assert _reason(lambda: rsb_matrix([2, 4], [q0, q1, q2], 8)) == \
+        "precondition:non-increasing-block-sizes"
+    for bad_n in (0, -3, n, 2.0):
+        assert _reason(lambda: rsb_matrix([1], [q0, q1], bad_n)) == \
+            "precondition:positive-integer-n"
+
+
+def test_sum_offdiag_power_validates_numeric_ms_only():
+    assert _reason(lambda: sum_offdiag_power("rsb", [0], [q0, q1], 2, n)) == \
+        "precondition:positive-integer-block-sizes"
+    assert _reason(lambda: sum_offdiag_power("rsb", [2, 4], [q0, q1, q2], 2, n)) == \
+        "precondition:non-increasing-block-sizes"
+    sum_offdiag_power("rsb", [m1, m2], [q0, q1, q2], 2, n)   # symbolic ok
+    sum_offdiag_power("rsb", [4, m2], [q0, q1, q2], 2, n)    # mixed ok
