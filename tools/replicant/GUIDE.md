@@ -77,12 +77,28 @@ CLI (from `tools/`):
   step, what was REUSED and what was ADAPTED relative to the nearest entry, e.g.
   `disorder: gaussian -> pm_one; hook disorder:pm_one`. Cavity is available for catalog entries only
   (`missing-step:route:cavity` otherwise).
+- Level-(a) 1RSB (`--param ansatz=1rsb`, any spec with level-(a) hooks, catalog specs included: their
+  own pipelines are not used): the 1RSB functional derived by rules (`derive_rsb.py`) and solved
+  (`solve_derived_rsb.py`); the report lists replicate / average-disorder / introduce-order-parameters
+  as REUSED and the RS ansatz, n -> 0, stationarity and solve steps as ADAPTED, relative to the RS
+  level-(a) derivation of the same spec. Knobs (also `--param`s): `frozen=true` (q1 = 1; discrete
+  variables with a counting measure), `solve_for=<parameter>` (frozen threshold: x fixed to 1, the
+  parameter solved for), `zero_temperature=true` (SK-type energies only), `branch`
+  (`nontrivial-k` or `replica-max`). The frozen Ising-perceptron capacity:
+  `python3 -m replicant run spec.json --param ansatz=1rsb --param frozen=true --param solve_for=alpha
+  --param kappa=0` with spec.json `{"family": "perceptron", "variables": "ising", "disorder":
+  "gaussian", "constraint": "margin kappa", "params": {"alpha": null}}` -> `alpha` 0.83307859974
+  (about 1 s). Every 1RSB value is `not-computed` (the 1RSB replicon is not computed): never final.
 Python API (put `tools/` on `sys.path`):
 `from replicant.catalog import catalog` (dict of `CatalogEntry`);
 `from replicant.compose import compose, nearest_entry`; `compose(spec, route).run(require_final=False,
 **params) -> Result`; `from replicant.spec import ModelSpec`;
 `from replicant.solve_derived import solve_derived_rs` (solve the DERIVED RS equations of a spec at a
 state point: all roots found from seeded searches, an audit residual, a computed replicon where derived);
+`from replicant.solve_derived_rsb import solve_derived_1rsb` (`solve_derived_1rsb(spec, frozen=,
+zero_temperature=, branch=, seeds=, fixed=, solve_for=, **params)`: the derived 1RSB functional
+solved, every audited root in `roots`, `stable` always None; `derive_rsb.derived_1rsb_functional(spec)`
+is the functional itself);
 `from replicant.derive_replicon import derived_replicon` (`derived_replicon(spec, solution_or_mapping)`:
 the level-(a) replicon at an RS solution, a mapping first checked to be a root of the derived equations);
 `from replicant.latex import render_latex, write_latex` (`write_latex(result, path, pdf=False)`; a
@@ -123,6 +139,10 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 |---|---|
 | `missing-step:family:<f>`, `:site:<v>`, `:disorder:<d>`, `:constraint:<c>`, `:prior:<p>` | composer: the level-(a) hook the spec needs does not exist (the detail names what exists and the nearest catalog entry) |
 | `missing-step:route:<r>` | unknown route, entry without that route, or cavity for a spec outside the catalog (no generic cavity composer) |
+| `missing-step:ansatz:<a>` | composer: an ansatz other than `rs`, `1rsb` |
+| `precondition:counting-measure-for-frozen`, `:discrete-variables-for-frozen` | frozen 1RSB asked for an energy that is not an indicator pattern average, or continuous variables |
+| `precondition:polynomial-energy-for-t0` | T = 0 1RSB asked for a Gaussian-integral energy (Hopfield, perceptron: needs q1 = 1 - C/beta, not implemented) |
+| `no-solution:not-a-local-maximum` | `branch="replica-max"`: the smallest-psi 1RSB root is not a local maximum of f |
 | `missing-step:derivation:<name>` | a requested document needs a derivation the entry does not provide |
 | `precondition:<name>` | an input or state precondition fails (state point incomplete: `state-point`; out-of-range or non-numeric input; `known-parameter`, `rs-reducible`, `rs-site-trace-form`, `supported-disorder-law`, `nonnegative-alpha`, `finite-kappa`, `known-ansatz`, `known-graph`, `tex-engine`, `latex-path`, `known-target`, `complete-spec`, ... and the step preconditions of the derivation) |
 | `unstable:<ansatz>` | `require_final` or `require_stable`: a computed stability is negative (RS replicon or cavity lambda < 0) |
@@ -171,14 +191,14 @@ banked in `reference/perceptron.json` as independent targets. Honest limits:
 - The annealed bound does not detect the spherical-site swap (the other checks do).
 - Enumeration slack c/N with c = 1 is an assumption of the test.
 
-ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 252 tests, about 18 s on a
+ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 270 tests, about 19 s on a
 laptop; also `python3 run_selftests.py replicant`) covers the core and refusal paths, the symbolic
 derivation against independent expressions, level agreement (a)=(b) for every family where both exist,
 every catalog entry against its banked non-slow values, the cavity routes, the composer and the held-out
 models, the CLI and the LaTeX writer (displayed equations re-checked numerically). `--full` adds 75
 `@slow` tests (full-RSB Parisi up to K = 9, population dynamics at reference sizes, the Hopfield replicon
 scans, the p-spin T -> 0 energy, solver-based composed and LaTeX checks, a PDF compile when a TeX engine
-is present) and takes about 6-7 minutes on a laptop (measured 6 min 42 s); run it before merging a
+is present) and takes about 8-9 minutes on a laptop (measured 8 min 29 s); run it before merging a
 change to a family. The `@slow` marker is honoured by
 `selftest.py` only: pytest ignores it and would run everything. Level agreement between the derivation
 and the pipelines is a consistency check, not new evidence for the ansatz; the cavity route reproducing
@@ -208,6 +228,21 @@ KNOWN HAZARDS:
   stated identity (the code differentiates the recorded site factor). The replicon value is accepted
   only when two quadrature rules agree (else fine-panel rules, else `no-convergence:quadrature`): at
   large beta the fixed splits alone can be off by 1e-3 (Hopfield beta ~ 43).
+- 1RSB at level (a) (`solve_derived_1rsb`): every value has `stable: null` (`not-computed`, 1RSB
+  stability toward further RSB is E4's); physics-level. Float64 product quadrature (composite
+  Gauss-Legendre main, trapezoid audit; Gauss-Hermite only for the search, measured 1e-8 off on Hopfield
+  integrands). The search is seeded and the default seed table misses roots (SK at h = 0.3, beta = 2;
+  Hopfield with x ~ 0.05): pass `seeds`. The edges q0 = 0 and q1 = q0 are not searched (the nested
+  equations keep 1/sqrt(q0) factors), so the h = 0 SK point with q0 = 0 is never reported; roots with
+  q1 - q0 < 1e-4 or x > 1 - 1e-4 are counted as `rs-degenerate` (collapse to RS), not as 1RSB roots.
+  Checked: SK T = 0 energy and beta = 2 / h = 0.3 values against `families/sk.py` (1e-8), the frozen
+  Ising-perceptron capacity against the bank (Krauth-Mezard, Ding-Sun digits), each reduction rule at
+  integer n against brute force, x = 1 against the derived RS. Full (q1 < 1) Ising perceptron below
+  the frozen capacity: only rs-degenerate roots (no full-1RSB capacity is claimed; no independent
+  target). Hopfield 1RSB: no independent target; Steffan & Kuehn (arXiv:cond-mat/9404036, Table 1)
+  give the T = 0 1RSB boundary 0.138186489, which this level cannot compute (T = 0 refused), so it is
+  not banked; with the conjugates eliminated the Hopfield psi is not a local maximum in (q0, q1, x)
+  (a negative Hessian eigenvalue), and `replica-max` refuses it rather than hiding that.
 - Root searches are seeded: a saddle may be missed; the solver refuses with `ambiguous:several-saddles`
   when it sees more than one, but absence of that refusal is not a proof there is only one.
 - Population dynamics near `T_c`: the spin-glass label is trustworthy only for `beta/beta_c <~ 0.95` or

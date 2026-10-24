@@ -16,7 +16,9 @@ comma list (a trailing comma makes a 1-list: ys=0.3,) -> tuple of those; anythin
 stays a string (e.g. learning=bayes).  spec.json: {"family", "variables",
 "disorder", "constraint", "prior", "params"}; a param given as null is left symbolic
 (beta, h, alpha, kappa: the derivation's own symbols); numbers are run parameters.
-`build_result(...)` returns the Result object, so writers (e.g. LaTeX) can be added.
+--param ansatz=1rsb selects the level-(a) 1RSB route (compose.compose(..., ansatz="1rsb");
+its knobs frozen=true, zero_temperature=true, solve_for=<parameter>, branch=... are also
+--params).  `build_result(...)` returns the Result object, so writers (e.g. LaTeX) can be added.
 --latex PATH writes the derivation document (latex.write_latex: the steps with their
 equations, citations, the check table and the labels); --pdf also compiles it (tectonic
 or pdflatex; refused precondition:tex-engine when neither is on PATH).  A refused run
@@ -125,7 +127,9 @@ def jsonable(x):
 
 def build_result(target, route, params):
     name, spec = load_spec(target)
-    return spec, compose(spec, route).run(**params)
+    params = dict(params)
+    ansatz = params.pop("ansatz", "rs")
+    return spec, compose(spec, route, ansatz).run(**params)
 
 
 def result_json(target, spec, res):

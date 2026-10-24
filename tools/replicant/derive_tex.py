@@ -107,8 +107,49 @@ def replicon_blocks(rep):
     return out + [sym(title, obj) for title, obj in rep.parts]
 
 
+def rsb_ansatz(old, new):
+    R = new["rsb"]
+    kind = ("frozen 1RSB (q1 = 1: the replicas of a block are one configuration, no qhat1)"
+            if R.frozen else "1RSB (Parisi): blocks of x replicas, q1 / qhat1 in a block, "
+            "q0 / qhat0 between blocks; x is Parisi's m")
+    out = [text("One-step replica symmetry breaking", f"{kind}; unknowns "
+                + ", ".join(map(str, R.params)) + "; rules: " + "; ".join(R.rules)),
+           sym("1RSB functional at symbolic n", sp.Eq(sp.Symbol("Phi_n^1RSB"), R.expr))]
+    if R.conditions:
+        out.append(text("Assumed by the reduction (enforced by the solver)",
+                        "; ".join(f"{c} > 0" for c in R.conditions)))
+    return out
+
+
+def rsb_replica_limit(old, new):
+    P = new["rsb_free"]
+    return [text("Continuation n -> 0", "phi = lim_{n->0} Phi_n^1RSB / n: polynomial part by "
+                 "ansatz.n_to_zero, (1/n) ln E_t[F^(n/x)] -> (1/x) E_t ln F; " + P.caveat),
+            sym("1RSB functional (per replica and variable)", sp.Eq(sp.Symbol("phi"), P.phi))]
+
+
+def zero_temperature_limit(old, new):
+    P = new["rsb_t0"]
+    return [text("Zero temperature", P.rules[-1]),
+            sym("lim phi/beta (= -e0)", sp.Eq(sp.Symbol("phi_0"), P.phi))]
+
+
+def rsb_stationarity(old, new):
+    P = new["rsb_t0"] if "rsb_t0" in new else new["rsb_free"]
+    return [text("Stationarity", "d phi / d p = 0 for p in " + ", ".join(map(str, P.params))
+                 + " (unsimplified; the solver eliminates the conjugates first)"),
+            sym("1RSB saddle-point equations", list(new["rsb_equations"]))]
+
+
+def solve_derived_1rsb(old, new):
+    from .compose_rsb import describe
+    return [text("Solution of the derived 1RSB equations", describe(new["rsb_solution"]))]
+
+
 HOOKS = {"replicate": replicate, "average-disorder": average_disorder,
          "introduce-order-parameters": introduce_order_parameters,
          "saddle-equations": saddle_equations, "rs-ansatz": rs_ansatz,
          "replica-limit": replica_limit, "rs-stationarity": rs_stationarity,
-         "solve-derived": solve_derived}
+         "solve-derived": solve_derived, "rsb-ansatz": rsb_ansatz,
+         "rsb-replica-limit": rsb_replica_limit, "zero-temperature-limit": zero_temperature_limit,
+         "rsb-stationarity": rsb_stationarity, "solve-derived-1rsb": solve_derived_1rsb}

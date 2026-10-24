@@ -2,7 +2,7 @@
 level-(a) steps, and say what was reused, adapted, or missing.
 
   nearest_entry(spec) -> CatalogEntry | None
-  compose(spec, route="replica") -> ComposedCalculation(steps, report)
+  compose(spec, route="replica", ansatz="rs") -> ComposedCalculation(steps, report)
   ComposedCalculation.run(*, require_final=False, **params) -> Result
 
 Matching.  A spec IS a catalog entry when its structural key (family, variables,
@@ -37,6 +37,10 @@ site:ising) and REUSED otherwise.  A hook that does not exist is a Refusal, neve
                                  cavity for a composed spec (there is no generic cavity
                                  composer)
 The detail wraps the underlying step's own refusal reason where there is one.
+
+ansatz="1rsb": the level-(a) 1RSB route for any spec with level-(a) hooks (compose_rsb.py:
+report relative to the spec's own RS derivation; values not-computed); any other ansatz is
+refused missing-step:ansatz:<a>.
 
 Results.  Result.rigor is always "physics-level".  Finality is per value
 (Result.finality: key -> catalog.Stability): catalog values carry their entry's
@@ -202,9 +206,13 @@ class ComposedCalculation:
     steps: list
     report: CompositionReport
     entry: CatalogEntry = None
+    ansatz: str = "rs"
 
     def run(self, *, require_final=False, **params) -> Result:
         try:
+            if self.ansatz == "1rsb":
+                from .compose_rsb import run_1rsb
+                return run_1rsb(self, require_final, dict(params))
             if self.report.kind == "catalog":
                 return self._run_catalog(require_final, params)
             return self._run_composed(require_final, params)
@@ -318,12 +326,28 @@ def _check_hooks(spec, near):
                           f"{v!r} would be silently ignored by them{where}")
 
 
-def compose(spec: ModelSpec, route: str = "replica") -> ComposedCalculation:
+ANSATZE = ("rs", "1rsb")
+
+
+def compose(spec: ModelSpec, route: str = "replica", ansatz: str = "rs") -> ComposedCalculation:
     try:
+        if ansatz not in ANSATZE:
+            raise Refusal(f"missing-step:ansatz:{ansatz}", f"known ansatze: {', '.join(ANSATZE)}")
+        if ansatz == "1rsb":
+            return _compose_rsb(spec, route)
         return _compose(spec, route)
     except Refusal as r:
         r.route = r.route or route
         raise
+
+
+def _compose_rsb(spec, route):
+    from .compose_rsb import level_a_rsb_steps, rsb_report
+    if route != "replica":
+        raise Refusal(f"missing-step:route:{route}", "ansatz 1rsb is a level-(a) replica route")
+    _check_hooks(spec, nearest_entry(spec))
+    return ComposedCalculation(spec, route, level_a_rsb_steps(spec), rsb_report(spec),
+                               ansatz="1rsb")
 
 
 def _compose(spec, route):
@@ -371,5 +395,5 @@ def _compose(spec, route):
     return ComposedCalculation(spec, route, steps, report)
 
 
-__all__ = ["Adaptation", "CompositionReport", "ComposedCalculation", "LEVEL_A_STEPS",
+__all__ = ["ANSATZE", "Adaptation", "CompositionReport", "ComposedCalculation", "LEVEL_A_STEPS",
            "Result", "compose", "hooks_used", "level_a_steps", "nearest_entry"]

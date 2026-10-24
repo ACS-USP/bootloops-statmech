@@ -98,18 +98,27 @@ def test_cli_unexpected_error_prints_ERROR_and_exits_1():
 def test_cli_unknown_parameter_is_refused_with_exit_2():
     """Final review, Important 1: a typo'd or undeclared parameter is REFUSED, not
     ignored (the reproduction ran RS at kappa = 0 and reported final: true)."""
+    # (ansatz is no longer an unknown name since E2: --param ansatz=1rsb selects the level-(a)
+    # 1RSB route, test_cli_ansatz_param_selects_the_1rsb_route; "variant" takes its place)
     code, out, err = _main(["run", "perceptron", "--param", "alpha=1.5", "--param",
-                            "ansatz=1rsb", "--param", "kapa=0.3"])
+                            "variant=1rsb", "--param", "kapa=0.3"])
     assert code == 2 and out == "", (code, out)
     assert err.startswith("REFUSED: precondition:known-parameter: "), err
-    assert "ansatz, kapa" in err and "accepted: alpha, kappa" in err, err
+    assert "kapa, variant" in err and "accepted: alpha, kappa" in err, err
+
+
+def test_cli_ansatz_param_selects_the_1rsb_route():
+    code, out, err = _main(["run", "sk", "--param", "ansatz=2rsb"])
+    assert code == 2 and err.startswith("REFUSED: missing-step:ansatz:2rsb"), err
+    code, out, err = _main(["run", "sk", "--param", "ansatz=1rsb", "--param", "beta=2"])
+    assert code == 2 and err.startswith("REFUSED: precondition:complete-point"), err
 
 
 def test_selftest_summary_line_states_the_full_tier_cost():
     from replicant.selftest import summary_line
     line = summary_line(235, 0, 68)
     assert line.startswith("replicant selftest: 235 passed, 0 failed, 68 skipped "), line
-    assert "--full" in line and "6-7 minutes" in line, line
+    assert "--full" in line and "8-9 minutes" in line, line
 
 
 @slow

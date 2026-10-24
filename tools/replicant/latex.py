@@ -149,6 +149,8 @@ def _derivation(res):
     rep_title = "Replicon of the RS saddle (level (a))"
     if res.report is not None and res.report.kind == "composed":
         rows = [(e, None, e.tex) for e in res.trace.entries]
+        if res.values.get("ansatz") == "1rsb":        # the RS replicon is not this saddle's
+            return rows, LEVEL_A_CITE, None
         _, rep, _ = _level_a(_spec_key(lift_numeric_beta(res.spec, {})[0]))
         return rows + ([(None, rep_title, rep)] if rep else []), LEVEL_A_CITE, None
     trace, rep, why = (None, [], "cavity route") if res.route != "replica" else \

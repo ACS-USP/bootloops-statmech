@@ -32,6 +32,12 @@ All notable changes to BootLoops are recorded here. The format follows
   Ising-perceptron values get computed finality; `derived_replicon(spec, solution)`; the replicon
   derivation appears in the LaTeX documents. Checked against the families' replicons (perceptron,
   Hopfield) at 12 points to 1e-8 and at the Ising AT root; planted hook errors move it.
+- `replicant` (E2): 1RSB at level (a). The 1RSB functional is derived by rules (block overlap sums,
+  two-level Hubbard-Stratonovich, the 1RSB split and spectrum, nested expectations, frozen q1 = 1 for
+  counting measures, a T = 0 limit for SK-type energies) and solved with an independent-rule audit
+  (`solve_derived_1rsb`); composer route `ansatz=1rsb` (values never final). Checked against the SK
+  family 1RSB (T = 0 and finite T, 1e-8) and the banked Krauth-Mezard frozen capacity of the Ising
+  perceptron; each rule against brute force at integer n.
 
 ## 1.0.1 (2026-10-09)
 

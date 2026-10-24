@@ -205,11 +205,12 @@ def H(x):
     return sp.erfc(x / sp.sqrt(2)) / 2
 
 
-def expect_closed(f, z, notes=None):
-    """E_z f in closed form for the two shapes the RS reductions meet.
-    Preconditions: Theta slope a > 0; exp-quadratic 1 - 2A > 0 (integrable).
-    One known false refuses; one sympy cannot decide is ASSUMED and the
-    assumption is appended to `notes` (a list) for the trace."""
+def expect_closed(f, z, notes=None, conds=None):
+    """E_z f in closed form for the shapes the RS / 1RSB reductions meet.
+    Preconditions: Theta slope a != 0 (a < 0 by reflection z -> -z, exp-step only; the
+    bare Theta needs a > 0); exp-quadratic 1 - 2A > 0 (integrable).  One known false
+    refuses; one sympy cannot decide is ASSUMED: the text goes to `notes` (a list) for the
+    trace and the expression (to be > 0) to `conds`, so a solver can enforce it."""
     c, g = sp.sympify(f).as_independent(z, as_Add=False)
 
     def need(cond, text, reason):
@@ -217,6 +218,8 @@ def expect_closed(f, z, notes=None):
             raise Refusal(reason, f"E_{z}[{f}]: {text} = {cond} is not > 0")
         if cond.is_positive is None and notes is not None:
             notes.append(f"assumed {text} = {cond} > 0")
+        if cond.is_positive is None and conds is not None:
+            conds.append(cond)
     if isinstance(g, sp.Heaviside):
         arg = sp.expand(g.args[0])
         if arg.is_polynomial(z) and sp.degree(arg, z) == 1:
@@ -229,8 +232,34 @@ def expect_closed(f, z, notes=None):
             A, B, C = (arg.coeff(z, k) for k in (2, 1, 0))
             need(sp.factor(1 - 2 * A), "1 - 2A", "precondition:gaussian-integrable")
             return c * sp.exp(C + B**2 / (2 * (1 - 2 * A))) / sp.sqrt(1 - 2 * A)
+    step = _exp_step(g, z)
+    if step is not None:
+        (B, C), (a, b) = step
+        if a.is_negative or (a.is_positive is not True and a.could_extract_minus_sign()):
+            # reflection z -> -z (the Gaussian law is even)
+            B, a = -B, -a
+        need(a, "slope a", "precondition:known-gaussian-integral")
+        # shift z = w + B: E exp(B z + C) Theta(a z + b) = exp(C + B^2/2) P(a (w + B) + b > 0)
+        return c * sp.exp(C + B**2 / 2) * H(-(b + a * B) / a)
     raise Refusal("precondition:known-gaussian-integral",
-                  f"E_{z}[{f}]: only Theta(a z + b), a > 0, and exp(quadratic in z)")
+                  f"E_{z}[{f}]: only Theta(a z + b), exp(quadratic in z) and "
+                  "exp(B z + C) Theta(a z + b)")
+
+
+def _exp_step(g, z):
+    """((B, C), (a, b)) for g = exp(B z + C) Theta(a z + b), a != 0, else None."""
+    fac = sp.Mul.make_args(g)
+    ex = [f for f in fac if isinstance(f, sp.exp)]
+    th = [f for f in fac if isinstance(f, sp.Heaviside)]
+    if len(fac) != 2 or len(ex) != 1 or len(th) != 1:
+        return None
+    lin = []
+    for e in (ex[0].args[0], th[0].args[0]):
+        e = sp.expand(e)
+        if not (e.is_polynomial(z) and sp.degree(e, z) == 1):
+            return None
+        lin.append((e.coeff(z, 1), e.coeff(z, 0)))
+    return lin[0], lin[1]
 
 
 def hubbard_stratonovich(A, S, z):
