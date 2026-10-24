@@ -55,3 +55,8 @@ class Capacity:
     note: str = ""
     point: object = field(default=None, compare=False)   # RSPoint at the threshold, if any
     caveat: str = CAVEAT
+
+CAVITY_CAVEAT = ("physics-level: cavity / population-dynamics results assume clustering "
+                 "(decorrelated cavity fields), a single RS state and tree-like local "
+                 "structure; not proven; population-dynamics outputs are statistical "
+                 "(value +- stderr from independent runs), not certified")

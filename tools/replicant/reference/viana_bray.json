@@ -1,0 +1,44 @@
+{
+  "beta_c_regular_pm1_k2": {
+    "value": "0.881373587019543025232609324980",
+    "tol": "1e-20",
+    "cite": "Mezard & Parisi, The Bethe lattice spin glass revisited, Eur. Phys. J. B 20, 217 (2001), arXiv:cond-mat/0009418, Sec. IV, Eq. (36): 'E_J tanh^2(beta_c J) = 1/k' for the random graph with fixed connectivity k+1 (lattice C, Sec. II), E = -sum_<ij> J_ij s_i s_j, Eq. (1); attributed there to their Ref. [17], Thouless, Phys. Rev. Lett. 56, 1082 (1986); read from the arXiv PDF during this build. Closed form; value = its decimal atanh(1/sqrt 2) at k = 2 (3-regular), J = +-1. Transition is the RS (paramagnet -> spin glass) instability of Q(h) = delta(h)",
+    "independent_route": "PD's own transition location: the linear growth factor of a tiny-amplitude cavity-field population, measured with the full nonlinear transfer u = (1/beta) atanh(tanh(beta J) tanh(beta h)) (no use of the closed form), crosses 1 between 0.95 and 1.05 beta_c (default tier) and bisects to beta_c within 1% (slow tier); plus PD collapse to h = 0 above and q > 0 below"
+  },
+  "beta_c_poisson_pm1_c3": {
+    "value": "0.658478948462408354312523173654",
+    "tol": "1e-20",
+    "cite": "Viana & Bray, J. Phys. C 18, 3037 (1985) (not fetched; paywalled), as quoted by Mooij & Kappen, Spin-glass phase transitions on real-world graphs, arXiv:cond-mat/0408378 (2004), Eq. (3): 'int tanh^2(beta_c^VB x) dP(x) = 1/d' with d the mean degree of the Erdos-Renyi (Poisson) graph; same boundary in Guerra & Toninelli, The high temperature region of the Viana-Bray diluted spin glass model, arXiv:cond-mat/0302401 (2003; journal reference not verified here), Theorem 1 '2 alpha E tanh^2(beta J) < 1' with Poisson degree of mean 2 alpha (their Sec. 2). Both read from the arXiv PDFs during this build. Closed form c E tanh^2(beta_c J) = 1; value = its decimal atanh(1/sqrt 3) at mean degree c = 3, J = +-1",
+    "independent_route": "PD's own transition location on the Poisson(c) cavity-degree law (growth factor of a tiny-amplitude population, full nonlinear transfer) straddles 1 at 0.95 / 1.05 beta_c"
+  },
+  "p0_rs_T0_regular_pm1_k2": {
+    "value": "0.333333333333333333333333333333",
+    "tol": "1e-20",
+    "cite": "Mezard & Parisi, The cavity method at zero temperature, arXiv:cond-mat/0207121 (2002; journal reference not verified here), Sec. III.B, after Eq. (18): 'for k = 2, the solution is p0 = 1/3, p1 = 2/9, p2 = 1/9' (RS, T = 0, +-1 couplings, fixed connectivity k + 1 = 3); read from the arXiv PDF during this build",
+    "independent_route": "replicant's exact T = 0 RS recursion on the integer cavity-field law (sympy roots of p0 = P(sum of k u's = 0), u = J sign(h)), sparse.rs_zero_temperature_pm1, and T = 0 population dynamics (statistical) within stderr"
+  },
+  "e0_rs_regular_pm1_k2": {
+    "value": "-1.27777777777777777777777777778",
+    "tol": "1e-20",
+    "cite": "Mezard & Parisi, The cavity method at zero temperature, arXiv:cond-mat/0207121, Sec. III.B: 'the ground state energy is E = -23/18 ~ -1.278', attributed there to Mezard & Parisi, Europhys. Lett. 3, 1067 (1987) (RS, +-1, k = 2, energy per spin, E = -sum_<ij> J_ij s_i s_j); Sec. V also quotes 'the RS result U ~ -1.2777'. RS ONLY: the same paper's 1RSB value U ~ -1.2717 is NOT banked here (no independent 1RSB route in v1 sparse code). Read from the arXiv PDF during this build. Value = decimal of -23/18",
+    "independent_route": "replicant's exact T = 0 RS evaluation (sympy, rationals) of -beta f -> -e = (k+1)/2 E max(J s s' + h s + h' s') - k E |H| over the solved integer field law; plus T = 0 population dynamics within stderr"
+  },
+  "q_rs_regular_pm1_k5_T0p8": {
+    "value": "0.6863",
+    "tol": "0.0002",
+    "cite": "Mezard & Parisi, Eur. Phys. J. B 20, 217 (2001), arXiv:cond-mat/0009418, Sec. VII, Eq. (87): replica symmetric population-dynamics results 'q = 0.6863 +- 0.0002' for J = +-1, fixed connectivity 6 (k = 5), T = 0.8. STATISTICAL: tol is the paper's quoted error; tests compare within a combined band 3 sqrt(tol^2 + stderr^2). RS only (1RSB Eq. (88) not banked)",
+    "independent_route": "replicant's own RS population dynamics (own code, own seeds), slow test test_pd_reproduces_mezard_parisi_rs_k5"
+  },
+  "e_rs_regular_pm1_k5_T0p8": {
+    "value": "-1.8160",
+    "tol": "0.001",
+    "cite": "Mezard & Parisi, Eur. Phys. J. B 20, 217 (2001), arXiv:cond-mat/0009418, Sec. VII, Eq. (87): RS internal energy 'U = -1.8160 +- 0.001' per spin, J = +-1, k = 5, T = 0.8 (the paper notes it disagrees with simulations, U = -1.799, Eq. (86): RS is wrong there). STATISTICAL, RS only",
+    "independent_route": "replicant's own RS population dynamics, slow test test_pd_reproduces_mezard_parisi_rs_k5"
+  },
+  "f_rs_regular_pm1_k5_T0p8": {
+    "value": "-1.863",
+    "tol": "0.002",
+    "cite": "Mezard & Parisi, Eur. Phys. J. B 20, 217 (2001), arXiv:cond-mat/0009418, Sec. VII, Eq. (87): RS free energy 'F = -1.863 +- 0.002' per spin, J = +-1, k = 5, T = 0.8. STATISTICAL, RS only",
+    "independent_route": "replicant's own RS population dynamics (Bethe free energy (k+1)/2 F_link - k F_site, Eq. (13) form), slow test test_pd_reproduces_mezard_parisi_rs_k5"
+  }
+}
