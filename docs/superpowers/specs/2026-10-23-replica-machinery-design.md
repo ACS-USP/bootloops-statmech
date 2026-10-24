@@ -132,6 +132,7 @@ exists, exact enumeration at small N, or flagged-statistical simulation).
 - A reader can follow any catalog entry step by step to the published
   derivation.
 - Catalog grows by adding entries, without touching the core.
+- **[RV, 2026-10-23]** The system writes LaTeX that details each calculation: every step with its equations, the citations, the banked-versus-computed check table, and the physics-level and statistical labels. Displayed equations that the code can evaluate are tested against the implementation, so the document cannot drift from the code. A PDF is compiled when a TeX engine (`tectonic` or `pdflatex`) is on the path.
 
 ## Non-goals (v1) **[call]**
 

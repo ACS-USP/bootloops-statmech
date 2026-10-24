@@ -22,6 +22,7 @@
 - A number that fed a fit never certifies it.
 - Out of scope: TAP, DMFT/dynamics, quantum models, automatic RSB-ansatz discovery, rigorous proofs, non-Gaussian disorder beyond what catalog entries and the two held-out models need.
 - Every run writes a machine-readable result and a rendered step trace.
+- **[RV, 2026-10-23]** The system can write LaTeX that details each calculation: every step with its equations, the citations, the banked-vs-computed check table, and the physics-level / statistical labels (Task 15).
 - Full RSB (Parisi PDE) sits behind a flag with its own slower battery.
 - Do not commit anything touching `docs/` or the package until the task that owns it says so (the spec and this plan are committed in Task 1).
 
@@ -31,7 +32,7 @@
 2. **No nontrivial solution.** T above T_c, α above capacity, or no fixed point: expect a reported `no_solution`/trivial branch, never a converged wrong value (Task 5).
 3. **Wrong fixed-point branch.** Hopfield has mixture states and spurious branches: expect the branch named in the result, selectable, and checked (Task 10).
 4. **Field vs no field.** AT line is meaningful only at h≠0; at h=0 the replicon criterion is the T_c test. Expect both, with the right one chosen per call (Task 6).
-5. **Unknown model given to the composer.** Expect a refusal naming the missing step, never a partial result presented as a full one (Task 15). Related: seeds and population size for population dynamics: expect identical results for identical seed, and an error bar that shrinks with population size (Task 13).
+5. **Unknown model given to the composer.** Expect a refusal naming the missing step, never a partial result presented as a full one (Task 14). Related: seeds and population size for population dynamics: expect identical results for identical seed, and an error bar that shrinks with population size (Task 13).
 
 ---
 
@@ -221,7 +222,24 @@
 - [ ] **Step 1: Failing tests:** `test_catalog_entry_reproduces_its_banked_numbers` (loop over all entries: every banked key passes `check`); `test_compose_known_spec_reports_all_reused`; `test_compose_unknown_family_refuses_naming_missing_step` (`Refusal.reason` starts `"missing-step:"`, no partial `Result`); `test_result_declares_physics_level`; `test_cli_refusal_prints_REFUSED_and_exits_2`; `test_cli_writes_json_and_rendered_trace`.
 - [ ] **Step 2: Run** → FAIL. **Step 3: Implement.** Matching is by `(variables, disorder, constraint, prior)` against step preconditions; `adapted` means a step reused with a changed parameter or law. **Step 4: Run** → pass; **Commit** `replicant: catalog, composer, CLI`.
 
-### Task 15: Held-out models and the positive control
+### Task 15: LaTeX derivation writer
+
+**Files:**
+- Create: `tools/replicant/latex.py`, `tests/test_latex.py`
+- Modify: `core.py` (optional `Step.tex`; `TraceEntry` carries its `TexBlock`s; a `Refusal` carries the partial trace), `catalog.py` (`CatalogEntry.derivation`), `__main__.py` (`--latex PATH`, `--pdf`), `derive.py` (tex hooks on the level (a) steps)
+
+**Interfaces:**
+- Consumes: `Trace`, `Result`, `CatalogEntry`, `refdata.RefValue`, the family functionals (SK, REM, p-spin, perceptron, Hopfield, cavity).
+- Produces: `@dataclass(frozen=True) class TexBlock(kind: str, title: str, body: str, expr: sympy.Expr | None = None)` (`kind` in `{"equation","align","text"}`; `expr` set when the block displays an equation the code can evaluate); `Step.tex: Callable[[State, State], list[TexBlock]] | None`; `render_latex(result: Result, *, title: str | None = None, standalone: bool = True) -> str` (preamble with amsmath; one section per trace step, in order, with its blocks; a "Reference check" table of key / computed / banked / tolerance / verdict from `refdata`; a bibliography built from the `cite` strings; the physics-level notice; the route label `replica` or `cavity`; population-dynamics quantities marked statistical); `write_latex(result, path, *, pdf: bool = False) -> Path` (with `pdf=True` compiles with `tectonic` or `pdflatex` if on PATH, otherwise refuses with `precondition:tex-engine`). CLI `python3 -m replicant run <entry> --latex out.tex [--pdf]`.
+- Design rules: level (a) steps render the sympy objects they hold with `sympy.latex`; each level (b) and cavity catalog entry supplies `derivation` blocks, each equation given as a sympy expression whenever the family code has the functional, otherwise as a LaTeX string with its paper citation; the writer never invents an equation the code does not hold.
+
+- [ ] **Step 1: Failing tests:** `test_sk_latex_contains_steps_in_order` (replicate, average, order-parameter, saddle appear in trace order, each with an `align` or `equation` block); `test_displayed_equations_match_implementation` (every `TexBlock` with an `expr` is lambdified and agrees with the family code to 1e-12 at three parameter points: e.g. the SK RS free-energy functional against `sk_rs`, the Gardner entropy against `gardner_entropy`); `test_every_catalog_entry_has_derivation` (at least one equation block, one citation, and a reference table row for each banked key); `test_latex_environments_balanced_and_specials_escaped` (every `\begin{X}` has its `\end{X}`; `_`, `%`, `&`, `#` in text blocks and cites are escaped); `test_refusal_renders_partial_derivation` (a refused composition renders the steps applied before the refusal and the refusal reason; closes the Task 1 deferred minor); `test_statistical_and_physics_labels_present` (cavity population-dynamics documents say statistical; every document carries the physics-level notice); `test_cli_latex_flag_writes_tex`; `@slow test_pdf_compiles` (skipped with a message when neither `tectonic` nor `pdflatex` is on PATH; compiles SK and Hopfield documents and asserts a non-empty PDF).
+- [ ] **Step 2: Run** selftest → Expected: FAIL.
+- [ ] **Step 3: Implement.** Add the tex hooks to the level (a) steps and `derivation` to every catalog entry created so far; keep each family's equations next to its code so the display cannot drift from the implementation (the consistency test is the guard).
+- [ ] **Step 4: Run** selftest and `--full` → Expected: pass; default-tier cost of this task's tests under ~1.5 s.
+- [ ] **Step 5: Commit** `replicant: LaTeX derivation writer`.
+
+### Task 16: Held-out models and the positive control
 
 **Files:**
 - Create: `tests/test_heldout.py`, `reference/heldout.json`
@@ -237,7 +255,7 @@
   - `test_heldout_models_not_in_catalog` — asserts neither spec is a catalog entry.
 - [ ] **Step 2: Run** → FAIL. **Step 3: Implement** any missing adapter in the existing steps (no special-casing the two models). **Step 4: Run** → pass; **Commit** `replicant: held-out reuse tests and positive control`.
 
-### Task 16: Full RSB (Parisi PDE), behind a flag
+### Task 17: Full RSB (Parisi PDE), behind a flag
 
 **Files:**
 - Create: `families/parisi.py`, `tests/test_parisi.py` (all `@slow`)
@@ -248,7 +266,7 @@
 - [ ] **Step 1: Failing tests (`@slow`):** `test_parisi_energy_within_banked_range` (value inside the cited FRSB interval, noting the sources' small disagreement); `test_frsb_below_1rsb`; `test_error_estimate_shrinks_with_grid`.
 - [ ] **Step 2: Run** `python3 tools/replicant/selftest.py --full` → FAIL. **Step 3: Implement** a Crank–Nicolson (or spectral) solver for the Parisi PDE. **Step 4: Run** `--full` → pass, and the default battery still runs in about 20 s. **Step 5: Commit** `replicant: Parisi full-RSB (slow tier)`.
 
-### Task 17: Documentation, registration, references
+### Task 18: Documentation, registration, references
 
 **Files:**
 - Create: `tools/replicant/GUIDE.md`
@@ -263,5 +281,6 @@
 
 ## Self-review notes
 
+- LaTeX derivations (user request): Task 15; held-out models (Task 16) also render a derivation.
 - Spec coverage: step library (T1,3,4,5), catalog (T2,6–9), composer (T14), cavity dense/sparse/1RSB (T11–13), level agreement (T10), held-out + positive control (T15), FRSB flag (T16), docs/registration (T17), honest labelling (T14 result, T12–13 labels), refusal (T1,6,14).
 - Staging if size bites: T13 is the designated second milestone; T16 is already behind a flag.
