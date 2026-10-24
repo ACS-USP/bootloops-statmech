@@ -40,5 +40,41 @@
     "tol": "0.002",
     "cite": "Mezard & Parisi, Eur. Phys. J. B 20, 217 (2001), arXiv:cond-mat/0009418, Sec. VII, Eq. (87): RS free energy 'F = -1.863 +- 0.002' per spin, J = +-1, k = 5, T = 0.8. STATISTICAL, RS only",
     "independent_route": "replicant's own RS population dynamics (Bethe free energy (k+1)/2 F_link - k F_site, Eq. (13) form), slow test test_pd_reproduces_mezard_parisi_rs_k5"
+  },
+  "e0_1rsb_regular_pm1_k2": {
+    "value": "-1.2717",
+    "tol": "0.0002",
+    "cite": "Mezard & Parisi, The cavity method at zero temperature, J. Stat. Phys. 111, 1 (2003), arXiv:cond-mat/0207121, Sec. V.F.2 ('The full 1RSB solution'): population dynamics of integer-field surveys (their Eq. (57)) 'has a maximum at a value mu ~ .7, and predicts a GGS energy density U ~ -1.2717'; also 'The full 1RSB result U ~ -1.2717 differs from the RS result U ~ -1.2777'; Fig. 4 (10^3 surveys, 10^4 iterations, spline through the data). 1RSB (non-factorized) ground-state energy per spin, J = +-1, fixed connectivity k + 1 = 3, E = -sum_<ij> J_ij s_i s_j. Read from the arXiv PDF during this build. STATISTICAL: the paper quotes NO uncertainty ('~'); tol = 2e-4 is OUR reading (two units of the last quoted digit), not the paper's. Distinct from the RS value -23/18 (key e0_rs_regular_pm1_k2) and the factorized 1RSB value -1.27231 (key e0_1rsb_factorized_regular_pm1_k2)",
+    "independent_route": "NONE independent of the 1RSB cavity ansatz: replicant's own population of surveys (cavity/rsb_sparse_t0.py, own code and seeds, Mezard-Parisi 2003 Eq. (26) recursion in the normalized-field convention, Phi from the Eq. (50)-type estimator, max over y by per-run parabola fits) is a REPRODUCTION TARGET for the dynamics, not an independent derivation; slow test test_energy_matches_banked_reference. Partial checks that do not use this number: y = 0 gives the exact RS -23/18, a symmetric start gives the exact factorized Phi(y), and the full solution lies above the factorized one at y = 0.7"
+  },
+  "e0_1rsb_factorized_regular_pm1_k2": {
+    "value": "-1.27231",
+    "tol": "0.00001",
+    "cite": "Mezard & Parisi, The cavity method at zero temperature, J. Stat. Phys. 111, 1 (2003), arXiv:cond-mat/0207121, Sec. V.F.1 ('Factorized case'), Eqs. (49)-(54): Phi(mu) 'has a maximum at mu ~ .4174, where the GGS energy is equal to E = -1.27231' (factorized 1RSB Ansatz, all cavity-field distributions equal and symmetric; attributed there to the replica computation of their Ref. [34]); J = +-1, k = 2. Read from the arXiv PDF during this build. tol = 1e-5: one unit of the last quoted digit",
+    "independent_route": "replicant's deterministic factorized recursion (cavity/rsb_sparse_t0.factorized_1rsb_t0: single symmetric survey iterated to its fixed point, Phi(y) from the variational site/link formula, golden-section maximum over y), which does not use the paper's closed forms (51)-(54); the test additionally checks the iterated p0(y) against closed form (51) as an oracle"
+  },
+  "mu_star_1rsb_factorized_regular_pm1_k2": {
+    "value": "0.4174",
+    "tol": "0.0001",
+    "cite": "Mezard & Parisi, The cavity method at zero temperature, J. Stat. Phys. 111, 1 (2003), arXiv:cond-mat/0207121, Sec. V.F.1: the factorized Phi(mu) 'has a maximum at mu ~ .4174' (mu = beta m, the zero-temperature Parisi parameter, their Fig. 4 caption); J = +-1, k = 2. tol = one unit of the last quoted digit",
+    "independent_route": "replicant's deterministic factorized recursion maximized over y by golden section (factorized_1rsb_t0)"
+  },
+  "e_1rsb_regular_pm1_k5_T0p8": {
+    "value": "-1.799",
+    "tol": "0.001",
+    "cite": "Mezard & Parisi, Eur. Phys. J. B 20, 217 (2001), arXiv:cond-mat/0009418, Sec. VII, Eq. (88): one step RSB cavity results at T = 0.8, J = +-1, fixed connectivity 6 (k = 5), at the maximising Parisi parameter x* = .24 +- .02 (their x = our m), extrapolated to M = oo states; errors are the paper's and are 'by far' dominated by the location of x*. Read from the arXiv PDF during this build. STATISTICAL, 1RSB: 'U = -1.799 +- 0.001' (internal energy per spin; agrees with simulations, their Eq. (86))",
+    "independent_route": "NONE independent of the 1RSB cavity ansatz: replicant's own population of populations (cavity/rsb_sparse.pop_of_pops_1rsb, own code and seeds) evaluated AT the paper's x* = 0.24 (an input, not re-derived: we do not maximise over m) and at finite inner size (no M extrapolation) is a REPRODUCTION TARGET, slow test test_finite_t_1rsb_reproduces_mezard_parisi_k5"
+  },
+  "q1_1rsb_regular_pm1_k5_T0p8": {
+    "value": "0.779",
+    "tol": "0.006",
+    "cite": "Mezard & Parisi, Eur. Phys. J. B 20, 217 (2001), arXiv:cond-mat/0009418, Sec. VII, Eq. (88): one step RSB cavity results at T = 0.8, J = +-1, fixed connectivity 6 (k = 5), at the maximising Parisi parameter x* = .24 +- .02 (their x = our m), extrapolated to M = oo states; errors are the paper's and are 'by far' dominated by the location of x*. Read from the arXiv PDF during this build. STATISTICAL, 1RSB: 'q1 = 0.779 +- .006' (self-overlap, site)",
+    "independent_route": "NONE independent of the 1RSB cavity ansatz: replicant's own population of populations (cavity/rsb_sparse.pop_of_pops_1rsb, own code and seeds) evaluated AT the paper's x* = 0.24 (an input, not re-derived: we do not maximise over m) and at finite inner size (no M extrapolation) is a REPRODUCTION TARGET, slow test test_finite_t_1rsb_reproduces_mezard_parisi_k5"
+  },
+  "f_1rsb_regular_pm1_k5_T0p8": {
+    "value": "-1.858",
+    "tol": "0.002",
+    "cite": "Mezard & Parisi, Eur. Phys. J. B 20, 217 (2001), arXiv:cond-mat/0009418, Sec. VII, Eq. (88): one step RSB cavity results at T = 0.8, J = +-1, fixed connectivity 6 (k = 5), at the maximising Parisi parameter x* = .24 +- .02 (their x = our m), extrapolated to M = oo states; errors are the paper's and are 'by far' dominated by the location of x*. Read from the arXiv PDF during this build. STATISTICAL, 1RSB: 'F = -1.858 +- .002' (free energy per spin)",
+    "independent_route": "NONE independent of the 1RSB cavity ansatz: replicant's own population of populations (cavity/rsb_sparse.pop_of_pops_1rsb, own code and seeds) evaluated AT the paper's x* = 0.24 (an input, not re-derived: we do not maximise over m) and at finite inner size (no M extrapolation) is a REPRODUCTION TARGET, slow test test_finite_t_1rsb_reproduces_mezard_parisi_k5; our f carries a finite-inner Jensen bias"
   }
 }
