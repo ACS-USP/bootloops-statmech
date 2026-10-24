@@ -96,8 +96,8 @@ def solve_derived(old, new):
     return [text("Solution of the derived equations",
                  f"{vals}; phi = {fmt(sol.free_energy)}; branch {sol.branch or '-'}; "
                  f"residual {fmt(sol.residual)} (independent quadrature), quadrature error "
-                 f"{fmt(sol.quad_error)}; derived replicon {rep}; stable = {sol.stable} "
-                 "(the solver's method and roots are in the trace line above)")]
+                 f"{fmt(sol.quad_error)}; derived replicon {rep}; stable = {sol.stable}.  "
+                 + (sol.note or ""))]
 
 
 HOOKS = {"replicate": replicate, "average-disorder": average_disorder,

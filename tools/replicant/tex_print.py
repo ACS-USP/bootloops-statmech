@@ -7,7 +7,8 @@
                         fractions count their wider part, sub/superscripts 0.6, spacing 0)
   lines(lhs, rhs)       [line, ...]: the rhs split at top-level + / - terms (and inside a
                         coefficient times a wide sum, with \\Bigl( \\Bigr)) so that no line is
-                        wider than WIDTH; [lhs = rhs] when it fits
+                        wider than WIDTH; [lhs = rhs] when it fits; a row that is still
+                        wider (one indivisible term) is scaled to the line width as a box
 
 Only the typesetting changes: the terms are printed one by one with the same printer,
 in sympy's own order and with its sign convention, so the displayed object is the one
@@ -119,13 +120,22 @@ def _pieces(expr, budget):
 
 
 def lines(lhs, rhs, width_=WIDTH):
-    """Display lines of `lhs = rhs` (lhs None: the expression alone)."""
+    """Display lines of `lhs = rhs` (lhs None: the expression alone).  When the lhs is the
+    wide side (e.g. a stationarity equation `... = 0`), the lhs is broken and `= rhs`
+    ends the last line."""
+    if lhs is not None and width(latex(lhs)) > width_ and \
+            width(latex(lhs)) > width(latex(rhs)):
+        rows = lines(None, lhs, width_)
+        rows[-1] += " = " + latex(rhs)
+        return rows
     left = "" if lhs is None else latex(lhs) + " = "
     whole = left + latex(rhs)
     if width(whole) <= width_:
         return [whole]
     rows, cur, w = [], left, width(left)
     for k, (sign, tex) in enumerate(_pieces(rhs, width_ - 6)):
+        if tex.startswith("- "):              # normalise: never "+ - x"
+            sign, tex = {"-": "+", "+": "-", "": "-"}[sign], tex[2:]
         piece = ((("- " if sign == "-" else "") if k == 0 else (f"{sign} " if sign else ""))
                  + tex)
         wp = width(piece)
@@ -135,4 +145,16 @@ def lines(lhs, rhs, width_=WIDTH):
         else:
             cur, w = cur + piece + " ", w + wp
     rows.append(cur.rstrip())
-    return rows
+    return [_fit(r, left if k == 0 else "", width_) for k, r in enumerate(rows)]
+
+
+def _fit(row, left, width_):
+    """A row still wider than the line (an indivisible term, e.g. exp of a long sum) is
+    scaled to the line width as one box (the lhs and its "=" stay outside the box)."""
+    if width(row) <= width_:
+        return row
+    body = row[len(left):] if left and row.startswith(left) else row
+    head = left if left and row.startswith(left) else ""
+    frac = "0.85" if head else "0.9"         # shrink only: never scale a narrow row up
+    return (head + r"\resizebox{\ifdim\width>" + frac + r"\linewidth " + frac
+            + r"\linewidth\else\width\fi}{!}{$\displaystyle " + body + "$}")

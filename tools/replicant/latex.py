@@ -70,11 +70,11 @@ def _block(b: TexBlock, bib):
         raise Refusal("precondition:equation-source",
                       f"block {b.title!r}: an equation with neither a sympy expression the "
                       "code holds nor a citation")
-    head = f"\\paragraph{{{escape(b.title)}}}"
+    head = f"\\paragraph{{{prose(b.title)}}}"
     if b.source:
         head += " " + bib.cite(b.source)
     if b.check is not None:
-        head += " " + escape("(sympy form; checked against the code by tests/test_latex.py)"
+        head += " " + prose("(sympy form; checked against the code by tests/test_latex.py)"
                              if b.expr is not None else "(evaluated by hand-coded quadrature; "
                              "checked against the code by tests/test_latex.py)")
     if b.kind == "text":
@@ -91,7 +91,9 @@ def _entry(k, e, bib, blocks, fallback_cite=None):
     head = f"\\subsection{{Step {k}: {escape(e.step)}}}\n"
     cite = e.cite or fallback_cite
     src = f"Source: {bib.cite(cite)}. " if cite else ""
-    return head + f"{src}Trace: {prose(e.summary)}\n\n" + _blocks(blocks, bib)
+    # a step that displays blocks shows its note there; the header keeps the State keys set
+    summary = e.summary.split("; ")[0] if blocks else e.summary
+    return head + f"{src}Trace: {prose(summary)}\n\n" + _blocks(blocks, bib)
 
 
 @lru_cache(maxsize=None)
@@ -171,12 +173,12 @@ def _solution(res, bib):
             val += f" $\\pm$ {escape(_num(res.errors.get(k)))} (statistical)"
         rows.append(f"{escape(k)} & {val} & {escape(st.state)} ({escape(st.ansatz)}) "
                     f"{bib.cite(st.cite)} & {'yes' if st.final else 'no'} \\\\")
-    meta = [f"{escape(k)} = {escape(_num(v))}" for k, v in res.values.items()
+    meta = [f"{prose(k)} = {prose(_num(v))}" for k, v in res.values.items()
             if k not in res.finality]
-    errs = [f"{escape(k)} = {escape(_num(v))}" for k, v in res.errors.items() if k not in stat]
+    errs = [f"{prose(k)} = {prose(_num(v))}" for k, v in res.errors.items() if k not in stat]
     notes = [n for n in res.notes if "NOT final" in n]
     out = ("\\section{Solution}\nValues at the requested parameters (" +
-           escape(", ".join(f"{k} = {_num(v)}" for k, v in res.params.items()) or "none") +
+           prose(", ".join(f"{k} = {_num(v)}" for k, v in res.params.items()) or "none") +
            "), each with its finality: only stable and exact-by-literature values are final.\n"
            "\\begin{center}\n\\begin{tabular}{llll}\nkey & value & finality (ansatz) & final \\\\"
            "\n\\hline\n" + "\n".join(rows) + "\n\\end{tabular}\n\\end{center}\n")
@@ -191,7 +193,7 @@ def _solution(res, bib):
 
 
 def _stability(res):
-    comp = [f"{escape(k)} = {escape(_num(v))}" for k, v in res.values.items()
+    comp = [f"{prose(k)} = {prose(_num(v))}" for k, v in res.values.items()
             if any(s in k for s in _STAB)]
     by = {}
     for k, st in res.finality.items():
@@ -200,7 +202,7 @@ def _stability(res):
     out += ("Computed stability quantities (replicon / AT / cavity susceptibility): "
             + "; ".join(comp) + ".\n\n") if comp else \
         "No stability quantity (replicon / AT) is computed by this run.\n\n"
-    out += "".join(f"{escape(s)}: {escape(', '.join(ks))}.\n\n" for s, ks in sorted(by.items()))
+    out += "".join(f"{prose(s)}: {prose(', '.join(ks))}.\n\n" for s, ks in sorted(by.items()))
     return out
 
 
@@ -209,7 +211,7 @@ def _references(res, bib, slow):
     out = "\\section{Reference check}\n"
     if res.entry is None:
         near = res.report.nearest if res.report else None
-        return out + escape(f"No banked keys: a composed model is not a catalog entry, so "
+        return out + prose(f"No banked keys: a composed model is not a catalog entry, so "
                             f"nothing is compared here (nearest entry: {near}).  This document "
                             "does not certify its numbers: a composed model is validated only "
                             "by an independent route (enumeration at small N, or a limit with "
@@ -217,7 +219,7 @@ def _references(res, bib, slow):
     try:
         done = {(o.file, o.key): o for o in res.reference_checks(slow=slow)}
     except Refusal as r:
-        return out + escape(f"refused: {r.reason}: {r.detail}") + "\n"
+        return out + prose(f"refused: {r.reason}: {r.detail}") + "\n"
     rows, stat = [], []
     for ref in res.entry.refs:
         if ref.route != res.route:
@@ -231,12 +233,12 @@ def _references(res, bib, slow):
             got, verdict = escape(_short(o.got)), ("agrees" if o.ok else "DISAGREES")
             if o.statistical:
                 got += " (statistical)"
-                stat.append(f"\\item {escape(ref.key)}: {escape(o.detail)}\n")
+                stat.append(f"\\item {prose(ref.key)}: {prose(o.detail)}\n")
         rows.append(f"{escape(ref.key)} & {got} & {escape(_short(want.value))} & "
                     f"{escape(want.tol)} & {verdict} & {bib.cite(want.cite)} \\\\")
     return (out + "Banked values (reference/*.json) against this pipeline's output; numbers "
             "are shown to 16 significant digits, the comparison uses them in full; slow and "
-            "statistical rows run only with --full (render\\_latex(slow=True)).\n"
+            "statistical rows run only with --full (\\texttt{render\\_latex(slow=True)}).\n"
             "\\begin{center}\\footnotesize\n\\setlength{\\tabcolsep}{4pt}\n" + _FIT +
             "{\\begin{tabular}{llllll}\n"
             "key & computed & banked & tolerance & verdict & source \\\\\n\\hline\n" +
@@ -266,9 +268,9 @@ def _caveat(res):
 
 def _labels(res):
     out = (f"\\section{{Labels}}\nRigor: \\textbf{{{escape(res.rigor)}}}. "
-           f"Route: \\textbf{{{escape(res.route)}}}.\n\n{escape(_caveat(res))}\n\n")
+           f"Route: \\textbf{{{prose(res.route)}}}.\n\n{prose(_caveat(res))}\n\n")
     if res.statistical:
-        out += escape(f"statistical: {', '.join(res.statistical)} are sampling estimates "
+        out += prose(f"statistical: {', '.join(res.statistical)} are sampling estimates "
                       "(value +- stderr over independent runs), not certified.") + "\n\n"
     rest = [n for n in res.notes if n and n != _caveat(res) and "NOT final" not in n]
     if rest:
@@ -284,12 +286,12 @@ def _result_body(res, bib, extra, slow):
                       "(compose.ComposedCalculation.run sets it)")
     sp_txt = ", ".join(f"{f} = {getattr(spec, f)}" for f in
                        ("family", "variables", "disorder", "constraint", "prior"))
-    out = ["\\section{Model}\n" + escape(sp_txt) + ".\n\n" +
-           (escape(res.entry.description) + " " + bib.cite(res.entry.cite) + "\n\n"
+    out = ["\\section{Model}\n" + prose(sp_txt) + ".\n\n" +
+           (prose(res.entry.description) + " " + bib.cite(res.entry.cite) + "\n\n"
             if res.entry else "") + _blocks(_model_blocks(res), bib)]
     out.append(f"\\section{{Method and route}}\nRoute: \\textbf{{{escape(res.route)}}} "
-               f"({escape(ROUTES.get(res.route, res.route))}). Rigor: "
-               f"\\textbf{{{escape(res.rigor)}}}. {escape(_caveat(res))}\n")
+               f"({prose(ROUTES.get(res.route, res.route))}). Rigor: "
+               f"\\textbf{{{prose(res.rigor)}}}. {prose(_caveat(res))}\n")
     if res.report is not None and res.report.kind == "composed":
         out.append("\\subsection{Reused and adapted steps}\n" +
                    _blocks(report_blocks(res.report), bib))
@@ -305,13 +307,13 @@ def _result_body(res, bib, extra, slow):
                  "observables and population dynamics.  Each equation is in sympy form "
                  "(checked against the code by tests/test_latex.py) or cited.")
     else:
-        intro = (f"No level-(a) derivation for this model ({why}): the governing equations "
-                 "the family code implements are shown, each in sympy form (checked against "
-                 "the code by tests/test_latex.py) or cited; no intermediate step the code "
-                 "does not perform is shown.")
-    out.append("\\section{Derivation}\n" + escape(intro) + "\n")
+        intro = ("No step-by-step symbolic derivation is available in this package for this "
+                 "model; the governing equations implemented by the code are shown below, "
+                 "each in sympy form (checked against the code by tests/test_latex.py) or "
+                 "cited.  No intermediate step the code does not perform is shown.")
+    out.append("\\section{Derivation}\n" + prose(intro) + "\n")
     if not composed and rows[0][0] is not None:
-        out.append(escape("The level-(a) steps below derive the same model symbolically "
+        out.append(prose("The level-(a) steps below derive the same model symbolically "
                           "(tests/test_agree.py checks them against the family equations); "
                           f"method as in {res.entry.cite}.") + "\n")
     for k, (e, title, blocks) in enumerate(rows, 1):
@@ -342,7 +344,7 @@ def _refusal_body(r, bib):
         or escape("The refusal came before any step was applied.") + "\n"))
     out.append("\\section{Labels}\nRigor: \\textbf{physics-level}. " +
                (f"Route: \\textbf{{{escape(route)}}}. " if route else "") +
-               escape(CAVITY_CAVEAT if route == "cavity" else CAVEAT) + "\n")
+               prose(CAVITY_CAVEAT if route == "cavity" else CAVEAT) + "\n")
     return "".join(out)
 
 
@@ -360,7 +362,7 @@ def render_latex(result, *, title=None, standalone=True, extra=(), slow=False) -
     body += bib.render()
     if not standalone:
         return body
-    return (PREAMBLE + f"\\title{{{escape(title)}}}\n\\date{{}}\n\\begin{{document}}\n"
+    return (PREAMBLE + f"\\title{{{prose(title)}}}\n\\date{{}}\n\\begin{{document}}\n"
             "\\maketitle\n" + body + "\\end{document}\n")
 
 

@@ -26,7 +26,7 @@ from replicant.families.common import CAVEAT, CAVITY_CAVEAT
 from replicant.latex import document_blocks, render_latex, write_latex
 from replicant.spec import ModelSpec
 from replicant.testing import slow
-from replicant.tex import Check, TexBlock, escape, invented, render, verify_block
+from replicant.tex import Check, TexBlock, escape, invented, prose, render, verify_block
 from replicant.tex_print import WIDTH, lines, width
 
 # cheap parameters per (entry, route): every route of every entry gets a document
@@ -196,12 +196,11 @@ def test_displayed_equations_match_implementation_all_points():
 def test_consistency_check_catches_a_flipped_sign():
     """Negative control: the same check on a deliberately wrong expression fails."""
     b = next(b for b in catalog()["sk"].derivation("replica") if "replicon" in b.title.lower())
-    assert not verify_block(b)
+    assert not verify_block(b, max_points=2)
     wrong_rhs = sp.Eq(b.expr.lhs, 2 - b.expr.rhs)      # 1 - x  ->  1 + x
     wrong = TexBlock(b.kind, b.title, render(wrong_rhs), wrong_rhs, check=b.check)
-    bad = verify_block(wrong)
-    assert len(bad) == 3, bad
-    assert len(verify_block(wrong, max_points=1)) == 1
+    bad = verify_block(wrong, max_points=2)          # (all 3 points: the --full test)
+    assert len(bad) == 2, bad
 
 
 # ---- refusals, labels, finality -------------------------------------------------------
@@ -244,7 +243,7 @@ def test_statistical_and_physics_labels_present():
         beta="0.8", pop=200, sweeps=4, burn_in=4, runs=2, seed=3)
     doc = render_latex(vb)
     assert set(vb.statistical) == {"q", "e", "f"}
-    assert "statistical" in doc and "stderr" in doc and escape(CAVITY_CAVEAT) in doc
+    assert "statistical" in doc and "stderr" in doc and prose(CAVITY_CAVEAT) in doc
     for k in vb.statistical:
         row = next(l for l in doc.splitlines() if l.startswith(f"{escape(k)} &"))
         assert "statistical" in row and "\\pm" in row, row
@@ -266,7 +265,7 @@ def test_cavity_document_uses_cavity_caveat():
     assert cavity_hopfield_rs("0.05", 3).caveat == CAVITY_CAVEAT
     for name in ("sk", "hopfield", "perceptron", "viana_bray"):
         doc = _doc(name, "cavity")
-        assert escape(CAVITY_CAVEAT) in doc and escape(CAVEAT) not in doc, name
+        assert prose(CAVITY_CAVEAT) in doc and prose(CAVEAT) not in doc, name
         assert "Route: \\textbf{cavity}" in doc
     for step in ("remove_site", "cavity_field_law", "add_site", "self_consistency"):
         assert escape(step) in _doc("sk", "cavity"), step
@@ -294,6 +293,7 @@ def test_composed_model_document_full():
                  "replica-limit", "rs-stationarity", "solve-derived"):
         assert any(step in t for t, _ in subs), step
     assert "No banked keys" in doc
+    assert not _raw_code_in_prose(doc), _raw_code_in_prose(doc)[:5]
 
 
 # ---- writer, CLI, PDF -----------------------------------------------------------------
@@ -375,12 +375,12 @@ def test_refused_cavity_document_carries_cavity_caveat():
     except Refusal as r:
         assert r.route == "cavity"
         doc = render_latex(r)
-        assert escape(CAVITY_CAVEAT) in doc and escape(CAVEAT) not in doc
+        assert prose(CAVITY_CAVEAT) in doc and prose(CAVEAT) not in doc
         assert "Route: \\textbf{cavity}" in doc
     try:
         run_pipeline([D.saddle_equations()], State())
     except Refusal as r:
-        assert r.route is None and escape(CAVEAT) in render_latex(r)
+        assert r.route is None and prose(CAVEAT) in render_latex(r)
 
 
 def test_cli_keeps_the_json_when_the_document_fails():
@@ -428,12 +428,16 @@ def test_compiled_documents_have_no_overfull_display():
             "sk_cavity": _result("sk", "cavity"), "pspin": _result("pspin", "replica"),
             "viana_bray": _result("viana_bray", "cavity"),
             "sk_pm_one": compose(PM_ONE_SK).run()}
+    x = sp.symbols("x0:40")
+    probe = sp.Eq(sp.Symbol("F"), sp.exp(sum(xi**2 for xi in x)) * sp.Symbol("a"))
+    extra = {"sk": [TexBlock("equation", "indivisible probe", render(probe), probe)]}
     with tempfile.TemporaryDirectory() as d:
         for name, res in docs.items():
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter("always", OverfullDisplay)
                 try:
-                    write_latex(res, os.path.join(d, f"{name}.tex"), pdf=True)
+                    write_latex(res, os.path.join(d, f"{name}.tex"), pdf=True,
+                                extra=extra.get(name, ()))
                 except Refusal as r:
                     if r.reason == "tex-engine:unavailable":
                         print(f"SKIP test_compiled_documents_have_no_overfull_display: {r.detail}")
@@ -447,3 +451,149 @@ def test_compiled_documents_have_no_overfull_display():
     planted = "Overfull \\hbox (74.6pt too wide) detected at line 67\n" \
               "Overfull \\hbox (3.0pt too wide) in paragraph at lines 3--4\n"
     assert overfull(planted) == [(74.6, 67, "display"), (3.0, 3, "paragraph")]
+
+
+# ---- prose and robustness (fix round 2) -------------------------------------------------
+PROSE_TABLE = {   # every pattern class found in the notes of the 11 catalog + composed docs
+    "m_a": "$m_{a}$",
+    "q_ab": "$q_{ab}$",
+    "qhat_ab": "$\\hat{q}_{ab}$",
+    "s_i^a": "$s_{i}^{a}$",
+    "Phi_n^RS": "$\\Phi _{n}^{RS}$",
+    "s_i^a/sqrt(N),": "$s_{i}^{a}/\\sqrt{N}$,",
+    "sqrt(1 - q)": "$\\sqrt{1 - q}$",
+    "n->0": "$n \\to 0$",
+    "a -> b": "a $\\to$ b",
+    "lim_{n->0}": "$\\lim _{n \\to 0}$",
+    "-t**4/(12*N**2)": "$-t^{4}/(12\\,N^{2})$",
+    "2.25*q;": "$2.25\\,q$;",
+    "sum_i": "$\\sum _{i}$",
+    "prod_a": "$\\prod _{a}$",
+    "E_z": "$E_{z}$",
+    "[E_z g]^n,": "$[E_{z} g]^{n}$,",
+    "(sum_a s_a)^2,": "$(\\sum _{a} s_{a})^{2}$,",
+    "tanh^2(beta_c J)": "$\\tanh ^{2}(\\beta _{c} J)$",
+    "int_x^inf": "$\\int _{x}^{\\infty }$",
+    "g(y*)^2/2": "$g(y^*)^{2}/2$",
+    "(a != b);": "$(a  \\neq  b)$;",
+    "alpha_c(kappa),": "$\\alpha _{c}(\\kappa )$,",
+    "ansatz.n_to_zero,": "\\texttt{ansatz.n\\_to\\_zero},",
+    "ansatz.sum_offdiag_power('rs',": "\\texttt{ansatz.sum\\_offdiag\\_power('rs'},",
+    "(families/sk.py": "(\\texttt{families/sk.py}",
+    "rs_ground_energy:": "\\texttt{rs\\_ground\\_energy}:",
+    "q_rs_T0,": "\\texttt{q\\_rs\\_T0},",
+    "e0_rs": "\\texttt{e0\\_rs}",
+    "N_scale": "\\texttt{N\\_scale}",
+    "pm_one;": "\\texttt{pm\\_one};",
+    "factor^n;": "\\texttt{factor\\^{}n};",          # an English word in it: code font
+    "s_a)^2,": "\\texttt{s\\_a)\\^{}2},",             # unbalanced fragment: code font
+    "beta = 2": "beta = 2",                          # plain prose stays text
+    "50% & #1": "50\\% \\& \\#1",
+}
+
+
+def test_prose_converts_the_code_notation_of_the_notes():
+    for src, want in PROSE_TABLE.items():
+        assert prose(src) == want, (src, prose(src), want)
+    for src in PROSE_TABLE:
+        out = prose(src)
+        assert out.count("$") % 2 == 0 and _brace_balanced(out), (src, out)
+
+
+def _brace_balanced(s):
+    depth, i = 0, 0
+    while i < len(s):
+        if s[i] == "\\":
+            i += 2
+            continue
+        depth += {"{": 1, "}": -1}.get(s[i], 0)
+        if depth < 0:
+            return False
+        i += 1
+    return depth == 0
+
+
+def _strip_texttt(s):
+    out, i = "", 0
+    while True:
+        j = s.find("\\texttt{", i)
+        if j < 0:
+            return out + s[i:]
+        out, k, depth = out + s[i:j], j + 8, 1
+        while depth:
+            if s[k] == "\\":
+                k += 2
+                continue
+            depth += {"{": 1, "}": -1}.get(s[k], 0)
+            k += 1
+        i = k
+
+
+def _raw_code_in_prose(doc):
+    body = doc.split("\\begin{document}")[1].split("\\begin{thebibliography}")[0]
+    body = re.sub(r"\\begin\{(equation|align|multline|tabular)\}.*?\\end\{\1\}", "", body,
+                  flags=re.S)
+    body = re.sub(r"\$[^$]*\$", "", _strip_texttt(body))
+    return [l for l in body.splitlines() if not l.startswith("\\subsection")
+            and re.search(r"\\_|\\\^\{\}|\\textgreater", l)]
+
+
+def test_documents_have_no_raw_code_notation_in_prose():
+    for name in ("sk", "hopfield"):
+        bad = _raw_code_in_prose(_doc(name, "replica"))
+        assert not bad, (name, bad[:5])
+    for name, route in _routes():                 # math mode and braces stay balanced
+        doc = _doc(name, route)
+        assert _brace_balanced(doc), (name, route)
+        for line in doc.splitlines():
+            if not line.startswith(("\\begin", "\\end")):
+                assert line.replace("\\$", "").count("$") % 2 == 0, (name, route, line)
+        for b in re.findall(r"\\begin\{(?:equation|align|multline)\}(.*?)\\end", doc, re.S):
+            assert "+ - " not in b and "- - " not in b, (name, route, b[:200])
+
+
+def test_step_note_is_printed_once():
+    doc = _doc("hopfield", "replica")
+    note = "condensed pattern gauged to +1"
+    assert doc.count(note) == 1, doc.count(note)
+    assert "Trace: set avg\n" in doc
+
+
+def test_indivisible_wide_term_is_scaled_to_the_line():
+    x = sp.symbols("x0:40")
+    probe = sp.Eq(sp.Symbol("F"), sp.exp(sum(xi**2 for xi in x)) * sp.Symbol("a"))
+    body = render(probe)
+    assert "\\resizebox" in body and body.startswith("F = \\resizebox"), body[:80]
+    assert render([probe]).startswith("F &= \\resizebox")          # the & stays outside
+    assert not invented(TexBlock("equation", "probe", body, probe))
+
+
+def test_missing_log_is_an_audit_failure():
+    import warnings
+    from replicant import latex_pdf
+    from replicant.latex import OverfullDisplay
+
+    class Done:
+        returncode, stdout, stderr = 0, "", ""
+
+    def fake_run(cmd, **kw):            # a TeX engine that writes a PDF and no log
+        open(cmd[-1][:-4] + ".pdf", "wb").write(b"%PDF-1.5 stub" * 200)
+        return Done()
+    with tempfile.TemporaryDirectory() as d:
+        tex = os.path.join(d, "x.tex")
+        open(tex, "w").write("x")
+        run, which = latex_pdf.subprocess.run, latex_pdf.shutil.which
+        latex_pdf.subprocess.run, latex_pdf.shutil.which = fake_run, lambda n: "/bin/tectonic"
+        try:
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always", OverfullDisplay)
+                latex_pdf.compile_pdf(tex)
+        finally:
+            latex_pdf.subprocess.run, latex_pdf.shutil.which = run, which
+        assert any("overflow audit unavailable: no log" in str(w.message) for w in caught)
+
+
+def test_cli_unwritable_out_is_an_error_not_a_traceback():
+    out, err = io.StringIO(), io.StringIO()
+    code = main(["run", "rem", "--out", "/nonexistent-dir/r.json"], stdout=out, stderr=err)
+    assert code == 1 and "ERROR: --out: FileNotFoundError" in err.getvalue()

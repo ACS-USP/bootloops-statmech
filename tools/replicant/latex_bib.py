@@ -2,7 +2,7 @@
 (no BibTeX, so a document compiles offline)."""
 import re
 
-from .tex import prose
+from .tex import escape
 
 
 _JOURNAL = re.compile(r"(J\. |Phys\. |PRL |Ann\. |Eur\. |Z\. |Europhys|PNAS )")
@@ -51,5 +51,5 @@ class _Bib:
     def render(self):
         if not self.keys:
             return ""
-        rows = "\n".join(f"\\bibitem{{{k}}} {prose(self.text[k])}" for k in self.keys.values())
+        rows = "\n".join(f"\\bibitem{{{k}}} {escape(self.text[k])}" for k in self.keys.values())
         return f"\n\\begin{{thebibliography}}{{99}}\n{rows}\n\\end{{thebibliography}}\n"

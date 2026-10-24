@@ -184,8 +184,12 @@ def main(argv=None, stdout=None, stderr=None):
         return 1
     text = json.dumps(doc, indent=2)
     if args.out:
-        with open(args.out, "w") as f:
-            f.write(text + "\n")
+        try:
+            with open(args.out, "w") as f:
+                f.write(text + "\n")
+        except OSError as exc:
+            print(f"ERROR: --out: {type(exc).__name__}: {exc}", file=stderr)
+            return 1
     else:
         print(text, file=stdout)
     print(f"trace ({res.route}, {res.rigor}):\n{res.trace.render()}", file=stderr)

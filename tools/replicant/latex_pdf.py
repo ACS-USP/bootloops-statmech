@@ -68,7 +68,10 @@ def compile_pdf(tex: Path, *, min_pt=1.0) -> Path:
     if not pdf.exists():
         raise Refusal("tex-engine:failed", f"{engine} wrote no {pdf.name}")
     log = tex.with_suffix(".log")
-    if log.exists():
+    if not log.exists():                 # no log: the audit did not run, which is not a pass
+        warnings.warn(OverfullDisplay(f"{tex.name}: overflow audit unavailable: no log "
+                                      f"({log.name}) written by {Path(engine).name}"))
+    else:
         bad = [o for o in overfull(log, min_pt) if o[2] == "display"]
         if bad:
             warnings.warn(OverfullDisplay(

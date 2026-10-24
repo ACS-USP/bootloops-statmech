@@ -43,10 +43,9 @@ def escape(s) -> str:
 
 
 def prose(s) -> str:
-    """escape() of prose that may quote code notation: Python's ** becomes ^ and a * between
-    two operands a space (beta**2*q -> beta^2 q), so trace notes read as text."""
-    s = re.sub(r"\*\*", "^", str(s))
-    return escape(re.sub(r"(?<=[\w)\]])\*(?=[\w(])", " ", s))
+    """Prose that may quote the package's code notation, typeset (tex_prose.prose)."""
+    from .tex_prose import prose as typeset
+    return typeset(s)
 
 
 @dataclass(frozen=True, eq=False)
@@ -84,14 +83,17 @@ def render(obj) -> str:
     """tex_print.latex of an Expr; `lhs = rhs` of an Eq; align rows `lhs &= rhs` of a list.
     A display wider than tex_print.WIDTH is broken at top-level + / - terms (a multline
     for an equation, `\\\\ &\\quad ...` rows in an align): typesetting only."""
-    from .tex_print import lines
+    from .tex_print import latex, lines
     if isinstance(obj, (list, tuple)):
-        rows = []
-        for e in obj:
-            ls = lines(e.lhs, e.rhs)
-            rows.append(" \\\\\n".join([ls[0].replace(" = ", " &= ", 1)]
-                                         + [f"&{x}" for x in ls[1:]]))
-        return " \\\\\n".join(rows)
+        # one equation number per equation: continuation rows carry \notag
+        all_ls = [(e, [x + r" \notag" for x in ls[:-1]] + ls[-1:])
+                  for e in obj for ls in [lines(e.lhs, e.rhs)]]
+        if any(not ls[0].startswith(latex(e.lhs) + " = ") for e, ls in all_ls):
+            # a broken lhs: every row starts at the alignment point (one column)
+            return " \\\\\n".join(f"&{x}" for _, ls in all_ls for x in ls)
+        return " \\\\\n".join(" \\\\\n".join([ls[0].replace(" = ", " &= ", 1)]
+                                                 + [f"&{x}" for x in ls[1:]])
+                               for _, ls in all_ls)
     if isinstance(obj, sp.Equality):
         return " \\\\\n".join(lines(obj.lhs, obj.rhs))
     return " \\\\\n".join(lines(None, obj))
