@@ -6,9 +6,10 @@
 
 gauss_expect integrates f(z) exp(-z^2/2)/sqrt(2 pi) over the real line with
 mpmath tanh-sinh quadrature on [-inf, -6, 0, 6, inf].  For smooth f of
-moderate growth (polynomials, cos, exp(a z), tanh, log cosh) it agrees with the
-exact value to ~25+ digits at dps=30 (checked in the tests at 1e-25); it is
-NOT validated for integrands with kinks or singularities, nor for f growing
+moderate growth it agrees with exact values to ~25 digits at dps=30 (tests:
+z^2, z^4, cos z, exp(a z) at 1e-25) and with independent trapezoid references
+for tanh^2 and log cosh at beta=10 (tests, ~1e-10).  NOT validated for
+integrands with kinks or singularities (e.g. erfc-type), nor for f growing
 faster than exp(z^2/2 - eps).
 
 fixed_point looks for x = F(x), scalar x.  It runs damped iteration
@@ -20,6 +21,15 @@ A point is accepted only if |F(x) - x| < tol; anything else is not reported.
 Branch naming: "trivial" is x ~ 0 when F(0) = 0 (returned as exactly 0);
 other points are "nontrivial", "nontrivial-2", ... in discovery order
 (seeds tried in the order x0, 0, -x0, x0/10, x0*10, -x0/10, -x0*10, 3*x0).
+
+Near a continuous transition (SK beta -> 1+) damped iteration slows, and the
+secant polish only starts once the residual is < 1e-3 within maxit=400 steps;
+in practice beta=1.05 and 1.001 are found (tests/spot check), but a missing
+branch always means "not found from these seeds".  When `branch` is given the
+sweep stops as soon as that branch is found, so `branches_seen` then lists
+only the branches found up to that point; with branch=None the sweep is full.
+`branch_values` pairs each seen name with its value; `converged` is always
+True on return (failures raise Refusal) and is kept for the interface.
 """
 from dataclasses import dataclass
 
@@ -96,6 +106,9 @@ def fixed_point(F, x0, *, dps: int = 30, tol: str = "1e-20", branch: str | None 
         if zero_ok:
             found.append(("trivial", mp.mpf(0), abs(f0)))
         n_non = 0
+        if branch == "trivial" and zero_ok:
+            return FixedPoint(found[0][1], found[0][2], True, "trivial",
+                              ("trivial",), (("trivial", found[0][1]),))
         for fac in _SEED_FACTORS:
             seed = x0 * mp.mpf(fac)
             if zero_ok and seed == 0:
@@ -110,6 +123,8 @@ def fixed_point(F, x0, *, dps: int = 30, tol: str = "1e-20", branch: str | None 
                 continue
             n_non += 1
             found.append(("nontrivial" if n_non == 1 else f"nontrivial-{n_non}", x, res))
+            if found[-1][0] == branch:
+                break
         if not found:
             raise Refusal("no-solution", "no seed converged to |F(x)-x| < tol")
         seen = tuple(n for n, _, _ in found)
