@@ -7,7 +7,7 @@
 No family name appears in this module: everything model-specific arrives
 through agree.derive_rs(spec) (the stationarity equations d phi/d p = 0, the
 declared unknowns p = RSFree.params, phi itself, the recorded site traces) and
-derive_replicon.replicon(state).
+solve_derived_stability.assess(state).
  1. Parameters.  Every free symbol of the equations or of phi that is not a
     declared unknown needs a value from `params` (by symbol name), else a
     Refusal.  A numeric spec.params["beta"] is lifted back to the symbol beta
@@ -55,19 +55,14 @@ derive_replicon.replicon(state).
  7. Outputs.  free_energy = phi at the solution, phi = lim (1/(N n)) ln E Z^n
     (RS): -beta f for a thermal model, the entropy (log volume / log count per
     variable) for the perceptron.  entropy = phi - beta d phi/d beta when phi
-    depends on beta, else phi.  replicon: derive_replicon (pair-separable or
-    LnGaussProd energy; Ising site, or a site without conjugate: SK, the spherical
-    and Ising perceptron, Hopfield), else None; replicon_route names the rules.  Its
-    value is _derived_num.checked (two quadrature rules agree to audit_tol, or two
-    fine-panel rules do, else Refusal no-convergence:quadrature).
-    STABILITY CONTRACT: stable is True only when the replicon was derived and is
-    > 0 (and the entropy check below passes); False when the replicon is < 0, or
-    when the variables are discrete (spec.variables "ising": counting measure)
-    and the RS entropy is < 0; None means UNKNOWN (replicon not derived for this
-    family): a composer must treat None as unknown and never present that RS
-    answer as final.  The replicon is the RS saddle's local stability toward
-    replica-symmetry breaking only (the Hopfield m-mode is not part of it).  No
-    capacity or threshold is computed.
+    depends on beta, else phi.  Stability: solve_derived_stability.assess (the
+    derived replicon, SK / perceptrons / Hopfield; for Hopfield also the mode of the
+    extra order parameter m from the derived phi), each value _derived_num.checked;
+    quad_error includes a fine-panel disagreement when that fallback was used.
+    STABILITY CONTRACT: stable is True only when every mode is computed and > 0 and
+    (discrete variables) the RS entropy is >= 0; False when a computed one fails;
+    None means UNKNOWN: a composer must treat None as unknown and never present that
+    RS answer as final.  Local stability only.  No capacity or threshold is computed.
 
 Numerics: mpmath under mp.workdps (the caller's precision is restored).  The
 main quadrature is not validated for sharply varying integrands (perceptron at
@@ -84,14 +79,13 @@ from . import agree
 from . import derive as D
 from ._derived_num import Num, checked, safe
 from .core import Refusal, Trace, TraceEntry
-from .derive_replicon import replicon as derive_replicon
 from .families.common import CAVEAT
 from .gauss import GaussE, _sympy_point, linear, stein
 from .solve import fixed_point
+from .solve_derived_stability import _DISCRETE, assess  # noqa: F401 (compose reads _DISCRETE)
 from .spec import ModelSpec
 
 _DEFAULT_SEEDS = ("0.5", "0.25", "0.75", "0.1", "0.9", "0.99")
-_DISCRETE = ("ising",)          # spec.variables with a counting measure (entropy >= 0)
 _QUADS = ("fast", "mp", "gh")
 _SAME = mp.mpf("1e-8")
 _ZERO = mp.mpf("1e-10")
@@ -115,6 +109,7 @@ class DerivedRSSolution:
     replicon: object = None      # derived lambda_R at the solution, or None
     roots: list = field(default_factory=list)   # every audited root: dicts
     replicon_route: str = ""     # derive_replicon's rules ("" when not derived)
+    mode: object = None          # extras' (Hopfield m) longitudinal mode, or None
 
 
 def _masked(e, fn):
@@ -493,19 +488,11 @@ class _Solver:
             ent_note = "entropy = phi - beta d phi/d beta"
         else:
             ent, ent_note = fe, "entropy = phi (no temperature: log count / volume per variable)"
-        rep = derive_replicon(self.state)
-        lam = None if rep.expr is None else checked(
-            self.num(safe(rep.expr).subs(self.point)), vals, self.tol)[0]
-        neg_ent = self.spec.variables in _DISCRETE and ent < 0
-        if lam is None:
-            stable = False if neg_ent else None
-            stab = ("stable=None means UNKNOWN: " if not neg_ent else "") + rep.note
-        else:
-            stable = bool(lam > 0) and not neg_ent
-            stab = f"replicon {mp.nstr(lam, 8)} ({rep.note})"
-        if neg_ent:
-            stab = (f"RS entropy {mp.nstr(ent, 6)} < 0 for discrete variables "
-                    f"({self.spec.variables}): RS is wrong here; " + stab)
+        a = assess(self.state, self.spec.variables,
+                   lambda e: checked(self.num(linear(stein(safe(e).subs(self.point)))), vals,
+                                     self.tol), ent)
+        stable, lam, stab = a.stable, a.replicon, a.note
+        qerr = max(pick["quad_error"], a.quad_error)
         note = "; ".join(self.notes + [self.method, f"roots: {listing}", ent_note, stab,
                                        "no capacity / threshold computed"])
         out = Trace()
@@ -514,9 +501,8 @@ class _Solver:
         out.add(TraceEntry("solve-derived", None,
                            f"branch {pick['name']}; stable {stable}; independent residual "
                            f"{mp.nstr(pick['residual'], 3)}; quad_error "
-                           f"{mp.nstr(pick['quad_error'], 3)}; {note}"))
+                           f"{mp.nstr(qerr, 3)}; {note}"))
         return DerivedRSSolution(
             pick["values"], fe, pick["residual"], list(self.eqs), out, stable, CAVEAT,
             pick["name"], ent, self.method, note,
-            {k: self.params[k] for k in self.by_name}, pick["quad_error"], lam, table,
-            rep.route)
+            {k: self.params[k] for k in self.by_name}, qerr, lam, table, a.route, a.mode)

@@ -171,11 +171,11 @@ banked in `reference/perceptron.json` as independent targets. Honest limits:
 - The annealed bound does not detect the spherical-site swap (the other checks do).
 - Enumeration slack c/N with c = 1 is an assumption of the test.
 
-ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 253 tests, about 19 s on a
+ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 252 tests, about 18 s on a
 laptop; also `python3 run_selftests.py replicant`) covers the core and refusal paths, the symbolic
 derivation against independent expressions, level agreement (a)=(b) for every family where both exist,
 every catalog entry against its banked non-slow values, the cavity routes, the composer and the held-out
-models, the CLI and the LaTeX writer (displayed equations re-checked numerically). `--full` adds 72
+models, the CLI and the LaTeX writer (displayed equations re-checked numerically). `--full` adds 75
 `@slow` tests (full-RSB Parisi up to K = 9, population dynamics at reference sizes, the Hopfield replicon
 scans, the p-spin T -> 0 energy, solver-based composed and LaTeX checks, a PDF compile when a TeX engine
 is present) and takes about 6-7 minutes on a laptop (measured 6 min 42 s); run it before merging a
@@ -192,13 +192,19 @@ KNOWN HAZARDS:
   spherical perceptron (Gaussian-integral energy, conjugate-free site), the Ising perceptron and Hopfield
   (Gaussian-integral energy, Ising site): `derive_replicon.py` and `derive_replicon_gauss.py` (Price
   covariance derivative, RS split, n -> 0 of the replica measure, replicon-eigenvector projection; the
-  spherical site by an explicit-n projection of its registered trace at n = 4, checked equal at n = 5).
+  spherical site by an explicit-n projection of its registered trace at n = 4; that eps is a Hessian
+  eigenvector and the value is the same at n = 5 is checked for the registered site in the slow tests,
+  not on every call).
   A composed model whose energy is anything else (a LogDet energy, a covariance other than `q_ab`) or
   whose site has no rule is reported UNKNOWN (False only if the discrete-variable entropy is negative),
-  and `final` is false. A composed RS value labelled `stable` means: derived replicon > 0 and (discrete
-  variables) RS entropy >= 0 at that point; it is LOCAL stability toward RSB, not a proof that RS is
-  exact, and for Hopfield it does not include the m-mode (the m_a are not varied: their decoupling from
-  the replicon sector is argued, not mechanised). The Ising-site susceptibility chi_R = E sech^4 is a
+  and `final` is false. A composed RS value labelled `stable` means: derived replicon > 0, for Hopfield
+  also the derived m-mode > 0 (`solve_derived_stability.py`: -d^2 phi_red/dm^2 with q, qhat held
+  stationary, from the Hessian of the derived phi; it equals beta times the family's `mode_eig`), and
+  (discrete variables) RS entropy >= 0 at that point; if a mode cannot be computed the value is UNKNOWN.
+  It is LOCAL stability, not a proof that RS is exact. A lower (m-unstable) Hopfield retrieval root can
+  have a positive replicon (e.g. beta = 20 at m = 0.98 m_fold: replicon +0.19, m-mode -2.24 beta): only
+  the m-mode rules it out. The decoupling of the m_a from the replicon sector is argued, not
+  mechanised. The Ising-site susceptibility chi_R = E sech^4 is a
   stated identity (the code differentiates the recorded site factor). The replicon value is accepted
   only when two quadrature rules agree (else fine-panel rules, else `no-convergence:quadrature`): at
   large beta the fixed splits alone can be off by 1e-3 (Hopfield beta ~ 43).

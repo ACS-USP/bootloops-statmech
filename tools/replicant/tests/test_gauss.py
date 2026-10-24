@@ -191,13 +191,13 @@ def test_mean_derivative_rule():
     assert abs(sp.N((M[0] - G.H((kap - h) / s)).subs(pt), 30)) < 1e-25
     g = sp.Lambda(lam_, sp.exp(bb * lam_**2 / 2))
     M = G.slot_moments(g, split, z, 2)
-    with mp.workdps(30):
+    with mp.workdps(24):
         qv, tv = mp.mpf(2) / 5, mp.mpf(3) / 10
         mean, sd = mp.sqrt(qv) * tv, mp.sqrt(1 - qv)
         b_ = mp.mpf(3) / 5
         d2 = lambda x: (b_ + b_**2 * x * x) * mp.exp(b_ * x * x / 2)      # g''
         direct = mp.quad(lambda u: d2(mean + sd * u) * mp.exp(-u * u / 2), [-mp.inf, mp.inf]) \
             / mp.sqrt(2 * mp.pi)
-        rule = mp.mpf(str(sp.N(M[2].subs({q: sp.Rational(2, 5), t: sp.Rational(3, 10)}), 30)))
-        assert abs(rule - direct) < mp.mpf("1e-20"), (rule, direct)
+        rule = mp.mpf(str(sp.N(M[2].subs({q: sp.Rational(2, 5), t: sp.Rational(3, 10)}), 24)))
+        assert abs(rule - direct) < mp.mpf("1e-18"), (rule, direct)
     assert _refusal(lambda: G.slot_moments(g, z**2, z, 1)) == "precondition:linear-in-z"

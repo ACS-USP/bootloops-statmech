@@ -3,6 +3,7 @@ conjugate field (used by derive_replicon.replicon).
 
   gauss_prod_replicon(coef, g)   -> GaussReplicon(e2, parts, note)
   conjugate_free_site(site)      -> (chi_R, s_R, note)
+  check_conjugate_free_site(site) -> s_R, its assumptions checked (eigenvector, n = 4, 5)
   replicon_vector(n)             -> {(a, b): eps_ab}, sum_b eps_ab = 0 for every a
 
 Energy  coef * LnGaussProd(g, q_ab, n) = coef ln Z_n(Q),  Z_n = E_lambda prod_a g(lambda_a),
@@ -27,10 +28,11 @@ by the code below (nothing typed in):
   The linear combination of E_t terms is merged and factored (sympy.factor) before the R_k
   are substituted.  Result: E''_R = coef E_t[(R_2 - R_1^2)^2].
 Site    a site with no conjugate (derive.SITES entry with conjugate=False, e.g. "spherical"):
-  its registered trace is evaluated at EXPLICIT n: the pair Hessian column at n = 4 (eps
-  checked to be an eigenvector, s_R its eigenvalue) and the second derivative along
-  q_ab = q + delta eps_ab at n = 5, which must equal s_R (n-independent, so its n -> 0
-  value; two values of n are evidence, not a proof, of n-independence).  The
+  its registered trace is evaluated at EXPLICIT n = 4 along q_ab = q + delta eps_ab:
+  s_R = d^2/d delta^2 / |eps|^2.  That eps is an eigenvector of the pair Hessian and
+  that s_R is the same at n = 5 (n-independent, so its n -> 0 value; two values of n are
+  evidence, not a proof) are checked by check_conjugate_free_site, run on the registered
+  site in the slow tests (not on every call: it costs ~0.2 s of sympy).  The
   conjugate-free analogue of the Ising rule is chi_R = -1/s_R (stationarity in q of the
   site term replaces the elimination of qhat).
 Honest label: rules 1, 2, 5 are exact identities; rule 3 and the use of the RS replicon as
@@ -99,8 +101,24 @@ def _rational_or_same(e):
     return c if c.is_rational_function(_T) else e
 
 
-@lru_cache(maxsize=64)
 def gauss_prod_replicon(coef, g, q=D.Q_RS):
+    """E''_R of coef * LnGaussProd(g, q_ab, n): the coefficient-free part is derived (and
+    cached) per weight g; coef multiplies it."""
+    e2, body, parts, notes = _gauss_prod_core(g, q)
+    parts = parts + (("Energy replicon eigenvalue (covariance derivative, n -> 0, "
+                      "projection; E_t averages t ~ N(0, 1) with the R_k at h = sqrt(q) t)",
+                      sp.Eq(sp.Symbol("E''_R"), coef * Et(body))),
+                     ("Energy replicon eigenvalue with the slot ratios substituted",
+                      sp.Eq(sp.Symbol("E''_R"), coef * e2)))
+    note = ("energy coef ln E_lambda prod_a g(lambda_a): Price covariance derivative "
+            "(gauss.price) on four replicas, RS split and slot moments "
+            "(gauss.slot_moments), n -> 0 of the replica measure, eigenvector projection "
+            f"-> E''_R = {coef} E_t[{body}], R_k = M_k/M_0" + "".join(f" ({x})" for x in notes))
+    return GaussReplicon(coef * e2, parts, note)
+
+
+@lru_cache(maxsize=64)
+def _gauss_prod_core(g, q):
     lam = sp.symbols("lambda_1:5", real=True)
     gf = sp.Function("g")
     F = sp.Mul(*(gf(x) for x in lam))
@@ -132,31 +150,45 @@ def gauss_prod_replicon(coef, g, q=D.Q_RS):
     # kept cancelled (the Gaussian weight: the expectation then closes); others as they are
     integrand = sp.Mul(*(_rational_or_same(b.xreplace(sub))**x for b, x in
                          (f.as_base_exp() for f in sp.Mul.make_args(body))))
-    e2 = coef * gauss.GaussE(integrand, _T)
+    e2 = gauss.GaussE(integrand, _T)
     G0 = sp.Function("G_0")
     m0 = gauss.slot_moments(g, H_MEAN + sp.sqrt(1 - q) * _Z, _Z, 0)[0]
     parts = (("Conditional slot weight (RS split, closed form; h = sqrt(q) t)",
               sp.Eq(G0(H_MEAN), m0)),
              ("Slot ratios (derivatives in the conditional mean)",
-              [sp.Eq(R[k], sp.Derivative(G0(H_MEAN), H_MEAN, k) / G0(H_MEAN)) for k in (1, 2)]),
-             ("Energy replicon eigenvalue (covariance derivative, n -> 0, projection; "
-              "E_t averages t ~ N(0, 1) with the R_k at h = sqrt(q) t)",
-              sp.Eq(sp.Symbol("E''_R"), coef * Et(body))),
-             ("Energy replicon eigenvalue with the slot ratios substituted",
-              sp.Eq(sp.Symbol("E''_R"), e2)))
-    note = ("energy coef ln E_lambda prod_a g(lambda_a): Price covariance derivative "
-            "(gauss.price) on four replicas, RS split and slot moments "
-            "(gauss.slot_moments), n -> 0 of the replica measure, eigenvector projection "
-            f"-> E''_R = {coef} E_t[{body}], R_k = M_k/M_0"
-            + "".join(f" ({x})" for x in notes))
-    return GaussReplicon(e2, parts, note)
+              [sp.Eq(R[k], sp.Derivative(G0(H_MEAN), H_MEAN, k) / G0(H_MEAN)) for k in (1, 2)]))
+    return e2, body, parts, tuple(notes)
+
+
+def _quotient(site, n, q):
+    """d^2/d delta^2 of the explicit-n trace along q_ab = q + delta eps_ab, / |eps|^2."""
+    d = sp.Dummy("delta")
+    eps = replicon_vector(n)
+    tr = site.trace(n, {p: q + d * v for p, v in eps.items()}, {p: sp.S(0) for p in eps}, 0)
+    return sp.factor(sp.cancel(sp.diff(tr, d, 2).subs(d, 0) / sum(v**2 for v in eps.values())))
 
 
 @lru_cache(maxsize=16)
 def conjugate_free_site(site, q=D.Q_RS):
-    """(chi_R, s_R, note) for a SITES entry without conjugate, from its explicit-n trace:
-    the pair Hessian column H eps at n = 4 (eps checked to be an eigenvector), the Rayleigh
-    quotient along eps at n = 4 and n = 5 (equal: n-independent)."""
+    """(chi_R, s_R, note) for a SITES entry without conjugate: s_R = the Rayleigh quotient
+    of its explicit n = 4 trace along eps.  It is the replicon eigenvalue when eps is an
+    eigenvector (true for a trace symmetric under replica permutations at the RS point:
+    the replicon sector is one irreducible block) and n-independent; both are verified for
+    a registered site by check_conjugate_free_site (tests, slow), not on every call."""
+    s4 = _quotient(site, 4, q)
+    if s4 == 0:
+        raise Refusal("precondition:nondegenerate-site", "site replicon s_R = 0: chi_R = -1/s_R "
+                      "undefined (the site does not fix q in the replicon direction)")
+    return (sp.factor(-1 / s4), s4,
+            f"conjugate-free site: explicit-n (n = 4) replicon quotient of the registered "
+            f"trace, s_R = {s4}, chi_R = -1/s_R (eigenvector and n-independence verified "
+            "for the registered site by check_conjugate_free_site in the slow tests)")
+
+
+def check_conjugate_free_site(site, q=D.Q_RS):
+    """The assumptions of conjugate_free_site, checked: eps is an eigenvector of the
+    n = 4 pair Hessian (the full column H eps), and the quotient is equal at n = 5.
+    Returns s_R or raises Refusal (replicon-eigenvector, replicon-n-independent)."""
     eps = replicon_vector(4)
     x = {p: sp.Dummy(f"q_{p[0]}{p[1]}") for p in eps}
     tr = site.trace(4, x, {p: sp.S(0) for p in eps}, 0)
@@ -164,16 +196,8 @@ def conjugate_free_site(site, q=D.Q_RS):
     along = sp.Add(*(eps[r] * sp.diff(tr, x[r]) for r in eps))
     col = {p: sp.cancel(sp.diff(along, x[p]).subs(rs)) for p in eps}
     s4 = sp.factor(_project(col, eps, "site trace at n = 4"))
-    d = sp.Dummy("delta")
-    eps5 = replicon_vector(5)
-    tr5 = site.trace(5, {p: q + d * v for p, v in eps5.items()}, {p: sp.S(0) for p in eps5}, 0)
-    s5 = sp.cancel(sp.diff(tr5, d, 2).subs(d, 0) / sum(v**2 for v in eps5.values()))
+    s5 = _quotient(site, 5, q)
     if sp.cancel(s4 - s5) != 0:
         raise Refusal("precondition:replicon-n-independent",
                       f"site replicon {s4} (n = 4) != {s5} (n = 5)")
-    if s4 == 0:
-        raise Refusal("precondition:nondegenerate-site", "site replicon s_R = 0: chi_R = -1/s_R "
-                      "undefined (the site does not fix q in the replicon direction)")
-    return (sp.factor(-1 / s4), s4,
-            f"conjugate-free site: explicit-n replicon of the registered trace, s_R = {s4} "
-            "(eigenvector at n = 4, equal at n = 5), chi_R = -1/s_R")
+    return s4

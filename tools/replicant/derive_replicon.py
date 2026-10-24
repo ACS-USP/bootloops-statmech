@@ -38,7 +38,8 @@ precondition is checked:
   Extra replica-indexed order parameters (Hopfield m_a) are not varied: at RS their
   couplings to q_ab, qhat_ab are vectors x_a (one value for a in the pair, one outside),
   whose contraction with a replicon eps vanishes (sum_b eps_ab = 0).  ARGUED, NOT
-  MECHANISED; the m-mode itself is a separate (longitudinal) stability question.
+  MECHANISED; the m-mode itself is a separate (longitudinal) stability question,
+  computed by solve_derived_stability (solve_derived's label requires both).
 None means UNKNOWN (not derived), never "stable".
 Honest label: physics-level (replica n -> 0, RS); the sign convention of lambda is
 checked against families.sk.sk_replicon (tests/test_solve_derived.py) and the
@@ -158,22 +159,18 @@ def replicon(state) -> Replicon:
 
 
 def _residual(num, saddle_tol, qtol):
-    """|equation| at the point by the independent rule; only a failing value is re-decided
-    by _derived_num.checked (so a coarse rule cannot refuse a true saddle)."""
+    """|equation| at the point.  The independent rule alone ACCEPTS (a value below
+    saddle_tol is taken as is); a value at or above it is re-decided by
+    _derived_num.checked, so a coarse rule cannot refuse a true saddle."""
     from ._derived_num import checked
     r = abs(num.audit([]))
     return r if r < mp.mpf(saddle_tol) else abs(checked(num, [], qtol)[0])
 
 
-def derived_replicon(spec, rs_solution, *, dps=20, saddle_tol="1e-9") -> Replicon:
-    """lambda_R of `spec` at an RS solution: a solve_derived.DerivedRSSolution, or a
-    mapping {name: value} of the unknowns and parameters (by symbol name).  A mapping is
-    first checked to be a root of the derived RS equations (independent quadrature,
-    max |lhs - rhs| < saddle_tol, else Refusal precondition:rs-saddle); saddle_tol=None
-    skips that check (a probe of the formula off the saddle).  Every number is
-    _derived_num.checked: two quadrature rules agree, else fine-panel rules, else Refusal
-    no-convergence:quadrature.  A family without a rule returns value None and the
-    reason in `note`."""
+def at_point(spec, rs_solution, *, dps=20, saddle_tol="1e-9", extra=()):
+    """(state, evaluate, qtol) at an RS solution (see derived_replicon): `evaluate(expr)`
+    gives _derived_num.checked (value, |difference|, rules) of a sympy expression there.
+    The point must give every symbol of the derived equations and of `extra`."""
     from ._derived_num import Num, checked, safe
     from .agree import derive_rs
     from .gauss import _sympy_point, linear, stein
@@ -182,11 +179,8 @@ def derived_replicon(spec, rs_solution, *, dps=20, saddle_tol="1e-9") -> Replico
     vals = ({**rs_solution.params, **rs_solution.values} if audited else dict(rs_solution))
     spec, vals, _ = lift_numeric_beta(spec, vals)
     eqs, state, _ = derive_rs(spec)
-    rep = replicon(state)
-    if rep.expr is None:
-        return rep
-    syms = {s.name: s for e in [rep.expr] + [x.lhs - x.rhs for x in eqs]
-            for s in e.free_symbols}
+    syms = {s.name: s for e in list(extra) + [state["rs_free"].expr] +
+            [x.lhs - x.rhs for x in eqs] for s in e.free_symbols}
     missing = sorted(set(syms) - set(vals))
     if missing:
         raise Refusal("precondition:complete-point", f"no value for {missing}")
@@ -200,7 +194,31 @@ def derived_replicon(spec, rs_solution, *, dps=20, saddle_tol="1e-9") -> Replico
                 raise Refusal("precondition:rs-saddle",
                               f"the point is not a root of the derived RS equations: "
                               f"residual {mp.nstr(res, 3)} >= {saddle_tol}")
-        value, qerr, rules = checked(Num(safe(rep.expr).subs(point), [], dps), [], qtol)
+
+    def evaluate(expr):
+        with mp.workdps(dps + 3):
+            return checked(Num(linear(stein(safe(expr).subs(point))), [], dps), [], qtol)
+    return state, evaluate, qtol
+
+
+def derived_replicon(spec, rs_solution, *, dps=20, saddle_tol="1e-9") -> Replicon:
+    """lambda_R of `spec` at an RS solution: a solve_derived.DerivedRSSolution, or a
+    mapping {name: value} of the unknowns and parameters (by symbol name).  A mapping is
+    first checked to be a root of the derived RS equations (max |lhs - rhs| <
+    saddle_tol by the independent quadrature, a failing value re-decided by
+    _derived_num.checked; else Refusal precondition:rs-saddle); saddle_tol=None skips
+    that check (a probe of the formula off the saddle).  The replicon VALUE is
+    _derived_num.checked: two quadrature rules agree, else two fine-panel rules, else
+    Refusal no-convergence:quadrature.  A family without a rule returns value None and
+    the reason in `note`."""
+    from .agree import derive_rs
+    from .solve_derived import lift_numeric_beta
+    rep = replicon(derive_rs(lift_numeric_beta(spec, {})[0])[1])
+    if rep.expr is None:
+        return rep
+    _, evaluate, qtol = at_point(spec, rs_solution, dps=dps, saddle_tol=saddle_tol,
+                                 extra=(rep.expr,))
+    value, qerr, rules = evaluate(rep.expr)
     note = rep.note + (f"; value cross-checked by two quadrature rules, {rules} "
                        f"(|difference| {mp.nstr(qerr, 3)} <= {mp.nstr(qtol, 3)})")
     return Replicon(rep.expr, note, value, rep.route, rep.parts)

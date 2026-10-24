@@ -27,7 +27,8 @@ All notable changes to BootLoops are recorded here. The format follows
 - `replicant` (E1): the replicon at level (a) for Gaussian-integral energies. The derived RS
   solution of the spherical and Ising perceptron and of Hopfield now carries a computed replicon
   (Price covariance derivative, RS split, n -> 0, eigenvector projection; the spherical volume by an
-  explicit-n projection), so `solve_derived_rs` returns `stable` True/False for them and composed
+  explicit-n projection; for Hopfield also the m-mode from the Hessian of the derived functional),
+  so `solve_derived_rs` returns `stable` True/False for them and composed
   Ising-perceptron values get computed finality; `derived_replicon(spec, solution)`; the replicon
   derivation appears in the LaTeX documents. Checked against the families' replicons (perceptron,
   Hopfield) at 12 points to 1e-8 and at the Ising AT root; planted hook errors move it.

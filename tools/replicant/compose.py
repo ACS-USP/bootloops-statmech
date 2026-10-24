@@ -42,10 +42,12 @@ Results.  Result.rigor is always "physics-level".  Finality is per value
 (Result.finality: key -> catalog.Stability): catalog values carry their entry's
 declaration; composed values the solver's computed flag (True -> stable, False ->
 unstable, None -> not-computed), with a note naming the derived replicon and its rules
-(derive_replicon: SK, the spherical and Ising perceptron and Hopfield have one).  Only "stable" and "exact-by-literature" are final;
-every other value gets a "NOT final (<state>)" note, Result.final = all values final,
-and run(require_final=True) refuses if ANY value is not final: unstable:<ansatz>, else
-unknown-stability:rs (RS, stability not computed), else not-final:<ansatz>.
+(derive_replicon: SK, the spherical and Ising perceptron and Hopfield have one; Hopfield
+also the derived m-mode, solve_derived_stability).  Only "stable" and
+"exact-by-literature" are final; every other value gets a "NOT final (<state>)" note,
+Result.final = all values final, and run(require_final=True) refuses if ANY value is not
+final: unstable:<ansatz>, else unknown-stability:rs (RS, stability not computed), else
+not-final:<ansatz>.
 """
 from dataclasses import dataclass, field
 
@@ -254,8 +256,14 @@ def _stability_note(sol):
     if sol.replicon is None:
         return "replicon not derived for this family (stability UNKNOWN)"
     out = f"derived replicon {mp.nstr(sol.replicon, 8)} ({sol.replicon_route})"
+    if sol.mode is not None:
+        out += f"; derived mode of the extra order parameters {mp.nstr(sol.mode, 8)}"
     if sol.stable is False and sol.replicon > 0:
-        out += "; unstable because the RS entropy is negative for discrete variables"
+        out += ("; unstable because the extras' mode is negative" if sol.mode is not None
+                and sol.mode < 0 else
+                "; unstable because the RS entropy is negative for discrete variables")
+    elif sol.stable is None:
+        out += "; stability UNKNOWN (a mode was not computed)"
     return out
 
 

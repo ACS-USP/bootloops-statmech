@@ -64,7 +64,6 @@ def _agree(spec, vals, target, **kw):
     return rep
 
 
-# ---- default tier --------------------------------------------------------------------
 def _order_point(variables, order):
     """The family saddle at a given order parameter (q spherical, qhat Ising): no root
     solve, alpha comes from the family's stationarity equation."""
@@ -76,24 +75,7 @@ def _order_point(variables, order):
     return vals, pt.replicon
 
 
-def test_derived_replicon_at_family_saddles_default_tier():
-    # one point per family: the derived lambda_R at the family's saddle, which the
-    # derived equations must accept (audit), equals the family's replicon
-    vals, lam = _order_point("spherical", "0.6")
-    rep = _agree(SPH, vals, lam, dps=10)
-    assert "covariance" in rep.route and "explicit-n" in rep.route, rep.route
-    # the saddle audit is a real check: a point off the saddle is refused
-    bad = {**vals, "q": vals["q"] * mp.mpf("1.01")}
-    r = _refusal(lambda: derived_replicon(SPH, bad, dps=10))
-    assert r.reason == "precondition:rs-saddle" and "residual" in r.detail, r
-    vals, lam = _order_point("ising", "10")
-    rep = _agree(ISI, vals, lam, dps=10)
-    assert vals["alpha"] > 1.05 and rep.value < 0 and "ising-site" in rep.route, rep
-    vals, lam = _hopfield_point("0.05", "3", "spinglass")        # cached by test_cavity_dense
-    assert abs(lam - mp.mpf("-1.033")) < 1e-3                     # the Task 9 table value
-    _agree(HOP, vals, lam, dps=10)
-
-
+# ---- default tier --------------------------------------------------------------------
 def _with_hook(registry, key, value, fn):
     saved = registry[key]
     registry[key] = value
@@ -104,25 +86,75 @@ def _with_hook(registry, key, value, fn):
         assert registry[key] is saved
 
 
-def test_planted_hook_error_changes_the_replicon():
-    # the Hopfield energy hook: weight exp(beta y^2/2) -> exp(1.1 beta y^2/2).  The
-    # planted hook must move the derived replicon at the same point far beyond the
-    # tolerance, and the restored registry gives the family value back
-    vals, lam = _hopfield_point("0.05", "3", "spinglass")
-    fam = D.FAMILIES["hopfield"]
+def _planted_family(name, weight):
+    """The registered family `name` with its pattern weight g replaced by weight(g)."""
+    fam = D.FAMILIES[name]
 
     def bad_average(zn):
         avg = fam.average(zn)
         y = avg.weight.variables[0]
-        return type(avg)(avg.spec, avg.n, avg.alpha,
-                         sp.Lambda(y, avg.weight.expr.subs(D.BETA, sp.Rational(11, 10) * D.BETA)),
+        return type(avg)(avg.spec, avg.n, avg.alpha, sp.Lambda(y, weight(avg.weight.expr, y)),
                          avg.note, avg.dropped)
-    bad = D.Family(fam.formal, fam.annealed, fam.supports_disorder, bad_average,
-                   fam.order_parameters, fam.variables)
-    planted = _with_hook(D.FAMILIES, "hopfield", bad,
-                         lambda: derived_replicon(HOP, vals, dps=10, saddle_tol=None).value)
+    return D.Family(fam.formal, fam.annealed, fam.supports_disorder, bad_average,
+                    fam.order_parameters, fam.variables, fam.constraints)
+
+
+def test_planted_hook_error_changes_the_replicon():
+    # default tier: exactly one Gaussian-energy point (spherical perceptron at the family
+    # saddle q = 0.6, computed here; the covariance rule and the explicit-n site); the
+    # Ising and Hopfield points, the off-saddle control and the weight-planted hooks are
+    # slow.  (1) the derived replicon there, which the derived equations must accept
+    # (saddle audit), equals the family's; (2) the perceptron energy hook planted (its
+    # Reduction energy scaled by 11/10) moves the replicon at the same point far beyond
+    # the tolerance (registry restored, identity asserted)
+    vals, lam = _order_point("spherical", "0.6")
+    rep = _agree(SPH, vals, lam, dps=10)
+    assert "covariance" in rep.route and "explicit-n" in rep.route, rep.route
+    fam = D.FAMILIES["perceptron"]
+
+    def scaled(avg, n, sum_pairs):
+        red = fam.order_parameters(avg, n, sum_pairs)
+        return D.Reduction(red.energy * sp.Rational(11, 10), red.correction, red.missing,
+                           red.field, red.extra)
+    bad = D.Family(fam.formal, fam.annealed, fam.supports_disorder, fam.average, scaled,
+                   fam.variables, fam.constraints)
+    planted = _with_hook(D.FAMILIES, "perceptron", bad,
+                         lambda: derived_replicon(SPH, vals, dps=10, saddle_tol=None).value)
     assert abs(planted - lam) > 1e-2, (planted, lam)
-    assert abs(derived_replicon(HOP, vals, dps=10).value - lam) < TOL
+
+
+@slow
+def test_planted_weight_hooks_change_the_replicon():
+    # the pattern weight itself: perceptron Theta(lambda - kappa) -> Theta(lambda - kappa
+    # - 1/10); Hopfield exp(beta y^2/2) -> exp(1.1 beta y^2/2)
+    vals, lam = _order_point("spherical", "0.6")
+    bad = _planted_family("perceptron", lambda g, y: g.subs(y, y - sp.Rational(1, 10)))
+    planted = _with_hook(D.FAMILIES, "perceptron", bad,
+                         lambda: derived_replicon(SPH, vals, saddle_tol=None).value)
+    assert abs(planted - lam) > 1e-2, (planted, lam)
+    vals, lam = _hopfield_point("0.05", "3", "spinglass")
+    bad = _planted_family("hopfield", lambda g, y: g.subs(D.BETA, sp.Rational(11, 10) * D.BETA))
+    planted = _with_hook(D.FAMILIES, "hopfield", bad,
+                         lambda: derived_replicon(HOP, vals, saddle_tol=None).value)
+    assert abs(planted - lam) > 1e-2, (planted, lam)
+    assert abs(derived_replicon(HOP, vals).value - lam) < TOL
+
+
+@slow
+def test_conjugate_free_site_assumptions_hold():
+    # the assumptions conjugate_free_site does not re-check on every call: eps is an
+    # eigenvector of the n = 4 pair Hessian and s_R is the same at n = 5.  Positive
+    # controls: an n-dependent site and a site that breaks replica permutation symmetry
+    from replicant.derive_replicon_gauss import check_conjugate_free_site
+    site = D.SITES["spherical"]
+    assert sp.simplify(check_conjugate_free_site(site) + 1 / (1 - D.Q_RS)**2) == 0
+    n_dep = D.Site(lambda n, q, qh, f=0: site.trace(n, q, qh, f) * n, site.conjugate)
+    assert _refusal(lambda: check_conjugate_free_site(n_dep)).reason == \
+        "precondition:replicon-n-independent"
+    skew = D.Site(lambda n, q, qh, f=0: site.trace(n, q, qh, f) + q[(1, 2)]**2 * q[(1, 3)],
+                  site.conjugate)
+    assert _refusal(lambda: check_conjugate_free_site(skew)).reason == \
+        "precondition:replicon-eigenvector"
 
 
 @slow
@@ -153,10 +185,23 @@ def test_unsupported_family_still_refuses():
     rep = _with_hook(D.FAMILIES, "perceptron", bad, lambda: replicon(derive_rs(ISI)[1]))
     assert rep.expr is None and "replicon not derived for this family" in rep.note, rep
     assert "covariance" in rep.note, rep.note
-    # the supported families no longer carry the refusal text
-    for spec in (SPH, ISI, HOP, default_spec("sk")):
-        r = replicon(derive_rs(spec)[1])
+    # the supported Gaussian-energy families no longer carry the refusal text (SK's
+    # replicon: test_solve_derived.test_solve_derived_sk_default_tier)
+    states = {}
+    for key, spec in (("sph", SPH), ("isi", ISI), ("hop", HOP)):
+        states[key] = derive_rs(spec)[1]
+        r = replicon(states[key])
         assert r.expr is not None and "not derived" not in r.note, (spec, r.note)
+    # stability contract (solve_derived_stability.assess): with extras (Hopfield m) whose
+    # mode cannot be computed (a stand-in evaluator that makes d^2 phi/d(q, qhat)^2
+    # singular) stable is None, never True; without extras the replicon decides
+    from replicant.solve_derived_stability import assess
+    one = lambda e: (mp.mpf(1), mp.mpf(0), "main vs independent")
+    a = assess(states["hop"], "ising", one, mp.mpf(1))
+    assert a.replicon == 1 and a.mode is None and a.stable is None, a
+    assert "UNKNOWN" in a.note and "not computed" in a.note, a.note
+    a = assess(states["isi"], "ising", one, mp.mpf(1))
+    assert a.stable is True and a.mode is None, a
 
 
 # ---- slow tier -----------------------------------------------------------------------
@@ -169,6 +214,12 @@ def test_derived_replicon_equals_family_replicon():
         _agree(SPH, *_perceptron_point("spherical", alpha, kappa))
     for alpha in ("0.5", "0.8", "1.2"):
         _agree(ISI, *_perceptron_point("ising", alpha))
+    sv, _ = _order_point("spherical", "0.6")           # positive control of the audit
+    r = _refusal(lambda: derived_replicon(SPH, {**sv, "q": sv["q"] * mp.mpf("1.01")}))
+    assert r.reason == "precondition:rs-saddle" and "residual" in r.detail, r
+    vals, lam = _order_point("ising", "10")
+    rep = _agree(ISI, vals, lam)
+    assert vals["alpha"] > 1.05 and rep.value < 0 and "ising-site" in rep.route, rep
     targets = ("-11.22", "-1.033", "-0.0281", "0.969", "0.800")
     for (a, b, br), want in zip(HOPFIELD_POINTS, targets):
         vals, lam = _hopfield_point(a, b, br)
@@ -215,3 +266,47 @@ def test_composed_ising_perceptron_stability_is_computed():
     r = _refusal(lambda: calc.run(alpha="1.02", kappa=0, dps=15, gh_nodes=300,
                                   require_final=True))
     assert r.reason == "unstable:rs", r
+
+
+# ---- Hopfield: the longitudinal (m-) mode of the derived functional ------------------
+@lru_cache(maxsize=None)
+def _hopfield_branches(beta="20", c="0.98"):
+    """At beta: alpha on the retrieval curve at m = c * m_fold (the LOWER, m-unstable
+    branch; family m-parametrisation) and both family points there (targets)."""
+    from replicant.families import hopfield as H
+    b = mp.mpf(beta)
+    with mp.workdps(25):
+        _, mf = H._fold_finite(H._key(b))
+        m = mf * mp.mpf(c)
+        a = H._alpha_of_m(b, m)[0]
+        s = H._sigma_at_m(b, m)
+        q = H._moments(b, m, s)[1]
+        low = {"alpha": a, "beta": b, "m": m, "q": q, "qhat": a * b**2 * s**2 / a}
+        low_mode = H._m_stability(a, b, m, s)
+    up = H.hopfield_rs(a, b)
+    upper = {"alpha": a, "beta": b, "m": up.m, "q": up.q, "qhat": a * b**2 * up.r}
+    return a, low, low_mode, upper, up
+
+
+@slow
+def test_hopfield_m_mode_gates_stability():
+    from replicant.solve_derived_stability import derived_stability
+    a, low, low_mode, upper, up = _hopfield_branches()
+    b = mp.mpf(20)
+    # lower retrieval root at m = 0.98 m_fold: replicon > 0, so a replicon-only label
+    # would say stable; the family's m-mode (target) and the derived one say unstable.
+    # Relative band 1e-7: d^2 phi/d(q, qhat)^2 gets ill-conditioned down the lower branch
+    # (at 0.9 m_fold the two codes differ by 7.5e-6 relative, the (q, qhat) subsystem
+    # being nearly degenerate there); at 0.98 they agree to 9e-9
+    lo = derived_stability(HOP, low)
+    assert lo.replicon > 0 and low_mode < 0 and lo.mode < 0, (lo.replicon, low_mode, lo.mode)
+    assert abs(lo.mode / b - low_mode) < 1e-7 * abs(low_mode), (lo.mode, low_mode)
+    assert lo.stable is False and "extras' mode" in lo.note, lo.note
+    hi = derived_stability(HOP, upper)
+    assert abs(hi.mode / b - up.mode_eig) < 1e-8 and hi.stable is up.stable, (hi, up)
+    assert abs(hi.replicon - up.replicon) < TOL
+    # the solver's label goes through the same assess: the root it finds is the upper one
+    s = solve_derived_rs(HOP, alpha=mp.nstr(a, 22), beta=20, dps=20)
+    assert abs(s.values["m"] - up.m) < 1e-10, s.values
+    assert s.stable is up.stable and abs(s.mode / b - up.mode_eig) < 1e-8
+    assert "modes computed: replicon, extras' mode" in s.note, s.note
