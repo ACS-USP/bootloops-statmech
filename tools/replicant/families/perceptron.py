@@ -179,17 +179,22 @@ def _ising_S(qhat, k):
 
 
 def rs_equations_symbolic(variables="spherical"):
-    """The spherical saddle equation the solver uses, q/(1-q) = alpha E_t E(x)^2
-    (alpha(q) = q / ((1-q) _T.eh2()) in _alpha_of / gardner_rs_point), in sympy
-    form with the GaussE placeholder; E(x) = phi(x)/H(x) as in _E."""
-    if variables != "spherical":
-        raise Refusal("not-implemented:symbolic-equations",
-                      f"{variables!r}: only the spherical equation is written symbolically")
+    """The saddle equations the solver uses, in sympy form with the GaussE
+    placeholder; E(x) = phi(x)/H(x) as in _E, x = (kappa - sqrt(q) t)/sqrt(1-q).
+      spherical  q/(1-q) = alpha E_t E(x)^2
+                 (alpha(q) = q / ((1-q) _T.eh2()) in _alpha_of / gardner_rs_point)
+      ising      q = E_z tanh^2(sqrt(qhat) z)            (_ising_q)
+                 qhat = alpha E_t E(x)^2 / (1-q)         (alpha(qhat) = qhat (1-q) / _T.eh2())"""
+    _check(variables)                         # refuses unknown variables
     q, alpha = sp.Symbol("q", positive=True), sp.Symbol("alpha", positive=True)
     kappa, t = sp.Symbol("kappa", real=True), sp.Symbol("t", real=True)
     x = (kappa - sp.sqrt(q) * t) / sp.sqrt(1 - q)
     E = (sp.exp(-x**2 / 2) / sp.sqrt(2 * sp.pi)) / (sp.erfc(x / sp.sqrt(2)) / 2)
-    return [sp.Eq(q / (1 - q), alpha * GaussE(E**2, t))]
+    if variables == "spherical":
+        return [sp.Eq(q / (1 - q), alpha * GaussE(E**2, t))]
+    qhat, z = sp.Symbol("qhat", positive=True), sp.Symbol("z", real=True)
+    return [sp.Eq(q, GaussE(sp.tanh(sp.sqrt(qhat) * z)**2, z)),
+            sp.Eq(qhat, alpha * GaussE(E**2, t) / (1 - q))]
 
 
 # ---- RS saddle, parametrised by the order parameter --------------------------

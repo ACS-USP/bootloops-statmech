@@ -35,6 +35,9 @@ Refusal):
   SITES     variable type -> Site(trace, conjugate): "ising" is the trace
             ln Tr exp(sum qhat s^a s^b + sum field s^a) with conjugates qhat;
             "spherical" the hand-supplied volume (1/2) ln det Q, no conjugate.
+            The site is chosen by spec.variables alone (introduce_order_parameters),
+            so a family listing several variables (the perceptron: spherical and
+            ising) gets a different entropic term and nothing else changes.
   LAWS      coupling/pattern laws by their exact K; the iid-pair, variance-1/N,
             K(beta X_ij) structure is SK's (`_sk_average`), not the steps'.
 A family whose energy carries conjugate fields beyond q_ab, qhat_ab (and the
@@ -343,7 +346,10 @@ def replicate(spec: ModelSpec, n) -> Step:
             missing.append("supported-family")
         elif spec.variables not in SITES or \
                 spec.variables not in FAMILIES[spec.family].variables:
-            missing.append("supported-variables")
+            accepted = [v for v in FAMILIES[spec.family].variables if v in SITES]
+            raise Refusal("precondition:supported-variables",
+                          f"{spec.family} is derived for variables {', '.join(accepted)} "
+                          f"(a registered SITES entry each); got {spec.variables!r}")
         if _valid_n(n) is None:
             missing.append("replica-number")
         return missing

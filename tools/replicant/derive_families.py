@@ -1,4 +1,4 @@
-"""Level (a) hooks for the perceptron (spherical) and the Hopfield model.
+"""Level (a) hooks for the perceptron (spherical or Ising couplings) and Hopfield.
 
 Registered into derive.FAMILIES on import (derive.py imports this module last).
 Each hook is split into what is HAND-SUPPLIED (the model: its constraint or
@@ -9,13 +9,22 @@ RS ansatz, n -> 0 and stationarity are then the generic steps of derive.py.
 `_perceptron_formal` / `_hopfield_formal` only build the displayed formal Z^n
 (the trace's `Zn`); nothing downstream reads them.  Only symbolic n.
 
-Perceptron (Gardner 1988), spec.params alpha, kappa; Gaussian patterns, J.J = N:
-  hand-supplied: the storage constraint g(lambda) = Theta(lambda - kappa), and the
-    spherical volume (derive._spherical_site: (1/2) ln det Q).
+Perceptron, spec.params alpha, kappa; Gaussian patterns; J stores pattern mu if
+J.xi^mu/sqrt(N) >= kappa (families/perceptron.py conventions).  spec.variables:
+  "spherical"  J.J = N (Gardner 1988): site derive.SITES["spherical"], the
+               hand-supplied volume (1/2) ln det Q, no conjugate;
+  "ising"      J in {-1, +1}^N (Gardner-Derrida 1988, Krauth-Mezard 1989): site
+               derive.SITES["ising"], the same trace SK uses,
+               ln Tr_J exp(sum_{a<b} qhat_ab J^a J^b) with -sum_{a<b} qhat_ab q_ab
+               (q_aa = 1 because J_i^2 = 1); rs_ansatz reduces it by
+               Hubbard-Stratonovich to -qhat/2 ... -> -qhat(1-q)/2 + E ln 2cosh.
+  The hook below does not look at spec.variables: both use the same pattern term.
+  hand-supplied: the storage constraint g(lambda) = Theta(lambda - kappa) (and,
+    spherical only, the volume).
   hook asserts (rule not mechanised): lambda_a = J^a.xi/sqrt(N) is Gaussian with
-    covariance Q_ab = J^a.J^b/N,
+    covariance Q_ab = J^a.J^b/N (Q_aa = 1 for both sites),
     exactly, for Gaussian xi at fixed J; P = alpha N independent patterns give
-    (1/N) ln E V^n = (1/2) ln det Q + alpha ln E_lambda prod_a g(lambda_a)
+    (1/N) ln E V^n = site + alpha ln E_lambda prod_a g(lambda_a)
     (the formal LnGaussProd(g, q_ab, n)).
 Hopfield (Amit-Gutfreund-Sompolinsky 1987), spec.params alpha, beta; +-1 patterns:
   H = -(1/2N) sum_mu (sum_i xi_i^mu s_i)^2 (i = j terms kept: a constant -p/2).
@@ -138,7 +147,7 @@ def _hopfield_order_parameters(avg, n, sum_pairs):
 
 D.FAMILIES["perceptron"] = D.Family(
     _perceptron_formal, _no_annealed, lambda d: d == "gaussian",
-    _perceptron_average, _perceptron_order_parameters, variables=("spherical",))
+    _perceptron_average, _perceptron_order_parameters, variables=("spherical", "ising"))
 D.FAMILIES["hopfield"] = D.Family(
     _hopfield_formal, _no_annealed, lambda d: d == "pm_one",
     _hopfield_average, _hopfield_order_parameters, variables=("ising",))

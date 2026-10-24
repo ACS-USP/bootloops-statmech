@@ -206,7 +206,7 @@ def test_rs_steps_refuse_what_they_cannot_do():
     assert _refusal(lambda: derived_rs_equations(
         ModelSpec("perceptron", "spherical", "pm_one"))) == "precondition:supported-disorder-law"
     assert _refusal(lambda: derived_rs_equations(
-        ModelSpec("perceptron", "ising", "gaussian"))) == "precondition:supported-variables"
+        ModelSpec("perceptron", "potts", "gaussian"))) == "precondition:supported-variables"
     assert _refusal(lambda: pipeline_rs_equations("rem")) == "precondition:supported-family"
 
 

@@ -6,7 +6,9 @@
   derive_rs(spec, n=None)           the same, returning (equations, State, Trace)
   pipeline_rs_equations(family)     level (b): the family module's
                                     rs_equations_symbolic(), the equations its
-                                    numeric solver solves
+                                    numeric solver solves; family "sk",
+                                    "perceptron" (spherical), "perceptron_ising"
+                                    (binary couplings) or "hopfield"
   compare_equations(a, b, route=)   Agreement(agree, route, detail)
   equations_agree(a, b, **kw)       compare_equations(...).agree
   is_identically_zero(expr)         the symbolic zero test used below
@@ -70,8 +72,9 @@ def default_spec(family):
     from .derive_families import ALPHA, KAPPA
     if family == "sk":
         return ModelSpec("sk", "ising", "gaussian", params={"beta": D.BETA, "h": D.H_FIELD})
-    if family == "perceptron":
-        return ModelSpec("perceptron", "spherical", "gaussian", constraint="margin kappa",
+    if family in ("perceptron", "perceptron_ising"):
+        variables = "ising" if family == "perceptron_ising" else "spherical"
+        return ModelSpec("perceptron", variables, "gaussian", constraint="margin kappa",
                          params={"alpha": ALPHA, "kappa": KAPPA})
     if family == "hopfield":
         return ModelSpec("hopfield", "ising", "pm_one", params={"alpha": ALPHA, "beta": D.BETA})
@@ -95,13 +98,15 @@ def derived_rs_equations(spec: ModelSpec) -> list:
 def pipeline_rs_equations(family: str) -> list:
     if family == "sk":
         from .families.sk import rs_equations_symbolic
-    elif family == "perceptron":
-        from .families.perceptron import rs_equations_symbolic
+    elif family in ("perceptron", "perceptron_ising"):
+        from .families.perceptron import rs_equations_symbolic as _p
+        return _p("ising" if family == "perceptron_ising" else "spherical")
     elif family == "hopfield":
         from .families.hopfield import rs_equations_symbolic
     else:
         raise Refusal("precondition:supported-family",
-                      f"{family!r} has no symbolic RS equations (sk, perceptron, hopfield)")
+                      f"{family!r} has no symbolic RS equations "
+                      "(sk, perceptron, perceptron_ising, hopfield)")
     return rs_equations_symbolic()
 
 
