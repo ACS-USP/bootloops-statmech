@@ -1,0 +1,135 @@
+"""Level (a) hooks for the perceptron (spherical) and the Hopfield model.
+
+Registered into derive.FAMILIES on import (derive.py imports this module last).
+Each hook is split into what is HAND-SUPPLIED (the model: its constraint or
+energy per pattern, the condensed-pattern term) and what it computes by a rule
+(the pattern average); the RS ansatz, n -> 0 and stationarity are then the
+generic steps of derive.py.  Only symbolic n is supported.
+
+Perceptron (Gardner 1988), spec.params alpha, kappa; Gaussian patterns, J.J = N:
+  hand-supplied: the storage constraint g(lambda) = Theta(lambda - kappa), and the
+    spherical volume (derive._spherical_site: (1/2) ln det Q).
+  rule: lambda_a = J^a.xi/sqrt(N) is Gaussian with covariance Q_ab = J^a.J^b/N,
+    exactly, for Gaussian xi at fixed J; P = alpha N independent patterns give
+    (1/N) ln E V^n = (1/2) ln det Q + alpha ln E_lambda prod_a g(lambda_a)
+    (the formal LnGaussProd(g, q_ab, n)).
+Hopfield (Amit-Gutfreund-Sompolinsky 1987), spec.params alpha, beta; +-1 patterns:
+  H = -(1/2N) sum_mu (sum_i xi_i^mu s_i)^2 (i = j terms kept: a constant -p/2).
+  hand-supplied: the condensed pattern, gauged to xi^1 = +1 (exact for +-1) and
+    decoupled by exp(N beta m^2/2) = int dm exp(N(-beta m^2/2 + beta m m_true)) at
+    the saddle: -(beta/2) sum_a m_a^2 and the site field beta m_a; and the energy of
+    one uncondensed pattern, g(y) = exp(beta y^2 / 2) per replica.
+  rule: y_a = sum_i xi_i s_i^a / sqrt(N) with the pattern law's cumulant series
+    (derive.LAWS["pm_one"]) kept to second order is Gaussian with covariance Q_ab;
+    the fourth cumulant is dropped and its order stated; p - 1 ~ alpha N patterns
+    give alpha LnGaussProd(g, q_ab, n).
+"""
+from dataclasses import dataclass
+
+import sympy as sp
+
+from . import derive as D
+from .core import Refusal
+from .spec import ModelSpec
+
+ALPHA = sp.Symbol("alpha", positive=True)
+KAPPA = sp.Symbol("kappa", real=True)
+_LAM = sp.Symbol("lambda", real=True)
+_i, _mu = sp.symbols("i mu", integer=True, positive=True)
+
+
+@dataclass(frozen=True)
+class PatternAverage:
+    """alpha * LnGaussProd(weight, q_ab, n) per spin/coupling, plus what was dropped."""
+    spec: ModelSpec
+    n: object
+    alpha: sp.Expr
+    weight: sp.Lambda
+    note: str
+    dropped: sp.Expr = sp.S(0)
+
+
+def _symbolic_n(zn):
+    if not isinstance(zn.n, sp.Symbol):
+        raise Refusal("precondition:symbolic-replica-number",
+                      f"{zn.spec.family}: derived at symbolic n only (formal Gaussian "
+                      "integrals over replicas; no explicit-n expansion)")
+
+
+def _no_annealed(spec, N):
+    raise Refusal("not-implemented:annealed",
+                  f"{spec.family}: exact ln E Z at finite N is not implemented")
+
+
+# ---- perceptron ---------------------------------------------------------------------
+
+def _perceptron_formal(n, beta, spec=None):
+    kappa = spec.params.get("kappa", KAPPA) if spec else KAPPA
+    J, xi = sp.IndexedBase("J"), sp.IndexedBase("xi")
+    field = sp.Sum(J[_i, D._a] * xi[_mu, _i], (_i, 1, D.N_SYM)) / sp.sqrt(D.N_SYM)
+    return sp.Function("Tr_J")(sp.Product(sp.Heaviside(field - kappa),
+                                          (D._a, 1, n), (_mu, 1, sp.Symbol("P"))))
+
+
+def _perceptron_average(zn) -> PatternAverage:
+    _symbolic_n(zn)
+    p = zn.spec.params
+    kappa, alpha = p.get("kappa", KAPPA), p.get("alpha", ALPHA)
+    g = sp.Lambda(_LAM, sp.Heaviside(_LAM - kappa))       # hand-supplied constraint
+    note = ("Gaussian patterns: lambda_a = J^a.xi/sqrt(N) jointly Gaussian, covariance "
+            "Q_ab = J^a.J^b/N (exact at fixed J); P = alpha N iid patterns -> "
+            f"alpha ln E_lambda prod_a g(lambda_a), g = {g.expr} (hand-supplied)")
+    return PatternAverage(zn.spec, zn.n, alpha, g, note)
+
+
+def _gauss_prod_reduction(avg, n, extra_energy=0, field=0, extra=None, missing=None):
+    q, _, _ = D._overlap_symbols(n)
+    energy = extra_energy + avg.alpha * D.LnGaussProd(avg.weight, q[D._a, D._b], n)
+    return D.Reduction(energy, sp.S(0), missing, field=field, extra=extra)
+
+
+def _perceptron_order_parameters(avg, n, sum_pairs):
+    return _gauss_prod_reduction(avg, n, missing="O(ln N / N) (saddle-point prefactor)")
+
+
+# ---- Hopfield -----------------------------------------------------------------------
+
+def _hopfield_formal(n, beta, spec=None):
+    s, xi = sp.IndexedBase("s"), sp.IndexedBase("xi")
+    y = sp.Sum(xi[_mu, _i] * s[_i, D._a], (_i, 1, D.N_SYM))
+    return D.Tr(sp.exp(beta / (2 * D.N_SYM)
+                       * sp.Sum(y**2, (_mu, 1, sp.Symbol("p")), (D._a, 1, n))))
+
+
+def _hopfield_average(zn) -> PatternAverage:
+    _symbolic_n(zn)
+    law = D._law(zn.spec)
+    beta = D._beta(zn.spec)
+    alpha = zn.spec.params.get("alpha", ALPHA)
+    ser = sp.expand(sp.series(law.cgf(D.T, D.N_SYM), D.T, 0, 5).removeO())
+    if ser.coeff(D.T, 1) != 0 or sp.simplify(ser.coeff(D.T, 2) * D.N_SYM - sp.Rational(1, 2)) != 0:
+        raise Refusal("precondition:unit-variance-patterns",
+                      f"{law.name}: pattern entries need mean 0, variance 1 (K = {ser})")
+    dropped = ser.coeff(D.T, 4) * D.T**4
+    g = sp.Lambda(_LAM, sp.exp(beta * _LAM**2 / 2))      # hand-supplied energy per pattern
+    note = ("condensed pattern gauged to +1 and decoupled by m_a (hand-supplied); "
+            "uncondensed: y_a = sum_i xi_i s_i^a/sqrt(N), pattern cumulant kept to "
+            f"t^2/(2N), dropped {dropped} per site and pattern -> O(1/N) per spin; "
+            f"y ~ N(0, Q), alpha N patterns -> alpha ln E_y prod_a g(y_a), g = {g.expr}")
+    return PatternAverage(zn.spec, zn.n, alpha, g, note, dropped)
+
+
+def _hopfield_order_parameters(avg, n, sum_pairs):
+    beta = D._beta(avg.spec)
+    m = sp.IndexedBase("m", real=True)
+    condensed = -beta / 2 * sp.Sum(m[D._a]**2, (D._a, 1, n))
+    return _gauss_prod_reduction(avg, n, extra_energy=condensed, field=beta * m[D._a],
+                                 extra={"m": m}, missing="O(1/N) per spin (dropped cumulant)")
+
+
+D.FAMILIES["perceptron"] = D.Family(
+    _perceptron_formal, _no_annealed, lambda d: d == "gaussian",
+    _perceptron_average, _perceptron_order_parameters, variables=("spherical",))
+D.FAMILIES["hopfield"] = D.Family(
+    _hopfield_formal, _no_annealed, lambda d: d == "pm_one",
+    _hopfield_average, _hopfield_order_parameters, variables=("ising",))

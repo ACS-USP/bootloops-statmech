@@ -100,8 +100,14 @@ def test_unsupported_disorder_refuses():
 
 
 def test_unsupported_family_and_variables_refuse():
-    assert _refusal(lambda: _run(ModelSpec("hopfield", "ising", "gaussian"), 2)) \
+    assert _refusal(lambda: _run(ModelSpec("potts", "ising", "gaussian"), 2)) \
         == "precondition:supported-family"
+    # Hopfield is registered (derive_families.py) but its condensed-pattern gauge
+    # needs +-1 patterns, and it is derived at symbolic n only.
+    assert _refusal(lambda: _run(ModelSpec("hopfield", "ising", "gaussian"), 2)) \
+        == "precondition:supported-disorder-law"
+    assert _refusal(lambda: _run(ModelSpec("hopfield", "ising", "pm_one"), 2)) \
+        == "precondition:symbolic-replica-number"
     assert _refusal(lambda: _run(ModelSpec("sk", "spherical", "gaussian"), 2)) \
         == "precondition:supported-variables"
     assert _refusal(lambda: _run(_sk(), 0)) == "precondition:replica-number"
@@ -152,6 +158,16 @@ def test_order_parameters_reproduce_annealed_at_n1():
     assert sp.simplify(F.N * F.energy + F.correction
                        - (annealed_log_Z(_sk(), F.N) - F.N*sp.log(2))) == 0
     assert sp.simplify(F.energy - beta**2/4) == 0
+
+
+def test_field_enters_site_trace_and_annealed_at_n1():
+    h = sp.Symbol("h", real=True)
+    spec = ModelSpec("sk", "ising", "gaussian", params={"beta": beta, "h": h})
+    F = _run(spec, 1, upto=3)[0]["functional"]
+    # n = 1: no pairs, the site trace is ln 2 cosh(beta h), the energy beta^2/4
+    assert sp.simplify(F.entropic - sp.log(2 * sp.cosh(beta * h))) == 0
+    assert sp.simplify(F.N * (F.energy + F.entropic) + F.correction
+                       - annealed_log_Z(spec, F.N)) == 0
 
 
 def test_saddle_equations_sk_n2():
