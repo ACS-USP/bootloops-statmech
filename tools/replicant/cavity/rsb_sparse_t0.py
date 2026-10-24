@@ -227,40 +227,54 @@ def rsb_ground_state_energy(degree_law, J_law, *, ys, pop: int, sweeps: int, see
         raise Refusal("precondition:init", f"init must be one of {INITS}, got {init!r}")
     burn_in = max(2 * sweeps, 20) if burn_in is None else burn_in
     check_sizes(pop, sweeps, runs, burn_in)
-    phis, ms, ts = [], [[] for _ in yv], [[] for _ in yv]
-    for ss in np.random.SeedSequence(seed).spawn(runs):
-        row = []
-        for j, y in enumerate(yv):
-            mean, am, _, at, _, _ = _t0_run(k, y * s, _reweight_sign, pop, burn_in, sweeps,
-                                            np.random.default_rng(ss), init)
-            row.append(mean[0] * s)
-            ms[j].append(am), ts[j].append(at)
-        phis.append(row)
-    phis = np.array(phis)
+    params = dict(degree_law=degree_law, J_law=J_law, ys=tuple(yv), pop=pop, sweeps=sweeps,
+                  burn_in=burn_in, seed=seed, runs=runs, init=init, reweight_sign=_reweight_sign)
 
-    def vertex(rows):
-        a, b, c = np.polyfit(yv, phis[rows].mean(0), 2)
-        ystar = -b / (2 * a) if a < 0 else math.nan
-        return c - b * b / (4 * a), ystar
+    def solve(p):
+        phis, ms, ts, fact = [], [[] for _ in yv], [[] for _ in yv], True
+        for ss in np.random.SeedSequence(seed).spawn(runs):
+            row = []
+            for j, y in enumerate(yv):
+                mean, am, _, at, _, ident = _t0_run(k, y * s, _reweight_sign, pop, burn_in,
+                                                    sweeps, np.random.default_rng(ss), init)
+                row.append(mean[0] * s)
+                ms[j].append(am), ts[j].append(at)
+                fact &= ident and mean[5] < 1e-12
+            phis.append(row)
+        phis = np.array(phis)
 
-    e0, ystar = vertex(slice(None))
-    if not yv[0] <= ystar <= yv[-1]:
-        raise Refusal("no-solution:no-maximum", f"no interior maximum of the run-averaged "
-                      f"phi(y) on {yv} (phi = {np.round(phis.mean(0), 5).tolist()}); widen "
-                      "the grid or lengthen the runs")
-    jack = np.array([vertex([i for i in range(runs) if i != r]) for r in range(runs)])
-    jerr = np.sqrt((runs - 1) / runs * ((jack - jack.mean(0))**2).sum(0))
-    # summarize() is used for the drift diagnostic and labels; values: pooled fit + jackknife
-    _, _, phase, note = summarize(phis, [f"phi@{y}" for y in yv], ms, ts, sweeps,
-                                  require_equilibrated, "1rsb")
-    val, err = {"e0": float(e0), "y_star": float(ystar)}, dict(zip(("e0", "y_star"),
-                                                                  map(float, jerr)))
-    note = (f"max over y of the run-averaged phi by a least-squares parabola on {yv}; "
-            f"stderr: jackknife over the {runs} runs (use Student-t, df = runs - 1); " + note)
-    return RSBResult(val, err, "statistical", phase, note,
-                     dict(degree_law=degree_law, J_law=J_law, ys=tuple(yv), pop=pop,
-                          sweeps=sweeps, burn_in=burn_in, seed=seed, runs=runs, init=init,
-                          reweight_sign=_reweight_sign))
+        def vertex(rows):
+            a, b, c = np.polyfit(yv, phis[rows].mean(0), 2)
+            ystar = -b / (2 * a) if a < 0 else math.nan
+            return c - b * b / (4 * a), ystar
+
+        e0, ystar = vertex(slice(None))
+        if not yv[0] <= ystar <= yv[-1]:
+            raise Refusal("no-solution:no-maximum", f"no interior maximum of the run-averaged "
+                          f"phi(y) on {yv} (phi = {np.round(phis.mean(0), 5).tolist()}); "
+                          "widen the grid or lengthen the runs")
+        jack = np.array([vertex([i for i in range(runs) if i != r]) for r in range(runs)])
+        jerr = np.sqrt((runs - 1) / runs * ((jack - jack.mean(0))**2).sum(0))
+        # phase from the diagnostics: "factorized" if every survey at every grid point stayed
+        # identical and symmetric, else "1rsb"; summarize() may override with "undetermined"
+        _, _, phase, note = summarize(phis, [f"phi@{y}" for y in yv], ms, ts, sweeps,
+                                      require_equilibrated, "factorized" if fact else "1rsb")
+        note = (f"max over y of the run-averaged phi by one least-squares parabola on {yv}; "
+                f"stderr: jackknife over the {runs} runs (use Student-t, df = runs - 1); "
+                + note)
+        return ({"e0": float(e0), "y_star": float(ystar)},
+                dict(zip(("e0", "y_star"), map(float, jerr))), phase, note)
+
+    planted = " [NON-DEFAULT REWEIGHTING]" if _reweight_sign != 1 else ""
+    descs = (f"remove one link: cavity spin keeps k = {k} further neighbours",
+             f"population of {pop} surveys per grid point y in {yv}, init {init}",
+             "survey recursion with state reweighting exp(-y DeltaE)" + planted)
+    state, trace = pipeline(params, descs, solve,
+                            (f"{MP03}, Sec. II", f"{MP03}, Sec. V.F.2, Eqs. (55)-(56)",
+                             f"{MP03}, Eqs. (26), (57)", f"{MP03}, Eqs. (43)-(44): GGS energy "
+                             f"= max_y phi; {MP01}, Eq. (50)"))
+    val, err, phase, note = state["solution"]
+    return RSBResult(val, err, "statistical", phase, note, params, trace)
 
 
 def factorized_1rsb_t0(k, y=None, *, tol=1e-13, max_iter=10000):

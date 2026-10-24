@@ -40,7 +40,7 @@ from . import graphs as G
 from ._rsb_common import (FACTORIZED_CAVEAT, MP01, MP03, RSB_CAVEAT,  # noqa: F401
                           STEP_NAMES, RSBResult,
                           check_sizes, pipeline, summarize)
-from .sparse import _beta, _ln2cosh, transfer
+from .sparse import _beta, _ln2cosh, _measure, transfer
 
 # ---- finite temperature ----------------------------------------------------------------
 LINK_PAIRS = 8   # link observables average over 8 * inner random state pairs (variance)
@@ -128,7 +128,12 @@ def _ft_run(p, rng):
         s1, s2 = (ws * mag).sum(1), (ws**2 * mag**2).sum(1)
         off = 1 - (ws**2).sum(1)
         q0 = np.where(off > 1e-9, (s1**2 - s2) / np.where(off > 1e-9, off, 1), s1**2)
-        acc.append((f, e, float(np.mean(q0)), float(np.mean((ws * mag**2).sum(1)))))
+        row = (f, e, float(np.mean(q0)), float(np.mean((ws * mag**2).sum(1))))
+        if m == 1:                                 # exact m = 1 functional of barycentres
+            mb = np.clip(np.tanh(b * h).mean(1), -1 + 1e-15, 1 - 1e-15)
+            _, e_b, f_b = _measure(rng, np.arctanh(mb) / b, law, jl, b, transfer, 0.0, cbar)
+            row += (f_b, e_b)
+        acc.append(row)
     collapsed = bool(np.max(np.abs(h)) < 1e-12)
     delta = bool(np.max(np.ptp(h, axis=1)) < 1e-12)
     spread = [_spread(a[3] - a[2]) for a in acc]               # q1 - q0 per measured sweep
@@ -143,7 +148,8 @@ def _ft_solve(p):
         ms[0].append(q1m), ms[1].append(spm), ts[0].append(q1t), ts[1].append(spt)
         coll, delt = coll and c, delt and d
     phase = "paramagnet" if coll else ("rs" if delt else "1rsb")
-    val, err, phase, note = summarize(per_run, ("f", "e", "q0", "q1"), ms, ts, p["sweeps"],
+    keys = ("f", "e", "q0", "q1") + (("f_bary", "e_bary") if p["m"] == 1 else ())
+    val, err, phase, note = summarize(per_run, keys, ms, ts, p["sweeps"],
                                       p["require_equilibrated"], phase)
     note += (f"; f carries a finite-inner (Jensen) bias O(1/inner), inner = {p['inner']}, "
              "not extrapolated")
@@ -159,9 +165,13 @@ def pop_of_pops_1rsb(degree_law, J_law, beta, m, *, pop: int, inner: int, sweeps
     max(2 sweeps, 20).  Drift diagnostic as Task 12 (cavity/_stats.drift) on q1 and on
     the inner spread q1 - q0 (a growing or collapsing spread is drift): a drifting run is
     "undetermined" or refused (require_equilibrated).
+    At m = 1 the result also carries f_bary, e_bary: the Bethe (RS) f and e of the
+    reweighted barycentres tanh(beta hbar) = E_states tanh(beta h) of each inner population
+    (Task 12's _measure on the barycentre population): the exact infinite-inner m = 1
+    functional, which isolates the identity f(m=1) = f_RS from finite-inner estimator bias.
     Reliable window: NOT mapped in (m, T) (cost).  Measured: a biased start at 0.95 beta_c
-    (k = 2) is flagged; at m = 1, q0 equals the RS q within stderr, while e and f sit a few
-    1e-3 above RS at pop >= 1000 (unresolved; see tests); small inner populations (<~ 20)
+    (k = 2) is flagged; m = 1 agrees with RS (pop 40000 reference) within the combined
+    99% Student-t band for f, e, q0, f_bary, e_bary (slow test); small inner populations (<~ 20)
     collapse towards q1 = q0 within ~60 sweeps at k = 2, beta = 1.5.
     _reweight_sign: test hook for planted errors (0 drops z^m, -1 uses z^-m)."""
     G.degree_law(degree_law)

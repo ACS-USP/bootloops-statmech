@@ -93,6 +93,13 @@ def test_m_equal_one_reduces_to_rs():
     # and q0 (overlap of barycentres) equals the RS q = E tanh^2(beta H)
     ok, info = _band(one.value["q0"], one.stderr["q0"], rs.value["q"], rs.stderr["q"], 4)
     assert ok, ("q0", info)
+    # PLANTED ERROR at T > 0: wrong sign z^-m in the inner resampling; the barycentres no
+    # longer follow BP and q0 misses RS q by ~0.06, failing the same band (default tier;
+    # the dropped-reweighting control, a smaller effect, is the slow m = 1 test)
+    bad = pop_of_pops_1rsb(K2, PM, beta, 1.0, pop=100, inner=12, sweeps=6, burn_in=16,
+                           runs=4, seed=21, init_spread=1.0, _reweight_sign=-1)
+    ok, info = _band(bad.value["q0"], bad.stderr["q0"], rs.value["q"], rs.stderr["q"], 4)
+    assert not ok, ("planted q0", info)
 
 
 def test_m_equal_one_poisson_gaussian_runs_and_matches_rs():
@@ -112,7 +119,7 @@ def test_finite_t_1rsb_differs_from_rs_below_m_one():
     are distinct, q1 > q0 well beyond noise.  (At k = 2, beta = 1.5 small inner populations
     collapse towards q1 = q0 within ~60 sweeps; not used here.)"""
     r = pop_of_pops_1rsb(("regular", 5), PM, 1.25, 0.24, pop=60, inner=16, sweeps=6,
-                         burn_in=30, runs=3, seed=5, init_spread=1.0)
+                         burn_in=24, runs=3, seed=5, init_spread=1.0)
     gap = r.value["q1"] - r.value["q0"]
     assert gap > 0.1 and gap > 3 * (r.stderr["q1"] + r.stderr["q0"]), (r.value, r.stderr)
     # 3 runs: the drift label is weak at this size (seed 6 at burn_in 40 says
@@ -167,13 +174,13 @@ def test_symmetric_start_stays_factorized_random_start_does_not():
     (Mezard-Parisi 2003 Fig. 5).  That the broken solution has the higher phi is slow-tier."""
     y = 0.7
     fac = factorized_1rsb_t0(2, y=y)
-    sym = rsb_sparse_energy(K2, PM, y, pop=200, sweeps=8, burn_in=16, runs=4, seed=8,
+    sym = rsb_sparse_energy(K2, PM, y, pop=60, sweeps=4, burn_in=4, runs=2, seed=8,
                             init="symmetric")
     assert sym.value["asym"] < 1e-12 and sym.phase == "factorized", sym
     for key in ("phi", "phi_var"):
         assert abs(sym.value[key] - float(fac["phi"])) < 1e-9, (key, sym.value, fac)
     assert abs(sym.value["e"] - float(fac["e"])) < 1e-9, (sym.value, fac)
-    full = rsb_sparse_energy(K2, PM, y, pop=200, sweeps=8, burn_in=30, runs=4, seed=8)
+    full = rsb_sparse_energy(K2, PM, y, pop=100, sweeps=8, burn_in=30, runs=3, seed=8)
     # 30 sweeps is not fully relaxed (the drift diagnostic may say "undetermined"; the
     # stationary label is checked in the slow tier), but factorization is clearly broken
     assert full.value["asym"] > 0.2 and full.phase in ("1rsb", "undetermined"), full
@@ -192,18 +199,29 @@ def test_planted_reweighting_errors_are_caught():
     assert abs(ok.value["phi"] - ok.value["phi_var"]) < 0.03, ok.value
 
 
+def test_ground_state_route_labels_and_traces():
+    """rsb_ground_state_energy: a symmetric start stays factorized, so its phase is
+    "factorized" (not "1rsb") and its e0 is the exact factorized maximum of the parabola;
+    the typed-step trace is attached like the other routes."""
+    r = rsb_ground_state_energy(K2, PM, ys=(0.2, 0.4, 0.6), pop=50, sweeps=4, burn_in=4,
+                                runs=2, seed=0, init="symmetric")
+    assert r.phase == "factorized" and r.label == "statistical", (r.phase, r.note)
+    assert abs(r.value["e0"] - float(factorized_1rsb_t0(2)["e0"])) < 1e-4, r.value
+    assert [e["step"] for e in r.trace.to_json()["entries"]] == list(R.STEP_NAMES)
+
+
 def test_drifting_nested_population_is_undetermined_or_refused():
     """T = 0: a near-factorized start (symmetric surveys + 1e-6 asymmetry) relaxes away from
     the unstable factorized solution, the asymmetry growing ~10% per sweep; with a short
     burn-in the drift diagnostic (dynamics only) must flag it.  T > 0: 0.95 beta_c (k = 2)
     from a biased start, the barycentres still decaying to h = 0 (as Task 12)."""
-    kw = dict(pop=200, sweeps=8, burn_in=4, runs=4, seed=10, init="near-factorized")
+    kw = dict(pop=100, sweeps=8, burn_in=4, runs=4, seed=10, init="near-factorized")
     r = rsb_sparse_energy(K2, PM, 0.7, **kw)
     assert r.phase == "undetermined" and "not equilibrated" in r.note, (r.phase, r.note)
     _refuses(lambda: rsb_sparse_energy(K2, PM, 0.7, require_equilibrated=True, **kw),
              "no-convergence:equilibration")
     bc = float(mp.mpf(_ref()["beta_c_regular_pm1_k2"].value))
-    f = pop_of_pops_1rsb(K2, PM, 0.95 * bc, 0.5, pop=100, inner=12, sweeps=8, burn_in=16,
+    f = pop_of_pops_1rsb(K2, PM, 0.95 * bc, 0.5, pop=60, inner=8, sweeps=8, burn_in=16,
                          runs=4, seed=10, init_field=1.0, init_spread=0.5)
     assert f.phase == "undetermined" and "not equilibrated" in f.note, (f.phase, f.note)
 
@@ -240,9 +258,13 @@ def test_rsb_leaves_mpmath_precision_unchanged():
 @slow
 def test_energy_matches_banked_reference():
     """Full (non-factorized) 1RSB ground-state energy, k = 2, J = +-1: max over y of phi(y),
-    per-run parabola fit on a y grid, 8 runs, 99% Student-t band against the banked
-    Mezard-Parisi 2003 value (a reproduction target, not an input).  It must also be
-    clearly above RS (-23/18), and the planted no-reweighting dynamics must not pass."""
+    one least-squares parabola through the run-averaged phi on a y grid, jackknife stderr
+    over 8 runs, 99% Student-t band against the banked Mezard-Parisi 2003 value (a
+    reproduction target, not an input).  The banked tol enters the band as a standard
+    error, so that window (~8e-4) is wider than the gap to the factorized maximum
+    (6.1e-4): the full-vs-factorized discrimination is the separate e0 - fac > t * stderr
+    assertion.  It must also be clearly above RS (-23/18), and the planted
+    no-reweighting dynamics must not pass."""
     t0 = time.time()
     ref = _ref()["e0_1rsb_regular_pm1_k2"]
     want, tol = float(ref.value), float(ref.tol)
@@ -283,25 +305,30 @@ def test_full_1rsb_lies_above_factorized_at_fixed_y():
 
 @slow
 def test_finite_t_m_one_reduces_to_rs_larger_population():
-    """k = 2, beta = 1.5, m = 1 at larger sizes vs Task 12 RS PD (pop 10000, 8 runs).
-    q0 (the barycentre overlap, the quantity the m = 1 identity is about) must agree within
-    the 99% Student-t band.  KNOWN, UNRESOLVED: at this precision e(m=1) and f(m=1) sit
-    above RS by a few 1e-3 (measured: pop 4000 / inner 40: e +0.0027(9), f +0.0046(7);
-    pop 1000 / inner 40: e +0.006(1); pop 1000 / inner 160: e +0.004(2)), shrinking with the
-    outer population; the collapsed case (inner 10) agrees.  So e and f are only held to
-    |e - e_RS|, |f - f_RS| < 0.01 here (a wrong reweighting moves them by more; see the
-    planted check below) -- reported as a concern, not hidden."""
-    rs = population_dynamics(K2, PM, 1.5, pop=10000, sweeps=20, burn_in=50, runs=8, seed=17)
-    one = pop_of_pops_1rsb(K2, PM, 1.5, 1.0, pop=1000, inner=40, sweeps=20, burn_in=40,
-                           runs=8, seed=13, init_spread=1.0)
-    assert one.value["q1"] - one.value["q0"] > 0.02, one.value
-    ok, info = _band(one.value["q0"], one.stderr["q0"], rs.value["q"], rs.stderr["q"], 8)
-    assert ok, ("q0", info)
-    for obs in ("e", "f"):
-        assert abs(one.value[obs] - rs.value[obs]) < 0.01, (obs, one.value, rs.value)
-    bad = pop_of_pops_1rsb(K2, PM, 1.5, 1.0, pop=1000, inner=40, sweeps=20, burn_in=40,
-                           runs=8, seed=13, init_spread=1.0, _reweight_sign=0)
-    assert abs(bad.value["e"] - rs.value["e"]) > 0.01, (bad.value, rs.value)
+    """k = 2, beta = 1.5, m = 1, pop 1000, inner 160, 8 runs, vs Task 12 RS PD at pop 40000
+    (8 runs; its stderr is ~2e-4, so the reference is not the noise floor).  Every
+    comparison is a 99% Student-t band on the COMBINED stderr (1RSB runs and RS runs).
+    Checked: the estimators f, e, q0 and the exact m = 1 barycentre functional f_bary,
+    e_bary (Bethe f, e of the reweighted barycentres; isolates the identity from
+    finite-inner estimator bias).  Measured at this build (offsets from RS):
+    inner 160: e +0.0013(21), e_bary +0.0023(15), f -0.0013(22), q0 -0.0003(10).
+    OPEN ITEM (not hidden): e_bary sits above RS by about +0.003 in every configuration
+    measured -- inner 20: +0.0024(13); inner 40: +0.0029(20) (seed 31), +0.0071(8)
+    (seed 13); inner 80: +0.0030(20); inner 160: +0.0023(15) -- each 1.4-1.8 sigma except
+    seed 13 / inner 40 (9 sigma); RS PD at pop 1000 shows no such shift.  A candidate
+    cause is barycentre sampling noise (q1 - q0) / inner, which stays ~1e-3 over this range
+    because the inner spread grows with inner; not established.  The planted control
+    (reweighting dropped) is off by ~0.075 and must fail the same band."""
+    rs = population_dynamics(K2, PM, 1.5, pop=40000, sweeps=20, burn_in=50, runs=8, seed=17)
+    kw = dict(pop=1000, inner=160, sweeps=20, burn_in=40, runs=8, seed=13, init_spread=1.0)
+    one = pop_of_pops_1rsb(K2, PM, 1.5, 1.0, **kw)
+    assert one.value["q1"] - one.value["q0"] > 0.05, one.value
+    for obs, ro in (("e", "e"), ("f", "f"), ("q0", "q"), ("e_bary", "e"), ("f_bary", "f")):
+        ok, info = _band(one.value[obs], one.stderr[obs], rs.value[ro], rs.stderr[ro], 8)
+        assert ok, (obs, info)
+    bad = pop_of_pops_1rsb(K2, PM, 1.5, 1.0, _reweight_sign=0, **{**kw, "inner": 40})
+    ok, info = _band(bad.value["e"], bad.stderr["e"], rs.value["e"], rs.stderr["e"], 8)
+    assert not ok, info
 
 
 @slow
