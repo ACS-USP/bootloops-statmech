@@ -22,7 +22,7 @@ solves it, and the answer survives an independent check that did not feed it.
 
 ## Shape of the thing
 
-A new package under `tools/`, working name **`replicant`** **[call]**, laid
+A new package under `tools/`, name **`replicant`** **[call]**, laid
 out like its neighbours: `GUIDE.md`, `README.md`, code, a selftest battery
 (row in `tools/README.md`, line in `tools/BATTERIES.json`), default battery
 about 20 s. Python with sympy and mpmath, certified numerics through
@@ -177,8 +177,8 @@ package name.
   higher ansatz for that model, refusing is correct output. The held-out
   success case must be a model for which a valid ansatz exists.
 - **`baller`.** Used for the banked reference values where roots and
-  integrals can be enclosed; optional elsewhere. `replicant` stays a
-  working name until approval.
+  integrals can be enclosed; optional elsewhere. `replicant` is the
+  package name as built.
 
 ## Status
 
@@ -218,8 +218,9 @@ ledger:
   N_scale = 1, the catalog entry and the banked values use Derrida's
   N_scale = 1/2 (the plan's normalisation statement was self-contradictory).
 - **Reference digits** for papers behind paywalls were read from open secondary
-  sources; each bank entry says so.
+  sources; each bank cite names the source its digits were read from.
 - **LaTeX derivation writer** (not in the original spec) was added at the
   user's request; held-out models also render a derivation.
+- **`baller`** is not used; arbitrary precision is plain mpmath.
 - **Time standard.** The default battery takes about 16 s; the slow tier
   (`--full`) about 6 minutes.

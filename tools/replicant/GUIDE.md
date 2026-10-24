@@ -57,10 +57,13 @@ CLI (from `tools/`):
   spherical Gardner entropy with the derivation as a PDF.
 - Worked example, cavity route: `python3 -m replicant run sk --route cavity --param beta=2` (the dense
   cavity route needs a state point and reproduces the RS equations by a different derivation);
-  `python3 -m replicant run viana_bray` (the sparse entry is cavity-only: transition `beta_c`, exact
-  T = 0 RS and factorized 1RSB for the 3-regular +-J graph); population dynamics with
-  `--param beta=1.25 --param k=5 --param runs=8` (RS) or `--param ansatz=1rsb --param m=0.24` (1RSB
-  population of populations) are STATISTICAL and slower (seconds to minutes).
+  `python3 -m replicant run viana_bray --route cavity` (the sparse entry is cavity-only, so `--route
+  cavity` is required: the default route is `replica` and is refused; returns transition `beta_c`, exact
+  T = 0 RS and factorized 1RSB for the 3-regular +-J graph, under 1 s); population dynamics,
+  `python3 -m replicant run viana_bray --route cavity --param beta=1.25 --param k=5 --param runs=8`
+  (RS; under 1 s measured at the default sizes) or `... --route cavity --param beta=1.25 --param k=5
+  --param ansatz=1rsb --param m=0.24` (1RSB population of populations; about 13 s measured), are
+  STATISTICAL (value +- stderr); reference-size runs are slower (minutes).
 - Composing from a spec: `python3 -m replicant run spec.json --param beta=1.5 --param h=0`. spec.json:
   `{"family": "sk", "variables": "ising", "disorder": "pm_one", "constraint": null, "prior": null,
   "params": {"beta": null, "h": null}}`. Required keys: `family`, `variables`, `disorder`; optional:
@@ -95,7 +98,7 @@ OUTPUTS: the `Result` object (`values`, `errors`, `rigor`, `route`, `stable`, `f
 `statistical`, `notes`, `params`, `report`, `trace`, `entry`, `spec`; `reference_checks(slow=False)`
 re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`, `rigor`, `values`,
 `errors`, `statistical`, `stable`, `final`, `finality`, `notes`, `params`, `report`, `trace`,
-`references`, `references_skipped_slow`). Numbers are decimal strings (20 digits).
+`references`, `references_skipped_slow`). mpmath values are written as 20-digit decimal strings.
 - PER-VALUE FINALITY (`finality[key]`: `state`, `ansatz`, `cite`, `note`): `stable` (stability computed
   by this run and positive), `unstable` (computed negative, or the entropy rules the ansatz out),
   `not-computed` (no stability computed here), `exact-by-literature` (the cited source establishes it;
@@ -133,7 +136,7 @@ CATALOG (v1; `list` shows the live table; values at the default / banked state p
 | `rem` random energy model | replica | `beta_c` 1.66511 (`T_c` 0.600561, N_scale 1/2) | `T_c`, frozen ground energy, 1RSB `m beta/beta_c = 1` (Derrida) | exact-by-literature (1RSB) |
 | `sk` Sherrington-Kirkpatrick | replica, cavity | `tc` 1; RS `-sqrt(2/pi)` = -0.797885; 1RSB -0.765259; at `beta`: RS `q, f, e, replicon` | `tc`, RS, 1RSB; slow tier: 2RSB -0.76361, 3RSB -0.76331, full-RSB -0.763166 | `tc` stable; RS ground energy unstable; 1RSB not-computed; full RSB exact-by-literature (slow) |
 | `pspin` spherical p-spin | replica | p = 3: `T_s` 0.586054, `T_d` 0.612372, `q_s` 0.645007 | `T_s`, `T_d`, `q_s`; slow: `e0` -1.172 | exact-by-literature (1RSB) |
-| `perceptron` spherical (Gardner) | replica, cavity | `alpha_c(kappa=0)` = 2; entropy at `alpha` | `alpha_c`, both routes | stable (RS exact for kappa >= 0; kappa < 0 needs RSB, refused) |
+| `perceptron` spherical (Gardner) | replica, cavity | `alpha_c(kappa=0)` = 2; entropy at `alpha` | `alpha_c`, both routes | stable (RS exact for kappa >= 0; kappa < 0 returns the RS value labelled unstable and not final; a spherical 1RSB request is refused, `not-implemented:spherical-rsb`) |
 | `teacher_student` | replica | Gibbs 0.624658 / Bayes 0.441700 asymptotic constants (`eps ~ c/alpha`) | both constants (bank tol is a 3-digit rounding) | exact-by-literature |
 | `hopfield` (AGS) | replica, cavity | `alpha_c(T=0)` 0.137906, `m` 0.967417, `E` -0.501445, `alpha_global` 0.051854 | all four (Steffan-Kuehn; AGS 0.051 for the global one) | T = 0 values not-computed; state-point values carry their replicon |
 | `viana_bray` sparse +-J | cavity | `beta_c` (3-regular) 0.881374; T = 0 RS `p0` 1/3, `e0` -23/18; factorized 1RSB -1.27231, mu* 0.4174 | those, plus slow/statistical population-dynamics RS and 1RSB at k = 5, T = 0.8 | `beta_c` stable; the rest not-computed |
@@ -160,13 +163,12 @@ banked in `reference/perceptron.json` as independent targets. Honest limits:
 - The annealed bound does not detect the spherical-site swap (the other checks do).
 - Enumeration slack c/N with c = 1 is an assumption of the test.
 
-ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 235 tests, about 16 s, from a
-clean clone; also `python3 run_selftests.py replicant`) covers the core and refusal paths, the symbolic
+ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 235 tests, about 16 s on a laptop; also `python3 run_selftests.py replicant`) covers the core and refusal paths, the symbolic
 derivation against independent expressions, level agreement (a)=(b) for every family where both exist,
 every catalog entry against its banked non-slow values, the cavity routes, the composer and the held-out
 models, the CLI and the LaTeX writer (displayed equations re-checked numerically). `--full` adds 68 `@slow`
-tests (full-RSB Parisi up to K = 9, population dynamics at reference sizes, the Hopfield and p-spin
-low-temperature scans, solver-based LaTeX checks, a PDF compile when a TeX engine is present) and takes
+tests (full-RSB Parisi up to K = 9, population dynamics at reference sizes, the Hopfield replicon scans, the
+p-spin T -> 0 energy, solver-based composed and LaTeX checks, a PDF compile when a TeX engine is present) and takes
 about 6 minutes; run it before merging a change to a family. The `@slow` marker is honoured by
 `selftest.py` only: pytest ignores it and would run everything. Level agreement between the derivation
 and the pipelines is a consistency check, not new evidence for the ansatz; the cavity route reproducing
@@ -194,18 +196,28 @@ KNOWN HAZARDS:
   exponent, still drifting at K = 8: -0.7631663 +- 6.8e-6 (the stated band is the whole extrapolated
   tail); `sk_ground_energy("fullrsb")` returns a bare value, use `parisi_ground_energy` for the band.
   The solver is capped at K <= 9 (T = 0) and K <= 5 (finite T); finite-T `e` is not extrapolated.
-- The 1RSB energy lies ABOVE the RS energy in the replica convention (the replica free energy is
-  maximised); the sparse population-of-populations estimator uses the m-reweighting of the cited papers.
+- The SK 1RSB ground energy lies ABOVE the RS one (-0.7653 vs -0.7979): the replica free energy is
+  maximised, so a more broken ansatz raises the energy towards the true value.
 - LaTeX writer: a heuristic converter turns code notation into math; some fragments stay in code font and
   a very wide expression can overrun the margin (`--pdf` warns `OverfullDisplay`). Writing a document
   checks nothing by itself; the checks are `tests/test_latex.py`.
-- Spherical perceptron below capacity returns -inf entropy at `alpha >= alpha_c`; kappa < 0 is refused
+- Spherical perceptron: above capacity the entropy is -inf (empty version space). kappa < 0 returns the
+  RS value labelled `unstable` and `final: false` (e.g. `--param alpha=1.5 --param kappa=-1` gives
+  `alpha_c` 13.27, replicon -1.106); only a spherical 1RSB request is refused
   (`not-implemented:spherical-rsb`). Hopfield cavity gives the energy, not `f`.
-- Banked values come from secondary open sources where the original is paywalled; each bank entry says so
-  (`reference/*.json`, field `cite`). Check the originals by hand before quoting a digit.
+- Level (a) hook names differ: the Theta rule refuses as `known-gaussian-integral`, the exp rule as
+  `gaussian-integrable`. At K = 8 the top Hessian eigenvalue (about -2.6e-8) is near the finite-difference
+  noise floor, so negative-definiteness is weakly established at the highest levels. The slow-tier catalog
+  check of `fullrsb_ground_energy` uses the bank tolerance 2e-4; the solver band (6.8e-6) is checked only
+  in `tests/test_parisi.py`. The `exact-by-literature` label of full RSB rests on the cited published
+  Parisi value (Talagrand, Panchenko), not on this package's K-level extrapolation, whose band is stated
+  separately.
+- Banked values often come from secondary open sources where the original is paywalled; each bank entry
+  names the source its digits were read from (`reference/*.json`, field `cite`), and where the cite says
+  the original was not fetched the digits come from the secondary source named there. Check the originals by hand before quoting a digit.
 
-RELATED: the numerics lean on the house conventions of `baller` (arbitrary precision is plain mpmath
-here, no ball enclosures); sibling statistics packages `mixalot`, `posq`.
+RELATED: none upstream or downstream in this repository. Arbitrary precision is plain mpmath (no ball
+enclosures; `baller` is not used).
 
 CREDIT: the replica method, the Parisi ansatz and the cavity method are due to others; the package
 reproduces their published calculations and credits them by key (bracketed keys resolve in
@@ -219,5 +231,6 @@ RSB analysis of [SK94]; the Viana-Bray model [VB85], the sparse cavity and popul
 [TAP77]. The universality of the SK free energy used in the held-out test is [CH04]. Reference digits are read
 from [Sto25] [OSS07] [CRT03] [SY17] [DM15] [FP16] [Gyo01] [PRGE20] [Cov65] [Bar97] as stated in the bank
 cites. The typed-step architecture, the symbolic level (a), the composer, the refusal and
-finality discipline and the LaTeX writer are ours. Every bank entry says whether its original was
-fetched; the REFERENCES.md note preserves that.
+finality discipline and the LaTeX writer are ours. Each bank entry names the source its digits were
+read from; where a cite says the original was not fetched, the digits come from the secondary source
+named there, and the REFERENCES.md note preserves that.

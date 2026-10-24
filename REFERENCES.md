@@ -75,7 +75,7 @@ Non-paper credits (verified): OSCAR — W. Decker, C. Eder, C. Fieker, M. Horn, 
 
 Keys used by `tools/replicant/GUIDE.md`. Entry added by the replicant package; citations as banked in
 `tools/replicant/reference/*.json` and in the package's step citations; originals not independently
-re-fetched unless the entry says so (the date line at the top of this file does not cover this section).
+re-fetched unless the entry says so; each bank cite names the source its digits were read from (the date line at the top of this file does not cover this section).
 "Original not fetched" means the bank value was read from the secondary source named in
 `reference/*.json`; "read from the arXiv PDF" means the replicant build read that PDF.
 

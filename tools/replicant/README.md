@@ -15,12 +15,13 @@ From the repository root:
 ```
 python3 tools/replicant/selftest.py                        # default battery, about 16 s
 cd tools && python3 -m replicant list                      # the 7 catalog entries
-python3 -m replicant run perceptron --param alpha=1.5 --out result.json --latex p.tex
+python3 -m replicant run perceptron --param alpha=1.5 --out /tmp/result.json --latex /tmp/p.tex
 ```
 
 `run` also takes a spec file for a model near a catalogued one
 (`python3 -m replicant run spec.json --param beta=1.5 --param h=0`; schema in the GUIDE),
-`--route cavity` for the entries that have a cavity route, and `--pdf` (with `--latex`) to
+`--route cavity` for the entries that have a cavity route (required for `viana_bray`, which is
+cavity-only: `python3 -m replicant run viana_bray --route cavity`), and `--pdf` (with `--latex`) to
 compile the derivation.
 
 ## Layout
