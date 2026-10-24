@@ -2,11 +2,13 @@ import itertools
 import os
 import sys
 from fractions import Fraction
+from types import SimpleNamespace
 
 import mpmath as mp
 import sympy as sp
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from replicant import derive
 from replicant.core import Refusal, State, run_pipeline
 from replicant.derive import (Averaged, annealed_log_Z, average_disorder,
                               introduce_order_parameters, replicate,
@@ -198,3 +200,54 @@ def test_refusal_inside_step_carries_reason():
     step = introduce_order_parameters()
     assert _refusal(lambda: step.apply(st.with_(avg=bad))) == \
         "precondition:quadratic-in-coupling-field"
+
+
+def test_functional_records_missing_order():
+    assert _run(_sk(), 2, upto=3)[0]["functional"].missing is None
+    F = _run(_sk("pm_one"), 1, upto=3)[0]["functional"]
+    assert F.missing == "O(1)"
+    gap = annealed_log_Z(_sk("pm_one"), F.N) - F.N*sp.log(2) \
+        - (F.N * F.energy + F.correction)
+    assert sp.simplify(sp.limit(gap, F.N, sp.oo) + beta**4/24) == 0
+
+
+def test_law_with_vanishing_third_and_fourth_cumulant_refuses():
+    derive.LAWS["k6"] = derive.DisorderLaw(
+        "k6", lambda t, N_: t**2/(2*N_) + t**6/N_**3)
+    try:
+        assert _refusal(lambda: _run(_sk("k6"), 2, upto=2)) == \
+            "precondition:dropped-cumulant-identified"
+    finally:
+        del derive.LAWS["k6"]
+
+
+def test_toy_family_flows_through_the_hooks():
+    # A disorder-free family (H = 0, Z = 2^N) registered from outside:
+    # the steps only route to its hooks.
+    calls = []
+
+    def average(zn):
+        calls.append("average")
+        return SimpleNamespace(note="toy: nothing to average")
+
+    def order_parameters(avg, n, sum_pairs):
+        calls.append("order_parameters")
+        return sp.S(0), sp.S(0), None
+
+    derive.FAMILIES["toy"] = derive.Family(
+        formal=lambda n, b: derive.Tr(sp.S(1)),
+        annealed=lambda spec, N_: N_ * sp.log(2),
+        supports_disorder=lambda d: d == "none",
+        average=average, order_parameters=order_parameters)
+    try:
+        spec = ModelSpec("toy", "ising", "none")
+        st, trace = _run(spec, 2, upto=3)
+        assert calls == ["average", "order_parameters"]
+        assert "toy: nothing to average" in trace.render()
+        F = st["functional"]
+        at0 = F.expr.subs({F.qhat[(1, 2)]: 0, F.q[(1, 2)]: 0})
+        assert sp.simplify(at0 - 2*sp.log(2)) == 0   # ln 2^n per spin
+        assert _refusal(lambda: _run(ModelSpec("toy", "ising", "gaussian"), 2)) \
+            == "precondition:supported-disorder-law"
+    finally:
+        del derive.FAMILIES["toy"]
