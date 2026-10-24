@@ -15,13 +15,14 @@
 Consistency guard.  Check(args, impl, points, part, slow): at each point (values for
 the sympy symbols `args`), the displayed expression (or its rhs / lhs / lhs - rhs when
 expr is an Eq) is evaluated from the sympy object, GaussE expectations by tanh-sinh
-quadrature at 16 digits on |z| <= 30 (an independent rule, not solve.gauss_expect), and
+quadrature at 16 digits on |z| <= 14 (an independent rule, not solve.gauss_expect), and
 compared with impl(*point) -- a call into the family code -- to 1e-12 relative to
 max(1, |impl|).  `points`, or each point, may be a callable (computed when the check
 runs: e.g. the overlap of a solved saddle); `slow` marks checks that need a solve per
 point (the default test tier checks the first point of every fast check; --full checks
 every point of every check).  mpmath's global precision is restored.
 """
+import re
 from dataclasses import dataclass
 from typing import Callable
 
@@ -31,12 +32,21 @@ import sympy as sp
 KINDS = ("equation", "align", "text")
 TOL = mp.mpf("1e-12")
 _SPECIAL = {"\\": r"\textbackslash{}", "{": r"\{", "}": r"\}", "_": r"\_", "%": r"\%",
-            "&": r"\&", "#": r"\#", "$": r"\$", "^": r"\^{}", "~": r"\~{}"}
+            "&": r"\&", "#": r"\#", "$": r"\$", "^": r"\^{}", "~": r"\~{}",
+            "<": r"\textless{}", ">": r"\textgreater{}", "|": r"\textbar{}"}
 
 
 def escape(s) -> str:
-    """Text-mode escape of the TeX specials _ % & # $ ^ ~ { } and backslash."""
+    """Text-mode escape of the TeX specials _ % & # $ ^ ~ { } and backslash, and of < > |
+    (which the OT1 encoding of a pdflatex run would print as other glyphs)."""
     return "".join(_SPECIAL.get(c, c) for c in str(s))
+
+
+def prose(s) -> str:
+    """escape() of prose that may quote code notation: Python's ** becomes ^ and a * between
+    two operands a space (beta**2*q -> beta^2 q), so trace notes read as text."""
+    s = re.sub(r"\*\*", "^", str(s))
+    return escape(re.sub(r"(?<=[\w)\]])\*(?=[\w(])", " ", s))
 
 
 @dataclass(frozen=True, eq=False)
@@ -46,6 +56,10 @@ class Check:
     points: object                 # tuple of points (a point may be a callable), or a callable
     part: str = "whole"            # "whole" | "rhs" | "lhs" | "residual" (lhs - rhs)
     slow: bool = False
+    # a cited block (no sympy expr): a hand-coded evaluation of the displayed formula,
+    # display(*point), compared with impl(*point); tol overrides TOL (e.g. nested quadrature)
+    display: Callable | None = None
+    tol: object = None
 
     def resolved_points(self, limit=None):
         pts = (self.points() if callable(self.points) else self.points)[:limit]
@@ -67,12 +81,20 @@ class TexBlock:
 
 
 def render(obj) -> str:
-    """sympy.latex of an Expr; `lhs = rhs` of an Eq; align rows `lhs &= rhs` of a list."""
+    """tex_print.latex of an Expr; `lhs = rhs` of an Eq; align rows `lhs &= rhs` of a list.
+    A display wider than tex_print.WIDTH is broken at top-level + / - terms (a multline
+    for an equation, `\\\\ &\\quad ...` rows in an align): typesetting only."""
+    from .tex_print import lines
     if isinstance(obj, (list, tuple)):
-        return " \\\\\n".join(f"{sp.latex(e.lhs)} &= {sp.latex(e.rhs)}" for e in obj)
+        rows = []
+        for e in obj:
+            ls = lines(e.lhs, e.rhs)
+            rows.append(" \\\\\n".join([ls[0].replace(" = ", " &= ", 1)]
+                                         + [f"&{x}" for x in ls[1:]]))
+        return " \\\\\n".join(rows)
     if isinstance(obj, sp.Equality):
-        return f"{sp.latex(obj.lhs)} = {sp.latex(obj.rhs)}"
-    return sp.latex(obj)
+        return " \\\\\n".join(lines(obj.lhs, obj.rhs))
+    return " \\\\\n".join(lines(None, obj))
 
 
 def sym(title, obj, check=None, kind=None, source=None):
@@ -81,10 +103,14 @@ def sym(title, obj, check=None, kind=None, source=None):
     return TexBlock(kind, title, render(obj), obj, source=source, check=check)
 
 
-def cited(title, body, source, kind="equation"):
+def cited(title, body, source, kind="equation", check=None):
+    """A LaTeX string mirroring the code, with its paper; `check` (with display=) is a
+    hand-coded evaluation of the displayed formula against the code."""
     if not (source and source.strip()):
         raise ValueError(f"cited block {title!r} needs a source")
-    return TexBlock(kind, title, body, source=source)
+    if check is not None and check.display is None:
+        raise ValueError(f"cited block {title!r}: a check needs a display function")
+    return TexBlock(kind, title, body, source=source, check=check)
 
 
 def text(title, body, source=None):
@@ -111,9 +137,9 @@ def evaluate(expr, args, point, dps=16):
         vals = []
         for g in atoms:
             fn = sp.lambdify(tuple(args) + (g.z,), g.f, "mpmath")
-            c = 1 / mp.sqrt(2 * mp.pi)       # |z| > 30 weighs < 1e-195: dropped
+            c = 1 / mp.sqrt(2 * mp.pi)       # |z| > 14 weighs < 1e-43: dropped
             vals.append(mp.quad(lambda z, fn=fn: fn(*pt, z) * c * mp.exp(-z * z / 2),
-                                [-30, -6, 0, 6, 30]))
+                                [-14, -5, 0, 5, 14]))
         dummies = [sp.Dummy() for _ in atoms]
         outer = sp.sympify(expr).xreplace(dict(zip(atoms, dummies)))
         v = sp.lambdify(tuple(args) + tuple(dummies), outer, "mpmath")(*pt, *vals)
@@ -132,15 +158,16 @@ def verify_block(b: TexBlock, *, tol=TOL, max_points=None) -> list:
     """[(point, displayed value, family value)] where they differ by more than tol
     (relative to max(1, |family value|)); [] when every point agrees.  max_points:
     check only the first points (the default test tier uses 1, --full all)."""
-    if b.expr is None or b.check is None:
-        raise ValueError(f"block {b.title!r} has no expr / check")
     c = b.check
-    e = _part(b.expr, c.part)
+    if c is None or (b.expr is None and c.display is None):
+        raise ValueError(f"block {b.title!r} has no expr / check")
+    e = None if b.expr is None else _part(b.expr, c.part)
+    tol = mp.mpf(c.tol) if c.tol is not None else tol
     bad = []
     for p in c.resolved_points(max_points):
         want = mp.mpf(c.impl(*p))          # the family code, at its own precision
         with mp.workdps(30):
-            got = evaluate(e, c.args, p)
+            got = evaluate(e, c.args, p) if e is not None else mp.mpf(c.display(*p))
             if not abs(got - want) <= tol * max(1, abs(want)):
                 bad.append((p, mp.nstr(got, 17), mp.nstr(want, 17)))
     return bad

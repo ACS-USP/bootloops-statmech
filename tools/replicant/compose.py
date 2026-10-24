@@ -196,9 +196,13 @@ class ComposedCalculation:
     entry: CatalogEntry = None
 
     def run(self, *, require_final=False, **params) -> Result:
-        if self.report.kind == "catalog":
-            return self._run_catalog(require_final, params)
-        return self._run_composed(require_final, params)
+        try:
+            if self.report.kind == "catalog":
+                return self._run_catalog(require_final, params)
+            return self._run_composed(require_final, params)
+        except Refusal as r:
+            r.route = r.route or self.route      # a refused document names its route
+            raise
 
     def _run_catalog(self, require_final, params):
         p = {**{k: v for k, v in self.spec.params.items()
@@ -285,6 +289,14 @@ def _check_hooks(spec, near):
 
 
 def compose(spec: ModelSpec, route: str = "replica") -> ComposedCalculation:
+    try:
+        return _compose(spec, route)
+    except Refusal as r:
+        r.route = r.route or route
+        raise
+
+
+def _compose(spec, route):
     if route not in ROUTES:
         raise Refusal(f"missing-step:route:{route}", f"known routes: {', '.join(ROUTES)}")
     for e in catalog().values():

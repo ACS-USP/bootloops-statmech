@@ -26,6 +26,7 @@ class Refusal(Exception):
         self.trace = trace      # the partial Trace (steps applied before), if known
         self.step = step        # the name of the step that refused, if known
         self.inner_trace = None  # a nested pipeline's partial trace, if any
+        self.route = None       # the route of the calculation, set by compose (writers)
         super().__init__(f"{reason}: {detail}" if detail else reason)
 
 

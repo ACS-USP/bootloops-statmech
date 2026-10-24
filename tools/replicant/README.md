@@ -15,7 +15,11 @@ refusal prints `REFUSED: <reason>: <detail>` and exits 2.
 LaTeX (latex.py): `python3 -m replicant run <entry|spec.json> ... --latex out.tex [--pdf]`
 writes the calculation as a paper appendix: model, route, every step with its equations
 (level (a) rendered from the sympy objects in the State; the family code's equations in
-sympy form, each checked against the code at three points, or cited), the solution with
-per-value finality, stability, the banked-versus-computed check table, the honest labels
-and a bibliography from the citations.  `--pdf` compiles it with tectonic or pdflatex.
-A refused run writes its partial derivation and the reason.
+sympy form or cited), the solution with per-value finality, stability, the
+banked-versus-computed check table, the honest labels and a bibliography from the
+citations.  Writing a document checks nothing: the displayed sympy equations (and a few
+cited ones, by hand-coded evaluation) are checked against the code by tests/test_latex.py
+-- the first point of each in the default tier, all three points and the solver-based
+ones with --full.  `--pdf` compiles it with tectonic or pdflatex and warns
+(OverfullDisplay) if a display is wider than the page.  A refused run writes its partial
+derivation and the reason.

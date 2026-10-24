@@ -67,7 +67,7 @@ MODELS = {
     "hopfield": (r"H(s) = -\frac{1}{2N}\sum_{i,j}\sum_{\mu=1}^{p}\xi_i^\mu\xi_j^\mu s_i s_j,"
                  r"\quad p = \alpha N,\ \xi_i^\mu = \pm 1,\ \beta = 1/T", _AGS),
     "viana_bray": (r"E(s) = -\sum_{\langle ij\rangle} J_{ij} s_i s_j - H\sum_i s_i,\quad "
-                   r"J_{ij} = \pm J,\ \text{random regular (excess degree } k\text{) or "
+                   r"J_{ij} = \pm J, \\ \text{random regular (excess degree } k\text{) or "
                    r"Poisson (mean degree } c\text{) graph}", _MP01),
 }
 
@@ -90,6 +90,20 @@ def model_blocks(spec):
 
 
 # ---- SK --------------------------------------------------------------------------------
+def _sk_1rsb_display(b, h, q0, q1, m):
+    """The displayed 1RSB -beta f, evaluated as written: nested tanh-sinh quadrature over
+    z and y at 12 digits (independent of sk_1rsb's 80 x 80 Gauss-Hermite grid)."""
+    with mp.workdps(12):
+        b, h, q0, q1, m = (mp.mpf(str(x)) for x in (b, h, q0, q1, m))
+        D = lambda f: mp.quad(lambda x: f(x) * mp.exp(-x * x / 2), [-12, 0, 12]) / \
+            mp.sqrt(2 * mp.pi)
+        inner = lambda z: mp.log(D(lambda y: mp.cosh(b * (h + mp.sqrt(q0) * z
+                                                          + mp.sqrt(q1 - q0) * y))**m))
+        return (mp.log(2) + b**2 / 4 * (1 - 2 * q1 + (1 - m) * q1**2 + m * q0**2)
+                + D(inner) / m)
+
+
+
 _PARISI = "Parisi, PRL 43, 1754 (1979); J. Phys. A 13, L115 (1980)"
 _AT = "de Almeida & Thouless, J. Phys. A 11, 983 (1978)"
 
@@ -103,6 +117,9 @@ def sk(route):
     quad = F.quadratic_term("rs").subs(sp.Symbol("q"), Q)
     (q_eq,) = F.rs_equations_symbolic()
     arb = (("1.5", "0", "0.4"), ("0.9", "0.3", "0.5"), ("2", "0.1", "0.8"))
+    rsb_pts = tuple((lambda b=b, h=h: (b, h, *(getattr(F.sk_1rsb(b, h), k)
+                                               for k in ("q0", "q1", "m"))))
+                    for b, h in (("1.5", "0"), ("2", "0"), ("2.5", "0")))
     at_sol = tuple((lambda b=b, h=h: (b, h, F.sk_rs(b, h).q)) for b, h in
                    (("1.5", "0"), ("0.9", "0.3"), ("2", "0.1")))
     return [
@@ -111,8 +128,7 @@ def sk(route):
              "(families/sk.py quadratic_term)"),
         sym("RS free energy (n -> 0)", sp.Eq(MINUS_BF, sp.log(2) + B**2 * quad / 4
                                               + GaussE(sp.log(sp.cosh(xi)), Z)),
-            Check((B, HF, Q), lambda b, h, q: -mp.mpf(b) * F.sk_rs(b, h).f, at_sol, "rhs",
-                  slow=True)),
+            Check((B, HF, Q), lambda b, h, q: -mp.mpf(b) * F.sk_rs(b, h).f, at_sol, "rhs")),
         sym("RS saddle-point equation (the map the solver iterates)", q_eq,
             Check((B, HF, Q), lambda b, h, q: F._rs_map(*_mpf(b, h, q)), arb, "rhs")),
         sym("Energy per spin", sp.Eq(sp.Symbol("e"), -B * (1 - Q**2) / 2
@@ -130,7 +146,10 @@ def sk(route):
         cited("1RSB free energy (q0 between blocks, q1 inside blocks of size m)",
               r"-\beta f = \ln 2 + \frac{\beta^2}{4}\left[1 - 2 q_1 + (1-m) q_1^2 + m q_0^2"
               r"\right] + \frac{1}{m}\,\mathbb{E}_z \ln \mathbb{E}_y \cosh^m \Xi,\quad "
-              r"\Xi = \beta\left(h + \sqrt{q_0}\, z + \sqrt{q_1 - q_0}\, y\right)", _PARISI),
+              r"\Xi = \beta\left(h + \sqrt{q_0}\, z + \sqrt{q_1 - q_0}\, y\right)", _PARISI,
+              check=Check(("beta", "h", "q0", "q1", "m"), lambda b, h, *_: -mp.mpf(b) *
+                          F.sk_1rsb(b, h).f, rsb_pts, slow=True, display=_sk_1rsb_display,
+                          tol="1e-9")),
         cited("1RSB stationarity",
               r"q_1 = \mathbb{E}_z\langle\tanh^2\Xi\rangle,\quad "
               r"q_0 = \mathbb{E}_z\langle\tanh\Xi\rangle^2,\quad "
@@ -228,7 +247,8 @@ def perceptron(route):
              "E(x) = phi(x)/H(x); the RS saddle is parametrised by q (alpha(q) explicit)"),
         sym("RS entropy (spherical couplings)",
             sp.Eq(sp.Symbol("S"), sp.log(1 - Q) / 2 + Q / (2 * (1 - Q))
-                  + A * GaussE(sp.log(_H(x)), T)), source=_GARDNER, check=Check((Q, KA, A), lambda q, k, a: pt(q, k).S, pts, "rhs")),
+                  + A * GaussE(sp.log(_H(x)), T)), source=_GARDNER,
+            check=Check((Q, KA, A), lambda q, k, a: pt(q, k).S, pts, "rhs")),
         sym("RS saddle-point equation", q_eq, Check((Q, KA, A), lambda q, k, a: 0, pts,
                                                     "residual")),
         sym("Replicon", sp.Eq(LAM, 1 - A * GaussE((E * (E - x))**2, T)),
@@ -241,9 +261,20 @@ def perceptron(route):
 
 
 # ---- teacher-student -------------------------------------------------------------------
+_BAYES = {}       # str(eps_Gibbs) -> eps_Bayes at the same alpha (filled with the points)
+
+
+def _gibbs_point(F, a):
+    g = F.teacher_student_error(a, "gibbs")
+    _BAYES[str(g)] = F.teacher_student_error(a, "bayes")
+    return (g,)
+
+
 def teacher_student(route):
     from .families import teacher_student as F
     Rs = sp.Symbol("R", positive=True)
+    EG = sp.Symbol("epsilon_G", positive=True)
+    bayes_of = _BAYES
     I = GaussE(sp.exp(-T**2 / 2) / _H(-T), T)
     curve = lambda: tuple((mp.cos(mp.pi * F.teacher_student_error(a, "gibbs")), a)
                           for a in ("1", "2", "5"))
@@ -256,9 +287,13 @@ def teacher_student(route):
             sp.Eq(Rs / sp.sqrt(1 - Rs), A / sp.pi * GaussE(sp.exp(-Rs * T**2 / 2)
                                                            / _H(-sp.sqrt(Rs) * T), T)),
             Check((Rs, A), lambda r, a: 0, curve, "residual", slow=True)),
-        cited("Generalization error; Bayes from Gibbs",
-              r"\epsilon = \frac{\arccos R}{\pi},\qquad R_{\mathrm{Bayes}} = "
-              r"\sqrt{R_{\mathrm{Gibbs}}}", "Opper & Haussler, PRL 66, 2677 (1991)"),
+        cited("Generalization error", r"\epsilon = \frac{\arccos R}{\pi}", _TS),
+        sym("Bayes from Gibbs: R_Bayes = sqrt(R_Gibbs), with R = cos(pi epsilon)",
+            sp.Eq(sp.Symbol("epsilon_B"), sp.acos(sp.sqrt(sp.cos(sp.pi * EG))) / sp.pi),
+            source="Opper & Haussler, PRL 66, 2677 (1991)",
+            check=Check((EG,), lambda e: bayes_of[str(e)],
+                        tuple((lambda a=a: _gibbs_point(F, a)) for a in ("1", "2", "5")),
+                        "rhs", slow=True)),
         sym("Large alpha, Gibbs", sp.Eq(sp.Symbol("alpha epsilon_G"), sp.sqrt(2) / I),
             Check((), lambda: F.asymptotic_constant("gibbs"), ((),), "rhs")),
         sym("Large alpha, Bayes", sp.Eq(sp.Symbol("alpha epsilon_B"), 1 / I),
@@ -302,8 +337,11 @@ def hopfield(route):
         sym("The function g; alpha_c = g(y*)^2/2 at its maximum g'(y*) = 0",
             sp.Eq(sp.Function("g")(y), sp.erf(y) / y - 2 / sp.sqrt(sp.pi) * sp.exp(-y**2)),
             Check((y,), lambda yy: F._g(mp.mpf(yy)), (("0.5",), ("1",), ("1.5",)), "rhs")),
-        cited("T = 0 energy (AGS Eq. (11))", r"E = \frac{\alpha(1 - r)}{2} - \frac{m^2}{2}",
-              _AGS),
+        sym("T = 0 energy (AGS Eq. (11)), at the T = 0 retrieval solution (m, r)",
+            sp.Eq(sp.Symbol("E"), A * (1 - R) / 2 - M**2 / 2), source=_AGS,
+            check=Check((A, M, R), lambda a, m, r: F.hopfield_t0(a).E,
+                        tuple((lambda a=a: (a, F.hopfield_t0(a).m, F.hopfield_t0(a).r))
+                              for a in ("0.05", "0.1", "0.13")), "rhs")),
     ]
 
 

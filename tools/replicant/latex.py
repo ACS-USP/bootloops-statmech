@@ -24,23 +24,29 @@ not hold.  write_latex(pdf=True) compiles with tectonic (preferred) or pdflatex 
 PATH, else refuses precondition:tex-engine; a failed compile is tex-engine:failed, or
 tex-engine:unavailable when the engine reports it could not fetch its packages.
 """
-import re
-import shutil
-import subprocess
 from functools import lru_cache
 from pathlib import Path
 
 import mpmath as mp
 
 from .core import Refusal, State, run_pipeline
-from .tex import Check, TexBlock, escape, invented  # noqa: F401 (re-exported)
+from .latex_bib import _Bib
+from .latex_pdf import OverfullDisplay, compile_pdf, overfull  # noqa: F401 (re-exported)
+from .tex import Check, TexBlock, escape, invented, prose  # noqa: F401 (re-exported)
 
 PREAMBLE = r"""\documentclass[11pt]{article}
 \usepackage[margin=2cm]{geometry}
-\usepackage{amsmath,amssymb}
+\usepackage{iftex}
+\ifPDFTeX
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\fi
+\usepackage{amsmath,amssymb,graphicx}
 \allowdisplaybreaks
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{4pt}
+\sloppy
+\setlength{\emergencystretch}{3em}
 """
 ROUTES = {"replica": "replica method: replicated partition function Z^n, disorder average, "
                      "order parameters q_ab (and conjugates), saddle point, RS / 1RSB "
@@ -49,36 +55,6 @@ ROUTES = {"replica": "replica method: replicated partition function Z^n, disorde
                     "back (marginal and reaction), self-consistency; on sparse graphs "
                     "population dynamics for the law of the cavity fields"}
 _STAB = ("replicon", "stability", "capacity_stable", "stable", "mode_eig")
-
-
-class _Bib:
-    """Cite strings -> \\cite keys; items are split at top-level '; '."""
-    def __init__(self):
-        self.keys = {}
-
-    @staticmethod
-    def items(cite):
-        out, depth, cur = [], 0, ""
-        for i, ch in enumerate(cite):
-            depth += {"(": 1, ")": -1}.get(ch, 0)
-            if ch == ";" and depth == 0 and cite[i + 1:i + 2] == " ":
-                out.append(cur.strip())
-                cur = ""
-            else:
-                cur += ch
-        return [x for x in out + [cur.strip()] if x]
-
-    def cite(self, cite):
-        if not cite:
-            return ""
-        keys = [self.keys.setdefault(it, f"b{len(self.keys) + 1}") for it in self.items(cite)]
-        return f"\\cite{{{','.join(keys)}}}"
-
-    def render(self):
-        if not self.keys:
-            return ""
-        rows = "\n".join(f"\\bibitem{{{k}}} {escape(it)}" for it, k in self.keys.items())
-        return f"\n\\begin{{thebibliography}}{{99}}\n{rows}\n\\end{{thebibliography}}\n"
 
 
 def _num(v):
@@ -98,10 +74,13 @@ def _block(b: TexBlock, bib):
     if b.source:
         head += " " + bib.cite(b.source)
     if b.check is not None:
-        head += " (sympy form, checked against the code)"
+        head += " " + escape("(sympy form; checked against the code by tests/test_latex.py)"
+                             if b.expr is not None else "(evaluated by hand-coded quadrature; "
+                             "checked against the code by tests/test_latex.py)")
     if b.kind == "text":
-        return f"{head}\n{escape(b.body)}\n"
-    return f"{head}\n\\begin{{{b.kind}}}\n{b.body}\n\\end{{{b.kind}}}\n"
+        return f"{head}\n{prose(b.body)}\n"
+    env = "multline" if b.kind == "equation" and "\\\\" in b.body else b.kind
+    return f"{head}\n\\begin{{{env}}}\n{b.body}\n\\end{{{env}}}\n"
 
 
 def _blocks(blocks, bib):
@@ -112,7 +91,7 @@ def _entry(k, e, bib, blocks, fallback_cite=None):
     head = f"\\subsection{{Step {k}: {escape(e.step)}}}\n"
     cite = e.cite or fallback_cite
     src = f"Source: {bib.cite(cite)}. " if cite else ""
-    return head + f"{src}Trace: {escape(e.summary)}\n\n" + _blocks(blocks, bib)
+    return head + f"{src}Trace: {prose(e.summary)}\n\n" + _blocks(blocks, bib)
 
 
 @lru_cache(maxsize=None)
@@ -120,9 +99,12 @@ def _level_a(key):
     """(trace, None) of the symbolic level-(a) derivation of a catalog spec, or
     (None, reason) when level (a) has no hook for it."""
     from . import compose as C
+    from . import derive as D
     from .spec import ModelSpec
     *fields, params = key
     spec = ModelSpec(*fields, params=dict(params))
+    if spec.family not in D.FAMILIES:
+        return None, f"derive.FAMILIES has no level-(a) hook for family {spec.family!r}"
     try:
         C._check_hooks(spec, None)
         return run_pipeline(C.level_a_steps(spec)[:6], State())[1], None
@@ -199,7 +181,7 @@ def _solution(res, bib):
            "\\begin{center}\n\\begin{tabular}{llll}\nkey & value & finality (ansatz) & final \\\\"
            "\n\\hline\n" + "\n".join(rows) + "\n\\end{tabular}\n\\end{center}\n")
     if notes:
-        out += "\\begin{itemize}\n" + "".join(f"\\item {escape(n)}\n" for n in notes) + \
+        out += "\\begin{itemize}\n" + "".join(f"\\item {prose(n)}\n" for n in notes) + \
             "\\end{itemize}\n"
     if meta:
         out += "Other outputs (parameters, labels, diagnostics): " + "; ".join(meta) + ".\n\n"
@@ -236,25 +218,44 @@ def _references(res, bib, slow):
         done = {(o.file, o.key): o for o in res.reference_checks(slow=slow)}
     except Refusal as r:
         return out + escape(f"refused: {r.reason}: {r.detail}") + "\n"
-    rows = []
+    rows, stat = [], []
     for ref in res.entry.refs:
         if ref.route != res.route:
             continue
         want = load(ref.file)[ref.key]
         o = done.get((ref.file, ref.key))
         if o is None:
-            got, verdict = "not run (slow" + (", statistical" if ref.statistical else "") + \
-                "; --full)", "--"
+            got, verdict = "not run (" + ("statistical" if ref.statistical else "slow") + \
+                ")", "--"
         else:
-            got, verdict = escape(o.got), ("agrees" if o.ok else "DISAGREES")
+            got, verdict = escape(_short(o.got)), ("agrees" if o.ok else "DISAGREES")
             if o.statistical:
-                got += f" ({escape(o.detail)})"
-        rows.append(f"{escape(ref.key)} & {got} & {escape(want.value)} & {escape(want.tol)} & "
-                    f"{verdict} & {bib.cite(want.cite)} \\\\")
-    return (out + "Banked values (reference/*.json) against this pipeline's output.\n"
-            "\\begin{center}\n\\begin{tabular}{llllll}\nkey & computed & banked & tolerance & "
-            "verdict & source \\\\\n\\hline\n" + "\n".join(rows) +
-            "\n\\end{tabular}\n\\end{center}\n")
+                got += " (statistical)"
+                stat.append(f"\\item {escape(ref.key)}: {escape(o.detail)}\n")
+        rows.append(f"{escape(ref.key)} & {got} & {escape(_short(want.value))} & "
+                    f"{escape(want.tol)} & {verdict} & {bib.cite(want.cite)} \\\\")
+    return (out + "Banked values (reference/*.json) against this pipeline's output; numbers "
+            "are shown to 16 significant digits, the comparison uses them in full; slow and "
+            "statistical rows run only with --full (render\\_latex(slow=True)).\n"
+            "\\begin{center}\\footnotesize\n\\setlength{\\tabcolsep}{4pt}\n" + _FIT +
+            "{\\begin{tabular}{llllll}\n"
+            "key & computed & banked & tolerance & verdict & source \\\\\n\\hline\n" +
+            "\n".join(rows) + "\n\\end{tabular}}\n\\end{center}\n" +
+            ("Statistical comparisons:\n\\begin{itemize}\n" + "".join(stat) +
+             "\\end{itemize}\n" if stat else ""))
+
+
+_FIT = "\\resizebox{\\ifdim\\width>\\linewidth\\linewidth\\else\\width\\fi}{!}"   # shrink if wide
+
+
+def _short(s, digits=16):
+    """A decimal string to `digits` significant digits (display only); other text as is."""
+    with mp.workdps(40):
+        try:
+            x = mp.mpf(str(s))
+        except (ValueError, TypeError):
+            return str(s)
+        return mp.nstr(x, digits) if len(str(s)) > digits + 3 else str(s)
 
 
 def _caveat(res):
@@ -271,7 +272,7 @@ def _labels(res):
                       "(value +- stderr over independent runs), not certified.") + "\n\n"
     rest = [n for n in res.notes if n and n != _caveat(res) and "NOT final" not in n]
     if rest:
-        out += "\\begin{itemize}\n" + "".join(f"\\item {escape(n)}\n" for n in rest) + \
+        out += "\\begin{itemize}\n" + "".join(f"\\item {prose(n)}\n" for n in rest) + \
             "\\end{itemize}\n"
     return out
 
@@ -298,12 +299,16 @@ def _result_body(res, bib, extra, slow):
         intro = ("Level (a): each step is rendered from the sympy objects that step put in "
                  "the State (sympy.latex); nothing is retyped.")
     elif res.route == "cavity":
-        intro = ("The cavity argument as the cavity code implements it (cavity/*.py), step "
-                 "by step; each equation in sympy form checked against the code or cited.")
+        intro = ("The cavity equations as the cavity code implements them (cavity/*.py): for "
+                 "the dense models in the order of its four steps (remove a site, the cavity-"
+                 "field law, add the site, self-consistency); for sparse graphs the recursion, "
+                 "observables and population dynamics.  Each equation is in sympy form "
+                 "(checked against the code by tests/test_latex.py) or cited.")
     else:
         intro = (f"No level-(a) derivation for this model ({why}): the governing equations "
-                 "the family code implements are shown, each in sympy form checked against "
-                 "the code or cited; no intermediate step the code does not perform is shown.")
+                 "the family code implements are shown, each in sympy form (checked against "
+                 "the code by tests/test_latex.py) or cited; no intermediate step the code "
+                 "does not perform is shown.")
     out.append("\\section{Derivation}\n" + escape(intro) + "\n")
     if not composed and rows[0][0] is not None:
         out.append(escape("The level-(a) steps below derive the same model symbolically "
@@ -325,16 +330,19 @@ def _result_body(res, bib, extra, slow):
 
 def _refusal_body(r, bib):
     from .compose import LEVEL_A_CITE
-    from .families.common import CAVEAT
+    from .families.common import CAVEAT, CAVITY_CAVEAT
     entries = r.trace.entries if r.trace is not None else []
-    out = ["\\section{Refused calculation}\n" + escape(
+    route = getattr(r, "route", None)
+    out = ["\\section{Refused calculation}\n" + prose(
         f"Refused: {r.reason}" + (f" at step {r.step}" if r.step else "") +
         (f": {r.detail}" if r.detail else "") + ". No value is reported; the steps "
         "applied before the refusal are shown below.") + "\n"]
     out.append("\\section{Partial derivation}\n" + (
         "".join(_entry(k, e, bib, e.tex, LEVEL_A_CITE) for k, e in enumerate(entries, 1))
         or escape("The refusal came before any step was applied.") + "\n"))
-    out.append("\\section{Labels}\nRigor: \\textbf{physics-level}. " + escape(CAVEAT) + "\n")
+    out.append("\\section{Labels}\nRigor: \\textbf{physics-level}. " +
+               (f"Route: \\textbf{{{escape(route)}}}. " if route else "") +
+               escape(CAVITY_CAVEAT if route == "cavity" else CAVEAT) + "\n")
     return "".join(out)
 
 
@@ -354,32 +362,6 @@ def render_latex(result, *, title=None, standalone=True, extra=(), slow=False) -
         return body
     return (PREAMBLE + f"\\title{{{escape(title)}}}\n\\date{{}}\n\\begin{{document}}\n"
             "\\maketitle\n" + body + "\\end{document}\n")
-
-
-_OFFLINE = re.compile(r"network|download|resolve host|could not connect|offline|"
-                      r"failed to fetch", re.I)
-
-
-def compile_pdf(tex: Path) -> Path:
-    engine = shutil.which("tectonic") or shutil.which("pdflatex")
-    if engine is None:
-        raise Refusal("precondition:tex-engine", "neither tectonic nor pdflatex is on PATH")
-    d = str(tex.parent)
-    if Path(engine).name == "tectonic":
-        runs = [[engine, "--chatter", "minimal", "--outdir", d, str(tex)]]
-    else:
-        runs = [[engine, "-interaction=nonstopmode", "-halt-on-error",
-                 f"-output-directory={d}", str(tex)]] * 2      # twice: citations
-    for cmd in runs:
-        p = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-        if p.returncode != 0:
-            log = (p.stdout + p.stderr)[-1500:]
-            reason = "tex-engine:unavailable" if _OFFLINE.search(log) else "tex-engine:failed"
-            raise Refusal(reason, f"{Path(engine).name} exit {p.returncode}: {log}")
-    pdf = tex.with_suffix(".pdf")
-    if not pdf.exists():
-        raise Refusal("tex-engine:failed", f"{engine} wrote no {pdf.name}")
-    return pdf
 
 
 def write_latex(result, path, *, pdf=False, **kw) -> Path:

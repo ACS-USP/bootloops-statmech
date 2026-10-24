@@ -21,11 +21,15 @@ stays a string (e.g. learning=bayes).  spec.json: {"family", "variables",
 equations, citations, the check table and the labels); --pdf also compiles it (tectonic
 or pdflatex; refused precondition:tex-engine when neither is on PATH).  A refused run
 with --latex still writes the document of its partial derivation and the reason, then
-exits 2.  --pdf without --latex is refused (precondition:latex-path).
+exits 2.  --pdf without --latex is refused (precondition:latex-path).  The JSON result is
+written before the document, so a refused compile (REFUSED: latex: ..., exit 2) or an
+unwritable path (ERROR: latex: OSError ..., exit 1) never loses it; a display wider than
+the page prints WARNING: (latex_pdf.OverfullDisplay).
 """
 import argparse
 import json
 import sys
+import warnings
 
 import mpmath as mp
 import sympy as sp
@@ -35,7 +39,7 @@ from .catalog import catalog
 from .compose import compose
 from .core import Refusal
 from .derive_families import ALPHA, KAPPA
-from .latex import write_latex
+from .latex import OverfullDisplay, write_latex
 from .spec import ModelSpec
 
 _SYMBOLS = {"beta": D.BETA, "h": D.H_FIELD, "alpha": ALPHA, "kappa": KAPPA}
@@ -166,14 +170,13 @@ def main(argv=None, stdout=None, stderr=None):
         params = dict(parse_param(p) for p in args.param)
         spec, res = build_result(args.target, args.route, params)
         doc = result_json(args.target, spec, res)
-        if args.latex:
-            written = write_latex(res, args.latex, pdf=args.pdf)
-            print(f"latex: wrote {written}", file=stderr)
     except Refusal as r:
-        if args.latex and not r.reason.startswith(("precondition:latex-path", "tex-engine",
-                                                   "precondition:tex-engine")):
-            write_latex(r, args.latex)
-            print(f"latex: wrote the refused calculation to {args.latex}", file=stderr)
+        if args.latex:
+            try:
+                write_latex(r, args.latex)
+                print(f"latex: wrote the refused calculation to {args.latex}", file=stderr)
+            except OSError as exc:
+                print(f"ERROR: latex: {type(exc).__name__}: {exc}", file=stderr)
         print(f"REFUSED: {r.reason}: {r.detail}", file=stderr)
         return 2
     except Exception as exc:          # not a named refusal: report it, never a traceback
@@ -186,4 +189,18 @@ def main(argv=None, stdout=None, stderr=None):
     else:
         print(text, file=stdout)
     print(f"trace ({res.route}, {res.rigor}):\n{res.trace.render()}", file=stderr)
+    if args.latex:                    # after the JSON: a writer failure never loses the result
+        try:
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always", OverfullDisplay)
+                written = write_latex(res, args.latex, pdf=args.pdf)
+            print(f"latex: wrote {written}", file=stderr)
+            for w in caught:
+                print(f"WARNING: {w.message}", file=stderr)
+        except Refusal as r:
+            print(f"REFUSED: latex: {r.reason}: {r.detail}", file=stderr)
+            return 2
+        except OSError as exc:
+            print(f"ERROR: latex: {type(exc).__name__}: {exc}", file=stderr)
+            return 1
     return 0

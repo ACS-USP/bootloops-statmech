@@ -27,6 +27,7 @@ from replicant.latex import document_blocks, render_latex, write_latex
 from replicant.spec import ModelSpec
 from replicant.testing import slow
 from replicant.tex import Check, TexBlock, escape, invented, render, verify_block
+from replicant.tex_print import WIDTH, lines, width
 
 # cheap parameters per (entry, route): every route of every entry gets a document
 CHEAP = {("sk", "cavity"): {"beta": "1.5", "h": "0.3"},
@@ -63,7 +64,7 @@ def _subsections(doc):
 
 
 def _has_math(body):
-    return "\\begin{equation" in body or "\\begin{align" in body
+    return any(f"\\begin{{{e}" in body for e in ("equation", "align", "multline"))
 
 
 # ---- structure ------------------------------------------------------------------------
@@ -107,6 +108,9 @@ def test_every_catalog_entry_has_derivation():
 def test_latex_environments_balanced_and_specials_escaped():
     assert escape("q_EA 50% & #1 $x^2~{a}\\") == \
         "q\\_EA 50\\% \\& \\#1 \\$x\\^{}2\\~{}\\{a\\}\\textbackslash{}"
+    assert escape("n -> 0, a < b, |z|") == \
+        "n -\\textgreater{} 0, a \\textless{} b, \\textbar{}z\\textbar{}"
+    assert "\\usepackage[T1]{fontenc}" in _doc("rem", "replica")      # guarded for pdflatex
     for name, route in _routes():
         doc = _doc(name, route)
         stack = []
@@ -119,6 +123,11 @@ def test_latex_environments_balanced_and_specials_escaped():
         for line in doc.splitlines():   # bibliography items and text are escaped
             if line.startswith("\\bibitem"):
                 assert not re.search(r"(?<!\\)[_%&#]", line.split("}", 1)[1]), line
+        text_mode = re.sub(r"\\begin\{(equation|align|multline)\}.*?\\end\{\1\}", "", doc,
+                           flags=re.S)
+        text_mode = re.sub(r"\$[^$]*\$|\\(cite|bibitem|begin|end)\{[^}]*\}", "", text_mode)
+        for line in text_mode.splitlines():      # every text-mode line is escaped
+            assert not re.search(r"(?<!\\)[_%#]", line), (name, route, line)
     # a trace summary with specials is escaped where it is shown
     sk = _doc("sk", "replica")
     assert "T = 0 energies; RS replicon at T = 0.5" in sk
@@ -153,6 +162,7 @@ def _checked_blocks():
         for b in catalog()[name].derivation(route):
             if b.expr is not None:
                 assert b.check is not None, (name, route, b.title)
+            if b.check is not None:          # incl. cited blocks with a hand-coded display
                 out.append((name, route, b))
     return out
 
@@ -165,7 +175,8 @@ def test_displayed_equations_match_implementation():
     for name, route, b in fast:     # default tier: the first point of each (--full: all)
         bad = verify_block(b, max_points=1)
         assert not bad, (name, route, b.title, bad)
-        assert len(b.check.resolved_points()) == 3 or not b.check.args, (name, b.title)
+        pts = b.check.points() if callable(b.check.points) else b.check.points
+        assert len(pts) == 3 or not b.check.args, (name, b.title)
     assert {n for n, _, _ in blocks} >= {"sk", "rem", "pspin", "perceptron", "hopfield",
                                          "teacher_student", "viana_bray"}
     assert mp.mp.dps == dps
@@ -330,3 +341,109 @@ def test_pdf_compiles():
                     return
                 raise
             assert pdf.suffix == ".pdf" and pdf.stat().st_size > 1000, (name, pdf)
+
+
+# ---- typesetting (fix round 1) --------------------------------------------------------
+def test_long_equation_breaks_at_terms_and_stays_the_same_object():
+    x = sp.symbols("x0:30")
+    q, n = sp.IndexedBase("q"), sp.Symbol("n", positive=True)
+    a, b = sp.symbols("a b", integer=True, positive=True)
+    pair = sp.Sum(q[a, b]**2, (b, a + 1, n), (a, 1, n))
+    rhs = sum(sp.log(1 + xi**2) * xi for xi in x) - pair + sp.Symbol("alpha") * (
+        sum(sp.log(1 + xi) for xi in x[:12]))
+    eq = sp.Eq(sp.Symbol("Phi"), rhs)
+    rows = lines(eq.lhs, eq.rhs)
+    assert len(rows) > 3 and all(width(r) <= WIDTH for r in rows), [width(r) for r in rows]
+    b_ = TexBlock("equation", "long", render(eq), eq)
+    assert not invented(b_) and "\\\\" in b_.body
+    assert "\\sum_{a < b \\leq n}" in b_.body and "substack" not in b_.body
+    assert "\\Bigl(" in b_.body and "\\Bigr)" in b_.body      # alpha (...) split inside
+    # the broken lines are the same terms: re-joined they equal the unbroken printout
+    flat = lambda s: s.replace("\\quad", "").replace("\\Bigl(", "\\left(").replace(
+        "\\Bigr)", "\\right)").replace("\\\\", "").replace(" ", "").replace("\n", "")
+    from replicant.tex_print import latex
+    assert flat(render(eq)) == flat(f"{latex(eq.lhs)} = {latex(eq.rhs)}")
+    short = sp.Eq(sp.Symbol("q"), x[0] + 1)
+    assert render(short) == "q = x_{0} + 1"
+    doc = render_latex(_result("rem", "replica"), extra=[b_])
+    assert "\\begin{multline}" in doc
+
+
+def test_refused_cavity_document_carries_cavity_caveat():
+    try:
+        compose(catalog()["sk"].spec, "cavity").run()
+    except Refusal as r:
+        assert r.route == "cavity"
+        doc = render_latex(r)
+        assert escape(CAVITY_CAVEAT) in doc and escape(CAVEAT) not in doc
+        assert "Route: \\textbf{cavity}" in doc
+    try:
+        run_pipeline([D.saddle_equations()], State())
+    except Refusal as r:
+        assert r.route is None and escape(CAVEAT) in render_latex(r)
+
+
+def test_cli_keeps_the_json_when_the_document_fails():
+    from replicant import latex_pdf
+    with tempfile.TemporaryDirectory() as d:
+        out, err = io.StringIO(), io.StringIO()
+        j, t = os.path.join(d, "r.json"), os.path.join(d, "r.tex")
+        which, latex_pdf.shutil.which = latex_pdf.shutil.which, lambda name: None
+        try:
+            code = main(["run", "rem", "--out", j, "--latex", t, "--pdf"], stdout=out, stderr=err)
+        finally:
+            latex_pdf.shutil.which = which
+        assert code == 2 and os.path.exists(j) and os.path.exists(t), err.getvalue()
+        assert "REFUSED: latex: precondition:tex-engine" in err.getvalue()
+        err = io.StringIO()
+        code = main(["run", "rem", "--out", j, "--latex", os.path.join(d, "no", "x.tex")],
+                    stdout=out, stderr=err)
+        assert code == 1 and "ERROR: latex: FileNotFoundError" in err.getvalue()
+        assert "Traceback" not in err.getvalue() and os.path.exists(j)
+
+
+def test_bibliography_lists_each_reference_once_and_no_code_notation():
+    doc = _doc("sk", "replica")
+    bib = [l for l in doc.splitlines() if l.startswith("\\bibitem")]
+    assert sum("Sherrington \\& Kirkpatrick" in l for l in bib) == 1, bib
+    assert sum(bool(re.match(r"\\bibitem\{b\d+\} Parisi, J\. Phys\. A 13, L115", l))
+               for l in bib) == 1, bib
+    for name, route in _routes():
+        body = _doc(name, route).split("\\begin{document}")[1]
+        text_only = re.sub(r"\\begin\{(equation|align|multline)\}.*?\\end\{\1\}", "", body,
+                           flags=re.S)
+        assert "**" not in text_only, (name, route)
+    assert "\\sloppy" in doc
+
+
+@slow
+def test_compiled_documents_have_no_overfull_display():
+    """Hopfield (the widest level-(a) functionals), SK, SK cavity, the p-spin functional, the
+    sparse cavity and the composed +-J SK: no display wider than the text block by 1 pt."""
+    import warnings
+    from replicant.latex import OverfullDisplay, overfull
+    if not _engine_or_skip():
+        return
+    docs = {"hopfield": _result("hopfield", "replica"), "sk": _result("sk", "replica"),
+            "sk_cavity": _result("sk", "cavity"), "pspin": _result("pspin", "replica"),
+            "viana_bray": _result("viana_bray", "cavity"),
+            "sk_pm_one": compose(PM_ONE_SK).run()}
+    with tempfile.TemporaryDirectory() as d:
+        for name, res in docs.items():
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always", OverfullDisplay)
+                try:
+                    write_latex(res, os.path.join(d, f"{name}.tex"), pdf=True)
+                except Refusal as r:
+                    if r.reason == "tex-engine:unavailable":
+                        print(f"SKIP test_compiled_documents_have_no_overfull_display: {r.detail}")
+                        return
+                    raise
+            log = os.path.join(d, f"{name}.log")
+            assert os.path.exists(log), name
+            bad = [o for o in overfull(log, 1.0) if o[2] == "display"]
+            assert not bad and not caught, (name, bad, [str(w.message) for w in caught])
+    # the detector itself sees a planted overfull display
+    planted = "Overfull \\hbox (74.6pt too wide) detected at line 67\n" \
+              "Overfull \\hbox (3.0pt too wide) in paragraph at lines 3--4\n"
+    assert overfull(planted) == [(74.6, 67, "display"), (3.0, 3, "paragraph")]
