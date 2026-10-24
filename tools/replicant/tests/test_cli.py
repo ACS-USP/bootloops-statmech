@@ -107,6 +107,29 @@ def test_cli_unknown_parameter_is_refused_with_exit_2():
     assert "kapa, variant" in err and "accepted: alpha, kappa" in err, err
 
 
+@slow
+def test_cli_1rsb_route_refuses_unknown_parameters():
+    """Fix round 1, Important 3: the 1RSB route refuses an unread name (composed and catalog
+    specs alike) instead of noting it."""
+    import tempfile
+    spec = {"family": "perceptron", "variables": "ising", "disorder": "gaussian",
+            "constraint": "margin kappa", "params": {"alpha": None}}
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+        json.dump(spec, f)
+    try:
+        code, out, err = _main(["run", f.name, "--param", "ansatz=1rsb", "--param",
+                                "frozen=true", "--param", "solve_for=alpha", "--param",
+                                "kappa=0", "--param", "kapa=0.3"])
+    finally:
+        os.unlink(f.name)
+    assert code == 2 and err.startswith("REFUSED: precondition:known-parameter"), err
+    assert "kapa" in err and "accepted: kappa" in err, err
+    code, out, err = _main(["run", "sk", "--param", "ansatz=1rsb", "--param", "beta=2",
+                            "--param", "h=0", "--param", "hh=5"])
+    assert code == 2 and err.startswith("REFUSED: precondition:known-parameter"), err
+    assert "hh" in err and "accepted: beta, h" in err, err
+
+
 def test_cli_ansatz_param_selects_the_1rsb_route():
     code, out, err = _main(["run", "sk", "--param", "ansatz=2rsb"])
     assert code == 2 and err.startswith("REFUSED: missing-step:ansatz:2rsb"), err

@@ -44,6 +44,16 @@ def test_compose_1rsb_reports_steps_relative_to_rs():
                                              "rsb-stationarity", "solve-derived-1rsb"]
 
 
+def test_compose_1rsb_report_is_computed_from_the_step_lists():
+    from replicant.compose_rsb import rsb_report
+    rep = rsb_report(_ising_perceptron(), {"zero_temperature": True})
+    assert rep.reused == ["replicate", "average-disorder", "introduce-order-parameters"]
+    assert [a.hook for a in rep.adapted] == ["rsb-ansatz", "rsb-replica-limit",
+                                             "zero-temperature-limit", "rsb-stationarity",
+                                             "solve-derived-1rsb"], rep.adapted
+    assert rep.adapted[2].step == "(new step)", rep.adapted[2]
+
+
 def test_compose_unknown_ansatz_and_route_refuse():
     assert _refusal(lambda: compose(_ising_perceptron(), ansatz="2rsb")).reason == \
         "missing-step:ansatz:2rsb"

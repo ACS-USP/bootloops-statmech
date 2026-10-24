@@ -14,6 +14,9 @@ solve_derived_rsb.py).
   singularities close to the real axis (U = i pi/2 at |Im t| ~ pi/(2 sqrt(qhat))), and a
   200-node Gauss-Hermite rule was measured 1e-8 off on Hopfield equations (alpha = 0.05,
   beta = 3) where both composite rules agree to 1e-13.
+  QuadNum(expr, args).value(vals) the same expression through a separate evaluation path
+                                  (scalar math-module code, adaptive QUADPACK): the
+                                  independent audit of the accepted roots
 A non-finite integrand value (float underflow such as ln 0 far in a tail) counts as 0
 where the product weight is below 1e-25; elsewhere, or for a complex or non-finite
 result, ValueError.  erfc is kept as written (_derived_num.safe).  Nothing here is
@@ -22,6 +25,7 @@ gauss_rsb before evaluation) or features narrower than the node spacing; the
 main-vs-audit difference is the check, reported by the solver as quad_error.
 """
 import math
+import warnings
 
 import numpy as np
 import sympy as sp
@@ -131,3 +135,64 @@ class NestedNum:
         if not math.isfinite(v):
             raise ValueError(f"non-finite value {v}")
         return v
+
+
+
+_MATH = [{"Erfc": math.erfc}, "math"]
+
+
+class QuadNum:
+    """The same derived expression through an INDEPENDENT evaluation path: lambdified
+    separately for the scalar `math` module (not the numpy code of NestedNum), each
+    expectation by adaptive QUADPACK (scipy.integrate.quad on the real line, epsabs 1e-13,
+    epsrel 1e-12), the inner one recomputed at every outer abscissa.  Used for the accepted
+    roots only (about 0.1-1 s per nested expression)."""
+    def __init__(self, expr, args):
+        expr = safe(sp.sympify(expr))
+        self.args = list(args)
+        tops = top_atoms(expr)
+        dum = [sp.Dummy(f"A{k}") for k in range(len(tops))]
+        self.outer = sp.lambdify(dum + self.args, expr.xreplace(dict(zip(tops, dum))), _MATH)
+        self.atoms = []
+        for A in tops:
+            inner = top_atoms(A.f)
+            if any(top_atoms(B.f) for B in inner):
+                raise Refusal("precondition:nesting-depth", str(A))
+            idum = [sp.Dummy(f"B{k}") for k in range(len(inner))]
+            F = sp.lambdify([A.z] + idum + self.args, A.f.xreplace(dict(zip(inner, idum))),
+                            _MATH)
+            fs = []
+            for B in inner:
+                w = sp.Dummy("w", real=True)
+                fs.append(sp.lambdify([A.z, w] + self.args, B.f.xreplace({B.z: w}), _MATH))
+            self.atoms.append((F, fs))
+
+    @staticmethod
+    def _E(g):
+        from scipy.integrate import IntegrationWarning, quad
+        c = 1 / math.sqrt(2 * math.pi)
+
+        def h(z):
+            d = c * math.exp(-z * z / 2)
+            if d < _TINY:               # float under/overflow far in a tail counts as 0 there
+                try:
+                    y = g(z) * d
+                except (ZeroDivisionError, OverflowError, ValueError):
+                    return 0.0
+                return y if math.isfinite(y) else 0.0
+            return g(z) * d
+        # QUADPACK's roundoff warnings (requested 1e-12 unreachable in float64) are not
+        # shown: the audit's verdict is the residual of the equations, compared with audit_tol
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", IntegrationWarning)
+            return quad(h, -math.inf, math.inf, epsabs=1e-13, epsrel=1e-12, limit=200)[0]
+
+    def value(self, vals):
+        vals = [float(v) for v in vals]
+        got = [self._E(lambda t, F=F, fs=fs: F(t, *[self._E(lambda u, f=f: f(t, u, *vals))
+                                                     for f in fs], *vals))
+               for F, fs in self.atoms]
+        v = self.outer(*got, *vals)
+        if isinstance(v, complex) or not math.isfinite(v):
+            raise ValueError(f"non-finite or complex value {v}")
+        return float(v)

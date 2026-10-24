@@ -98,6 +98,13 @@ def test_abs_split_rule():
         assert abs(sp.N(closed.subs(pt), 30) - direct) < 1e-25
 
 
+def test_abs_split_refuses_a_non_linear_exponent():
+    assert _refusal(lambda: GR.abs_split(sp.exp(sp.sqrt(sp.Abs(x))))) == \
+        "precondition:abs-linear-exponent"
+    assert _refusal(lambda: GR.abs_split(sp.exp(sp.Abs(x) + sp.Abs(x - 1)))) == \
+        "precondition:abs-linear-exponent"
+
+
 def test_zero_temperature_power_rule():
     beta = sp.Symbol("beta", positive=True)
     e = sp.log(GaussE((sp.exp(beta * (a + b * u)) + sp.exp(-beta * (a + b * u)))**(mu / beta), u))

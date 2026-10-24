@@ -4,7 +4,9 @@
       each conjugate qhat_j is solved from d phi/d q_j = 0 when that equation is linear in
       qhat_j outside every expectation and qhat_j occurs in none of them; psi(rest) =
       phi(rest, S(rest)) has the same stationary points (d psi/d q = phi_qhat S'(q),
-      d psi/d x = phi_x), and it is the functional the replica rule extremises
+      d psi/d x = phi_x).  Its Hessian has NO max/min meaning in general (the meaningful
+      reduction eliminates qhat through d phi/d qhat = 0: solve_derived_rsb_post.schur_hessian);
+      the T = 0 functional below is built from psi, so its Hessian is only a heuristic label
   zero_temperature_limit() -> Step "zero-temperature-limit" (State key `rsb_t0`)
       psi with q1 = 1 and x = mu/beta, then lim_{beta->oo} psi/beta (derive_rsb docstring);
       the finite-beta positivity conditions are dropped (the T = 0 expectations are closed

@@ -100,6 +100,7 @@ def test_frozen_site_reduction_matches_brute_force_at_integer_n():
     assert abs(got - float(brute)) < 1e-12, (got, float(brute))
 
 
+@slow
 def test_gaussian_energy_reduction_matches_the_determinant_at_integer_n():
     # E_y prod_a exp(b y_a^2 / 2), y ~ N(0, C), C 1RSB: = det(I - b C)^(-1/2) exactly
     bv = sp.Rational(1, 5)
