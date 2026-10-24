@@ -344,6 +344,14 @@ def _valid_n(n):
     return n if isinstance(n, sp.Symbol) else None
 
 
+def _tex(name):
+    """The step's TeX hook (derive_tex.HOOKS, imported when a document is written)."""
+    def hook(old, new):
+        from .derive_tex import HOOKS
+        return HOOKS[name](old, new)
+    return hook
+
+
 def replicate(spec: ModelSpec, n) -> Step:
     def requires(state):
         missing = []
@@ -366,7 +374,7 @@ def replicate(spec: ModelSpec, n) -> Step:
         kw = {"spec": spec} if "spec" in inspect.signature(formal).parameters else {}
         return state.with_(Zn=Replicated(spec, m, beta, formal(m, beta, **kw)))
 
-    return Step("replicate", requires, apply)
+    return Step("replicate", requires, apply, tex=_tex("replicate"))
 
 
 def _order_in_N(expr, N):
@@ -389,7 +397,7 @@ def average_disorder() -> Step:
         return state.with_(avg=FAMILIES[zn.spec.family].average(zn))
 
     return Step("average-disorder", requires, apply,
-                note=lambda s: s["avg"].note)
+                note=lambda s: s["avg"].note, tex=_tex("average-disorder"))
 
 
 def introduce_order_parameters() -> Step:
@@ -417,7 +425,8 @@ def introduce_order_parameters() -> Step:
             spec, n, N_SYM, q, qh, red.energy, red.correction, entropic, expr,
             zero, red.missing, dict(red.extra or {}), site.conjugate))
 
-    return Step("introduce-order-parameters", requires, apply)
+    return Step("introduce-order-parameters", requires, apply,
+                tex=_tex("introduce-order-parameters"))
 
 
 def saddle_equations() -> Step:
@@ -439,7 +448,7 @@ def saddle_equations() -> Step:
                for v in list(F.q.values()) + list(F.qhat.values())]
         return state.with_(equations=eqs)
 
-    return Step("saddle-equations", requires, apply)
+    return Step("saddle-equations", requires, apply, tex=_tex("saddle-equations"))
 
 
 # --- replica symmetry, n -> 0, stationarity ------------------------------------
@@ -591,7 +600,7 @@ def rs_ansatz() -> Step:
         return state.with_(rs=RSFunctional(F.spec, F.n, expr, params, rules, sites=sites))
 
     return Step("rs-ansatz", requires, apply,
-                note=lambda s: "RS; rules: " + "; ".join(s["rs"].rules))
+                note=lambda s: "RS; rules: " + "; ".join(s["rs"].rules), tex=_tex("rs-ansatz"))
 
 
 def replica_limit() -> Step:
@@ -607,7 +616,7 @@ def replica_limit() -> Step:
     return Step("replica-limit", requires, apply,
                 note=lambda s: ("n -> 0: polynomial part by ansatz.n_to_zero, the rest by "
                                 "d/dn at n = 0, i.e. (1/n) ln E[f^n] -> E ln f; "
-                                + s["rs_free"].caveat))
+                                + s["rs_free"].caveat), tex=_tex("replica-limit"))
 
 
 def rs_stationarity() -> Step:
@@ -621,7 +630,8 @@ def rs_stationarity() -> Step:
         return state.with_(rs_equations=[sp.Eq(sp.diff(P.expr, p), 0) for p in P.params])
 
     return Step("rs-stationarity", requires, apply,
-                note=lambda s: "d/d" + ", d/d".join(str(p) for p in s["rs_free"].params))
+                note=lambda s: "d/d" + ", d/d".join(str(p) for p in s["rs_free"].params),
+                tex=_tex("rs-stationarity"))
 
 
 def annealed_log_Z(spec: ModelSpec, N) -> sp.Expr:

@@ -3,6 +3,7 @@
   python3 -m replicant list
   python3 -m replicant run <entry|spec.json> [--route replica|cavity]
                            [--param k=v ...] [--out result.json]
+                           [--latex derivation.tex [--pdf]]
 
 `run` composes the calculation (compose.compose), runs it, writes the JSON result
 (values, errors, rigor, route, stable, final, notes, the composition report, the trace
@@ -16,6 +17,11 @@ stays a string (e.g. learning=bayes).  spec.json: {"family", "variables",
 "disorder", "constraint", "prior", "params"}; a param given as null is left symbolic
 (beta, h, alpha, kappa: the derivation's own symbols); numbers are run parameters.
 `build_result(...)` returns the Result object, so writers (e.g. LaTeX) can be added.
+--latex PATH writes the derivation document (latex.write_latex: the steps with their
+equations, citations, the check table and the labels); --pdf also compiles it (tectonic
+or pdflatex; refused precondition:tex-engine when neither is on PATH).  A refused run
+with --latex still writes the document of its partial derivation and the reason, then
+exits 2.  --pdf without --latex is refused (precondition:latex-path).
 """
 import argparse
 import json
@@ -29,6 +35,7 @@ from .catalog import catalog
 from .compose import compose
 from .core import Refusal
 from .derive_families import ALPHA, KAPPA
+from .latex import write_latex
 from .spec import ModelSpec
 
 _SYMBOLS = {"beta": D.BETA, "h": D.H_FIELD, "alpha": ALPHA, "kappa": KAPPA}
@@ -146,16 +153,27 @@ def main(argv=None, stdout=None, stderr=None):
     run.add_argument("--route", default="replica")
     run.add_argument("--param", action="append", default=[])
     run.add_argument("--out")
+    run.add_argument("--latex")
+    run.add_argument("--pdf", action="store_true")
     args = ap.parse_args(argv)
     if args.cmd == "list":
         for name, e in catalog().items():
             print(f"{name:16s} routes={','.join(sorted(e.routes)):15s} {e.cite}", file=stdout)
         return 0
     try:
+        if args.pdf and not args.latex:
+            raise Refusal("precondition:latex-path", "--pdf needs --latex PATH")
         params = dict(parse_param(p) for p in args.param)
         spec, res = build_result(args.target, args.route, params)
         doc = result_json(args.target, spec, res)
+        if args.latex:
+            written = write_latex(res, args.latex, pdf=args.pdf)
+            print(f"latex: wrote {written}", file=stderr)
     except Refusal as r:
+        if args.latex and not r.reason.startswith(("precondition:latex-path", "tex-engine",
+                                                   "precondition:tex-engine")):
+            write_latex(r, args.latex)
+            print(f"latex: wrote the refused calculation to {args.latex}", file=stderr)
         print(f"REFUSED: {r.reason}: {r.detail}", file=stderr)
         return 2
     except Exception as exc:          # not a named refusal: report it, never a traceback

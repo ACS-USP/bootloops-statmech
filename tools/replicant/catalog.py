@@ -20,6 +20,9 @@ and refuses require_final when any value is not final.  Honest labels: every rou
 RS/1RSB ansaetze, or the cavity clustering assumptions); population-dynamics numbers are
 statistical (value +- stderr over independent runs), never certified.
 
+Each entry also exposes derivation(route): the equations a LaTeX document displays
+(latex.py), kept next to the family code in latex_entries.py / latex_cavity.py.
+
 Matching to model specifications (which entry a spec is, which is nearest) lives in
 compose.py; the entries themselves in catalog_entries.py and catalog_sparse.py.
 """
@@ -135,6 +138,12 @@ class CatalogEntry:
                               "declaration")
             out[k] = d(values) if callable(d) else d
         return out
+
+    def derivation(self, route=None):
+        """The displayed equations of this entry's route ([tex.TexBlock]; latex_entries.py,
+        latex_cavity.py): sympy forms checked against the family code, or cited strings."""
+        from .latex_entries import derivation
+        return list(derivation(self.name, route or self.default_route))
 
     def execute(self, route=None, **params):
         """(final State, Trace) of the route's pipeline at `params`."""

@@ -126,6 +126,7 @@ class Result:
     report: CompositionReport = None
     params: dict = field(default_factory=dict)
     entry: CatalogEntry = None
+    spec: ModelSpec = None          # the spec that was run (for writers, e.g. latex.py)
 
     def reference_checks(self, *, slow=False):
         """The entry's banked comparisons for this route (RefOutcome list); slow and
@@ -181,7 +182,8 @@ def _finalise(res: Result, finality, require_final):
             reason = f"not-final:{states[0][1]}"
         raise Refusal(reason, "; ".join(f"{k}: {st.ansatz} {st.state}" + (f" ({st.note})"
                                                                            if st.note else "")
-                                        for k, st in bad.items()))
+                                        for k, st in bad.items()),
+                      trace=res.trace, step="require-final")
     return res
 
 
@@ -206,7 +208,7 @@ class ComposedCalculation:
         res = Result(dict(values), trace, errors=dict(state["errors"]),
                      notes=[self.entry.caveats[self.route], *state["notes"]], route=self.route,
                      statistical=tuple(state["statistical"]), report=self.report, params=p,
-                     entry=self.entry)
+                     entry=self.entry, spec=self.spec)
         return _finalise(res, self.entry.finality_of(values), require_final)
 
     def _run_composed(self, require_final, params):
@@ -224,7 +226,7 @@ class ComposedCalculation:
         res = Result(values, trace, errors={"residual": sol.residual,
                                             "quad_error": sol.quad_error},
                      notes=[sol.caveat, *lift, sol.note], route="replica", report=self.report,
-                     params={**point, **knobs})
+                     params={**point, **knobs}, spec=self.spec)
         rep = "" if sol.replicon is None else f"derived replicon {sol.replicon}"
         fin = {k: from_flag(sol.stable, "rs", LEVEL_A_CITE, rep or "replicon not derived")
                for k in values if k not in ("branch", "ansatz", "stable")}
@@ -244,7 +246,8 @@ def level_a_steps(spec, point=None, knobs=None):
     return [D.replicate(spec, n), D.average_disorder(), D.introduce_order_parameters(),
             D.rs_ansatz(), D.replica_limit(), D.rs_stationarity(),
             Step("solve-derived", lambda s: [] if "rs_equations" in s else ["rs_equations"],
-                 solve, LEVEL_A_CITE, lambda s: s["solution"].trace.entries[-1].summary)]
+                 solve, LEVEL_A_CITE, lambda s: s["solution"].trace.entries[-1].summary,
+                 D._tex("solve-derived"))]
 
 
 # ---- compose ------------------------------------------------------------------------
