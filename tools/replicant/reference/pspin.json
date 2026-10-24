@@ -1,0 +1,26 @@
+{
+  "ts_p3": {
+    "value": "0.586",
+    "tol": "5e-4",
+    "cite": "Static (1RSB, Kauzmann) transition of the spherical p-spin, p = 3, couplings of variance J^2 p!/(2 N^(p-1)), J = 1. Read from Cugliandolo, Lozano & Nessi, J. Stat. Mech. (2017) 083301, doi:10.1088/1742-5468/aa7dfb, arXiv:1703.10080, Sec. 2.2.1, Eq. (12) and text: 'Specializing to the p = 3 case, Ts = 0.586 J', and Table 1; same value in Barrat, arXiv:cond-mat/9701031 (1997), Fig. 4 caption 'TS = 0.586'. Original: Crisanti & Sommers, Z. Phys. B 87, 341 (1992), doi:10.1007/BF01309287 (paywalled, not fetched). tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own solve of its functional (ln det from the 1RSB eigenvalues checked against ansatz.rsb_matrix at integer n, power sum from ansatz.sum_offdiag_power): T_s from the touching condition g(q) = g'(q) = 0 of the m-equation at m = 1 (2D findroot), agreeing with the y-parametrised solution 0.5860540 to 1e-20"
+  },
+  "td_p3": {
+    "value": "0.612372",
+    "tol": "1e-4",
+    "cite": "Dynamic (mode-coupling) transition, same convention: Barrat, arXiv:cond-mat/9701031 (1997), Fig. 2 caption 'Td = 0.612372'; closed form T_d = sqrt(p (p-2)^(p-2) / (2 (p-1)^(p-1))) in Castellani & Cavagna, J. Stat. Mech. (2005) P05012, doi:10.1088/1742-5468/2005/05/P05012, arXiv:cond-mat/0505032, Eq. (147); Cugliandolo, Lozano & Nessi, arXiv:1703.10080, Table 1: Td = 0.6123 (rounded, within tol)",
+    "independent_route": "closed form evaluated by replicant, sqrt(3/8) = 0.6123724357, compared to the banked digits; T_d > T_s checked against replicant's own static solve"
+  },
+  "qs_p3": {
+    "value": "0.645",
+    "tol": "5e-4",
+    "cite": "Self-overlap q_EA at T_s for p = 3, J = 1: Cugliandolo, Lozano & Nessi, J. Stat. Mech. (2017) 083301, arXiv:1703.10080, Table 1, column Ts = 0.586, row q_ea = 0.645 (Eq. (11): q_s = 1 - y)",
+    "independent_route": "q at the touching point of replicant's own m = 1 equation g(q) = g'(q) = 0 (same 2D solve as ts_p3): 0.6450075"
+  },
+  "e0_p3": {
+    "value": "-1.172",
+    "tol": "5e-4",
+    "cite": "Equilibrium (1RSB) ground-state energy per spin for p = 3, J = 1: Cugliandolo, Lozano & Nessi, J. Stat. Mech. (2017) 083301, arXiv:1703.10080, Table 1, column T = 0, row e_eq = -1.172",
+    "independent_route": "replicant's own 1RSB solution at beta = 1e4, e = -(beta/2)(1 + (m-1) q^p) at the stationary point: -1.17168 (T -> 0 limit q = 1 - aT, m = bT)"
+  }
+}

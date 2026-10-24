@@ -39,7 +39,6 @@ Honest label: the n -> 0 continuation and the RS/1RSB ansatze are
 physics-level (Parisi), not proven; the numbers carry quadrature error only.
 """
 import math
-from dataclasses import dataclass
 from functools import lru_cache
 
 import mpmath as mp
@@ -49,31 +48,10 @@ import sympy as sp
 from ..ansatz import n_to_zero, sum_offdiag_power
 from ..core import Refusal
 from ..solve import fixed_point, gauss_expect
+from .common import CAVEAT, RSBSolution, RSSolution  # noqa: F401 (re-exported)
 
-CAVEAT = ("physics-level: replica n->0 continuation and RS/1RSB ansatz "
-          "(Parisi), not proven; numbers carry quadrature error only")
 _DPS = 15
 _BETA_MAX_1RSB = 3.0
-
-
-@dataclass(frozen=True)
-class RSSolution:
-    q: object
-    f: object
-    e: object
-    stable: bool
-    replicon: object = None
-    caveat: str = CAVEAT
-
-
-@dataclass(frozen=True)
-class RSBSolution:
-    q0: object
-    q1: object
-    m: object
-    f: object
-    e: object
-    caveat: str = CAVEAT
 
 
 def quadratic_term(kind):

@@ -1,0 +1,20 @@
+{
+  "tc_derrida": {
+    "value": "0.60056120439322489742890",
+    "tol": "1e-20",
+    "cite": "Derrida, The random energy model, Physics Reports 67, 29-35 (1980), Sec. 4: 'T_c = J/2 sqrt(log 2)' with P(E) = (pi N J^2)^(-1/2) exp(-E^2/(N J^2)), Eq. (2); read from the copy at thp.uni-koeln.de/krug/teaching-Dateien/WS2011/Derrida1980.pdf. Same statement in Derrida & Mottishaw, J. Stat. Mech. (2015) P01021, doi:10.1088/1742-5468/2015/01/P01021, arXiv:1410.1432, Eq. (2). Full paper Derrida, Phys. Rev. B 24, 2613 (1981), doi:10.1103/PhysRevB.24.2613 (not fetched). The paper states the closed form; value = its decimal at J = 1 (replicant N_scale = J^2/2 = 1/2)",
+    "independent_route": "Derrida's microcanonical argument redone numerically: root e0 < 0 of replicant's s(e) = ln 2 - e^2/(2 N_scale) and the slope s'(e0) = beta_c (tests, three N_scale values); plus the exact finite-N quenched E ln Z by quadrature (no replicas), which follows the frozen branch above beta_c"
+  },
+  "ground_energy_derrida": {
+    "value": "-0.83255461115769775635316",
+    "tol": "1e-20",
+    "cite": "Derrida, Physics Reports 67, 29 (1980), Sec. 5: for T < T_c 'the system is frozen in its ground state and the energy is E = -N J sqrt(log 2)'; also Derrida & Mottishaw, arXiv:1410.1432, Eq. (3). Closed form, decimal at J = 1. In the frozen phase f = E_ground / N (entropy 0)",
+    "independent_route": "replicant's 1RSB route (rem_1rsb: n/m groups of m coincident replicas, m* = beta_c/beta) gives -beta f = beta sqrt(2 N_scale ln 2), equal to -beta * (-sqrt(ln 2)) at N_scale = 1/2; the exact finite-N quenched quadrature approaches it as N grows"
+  },
+  "m_times_beta_over_beta_c": {
+    "value": "1",
+    "tol": "1e-20",
+    "cite": "Derrida & Mottishaw, J. Stat. Mech. (2015) P01021, arXiv:1410.1432, Eqs. (4)-(6): Parisi q(x) = Theta(x - 1 + <P2>) with <P2> = 1 - mu, mu = T/T_c below T_c, so the 1RSB breakpoint is m = T/T_c = beta_c/beta; same in Derrida & Mottishaw, J. Phys. A 55 (2022), doi:10.1088/1751-8121/ac71e9, arXiv:2202.12584, Eq. (5) (<Y_2> = 1 - beta_c/beta). Meaning: m * beta / beta_c = 1 for beta >= beta_c",
+    "independent_route": "replicant derives m* symbolically: -beta f(m) = ln 2 / m + N_scale beta^2 m / 2, the energy part from ansatz.sum_offdiag_power (q in {0, 1}) with ansatz.n_to_zero, the entropy part from (2^N)^(n/m) block choices; sympy solves d/dm = 0 to sqrt(2 ln 2 / N_scale)/beta"
+  }
+}
