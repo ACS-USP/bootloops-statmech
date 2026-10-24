@@ -39,7 +39,7 @@ import mpmath as mp
 import numpy as np
 
 from ..core import Refusal
-from ..families.common import HopfieldSolution
+from ..families.common import CAVITY_CAVEAT, HopfieldSolution
 from . import _quad as Q
 
 BRANCHES = ("retrieval", "spinglass", "paramagnet")
@@ -167,7 +167,8 @@ def _solution(a, b, law, branch, m, s, mode, note):
     note += (f"; cavity susceptibility lambda = {mp.nstr(lam, 6)}: "
              + ("RS locally stable" if lam > 0 else "RS AT-unstable (RS kept as RS)"))
     return HopfieldSolution(mp.mpf(m), mp.mpf(q), mp.mpf(r), branch, None,
-                            residual=mp.mpf(res), note="cavity route: " + note, **lab)
+                            residual=mp.mpf(res), note="cavity route: " + note,
+                            caveat=CAVITY_CAVEAT, **lab)
 
 
 def _mattis(b):

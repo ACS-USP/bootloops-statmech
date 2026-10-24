@@ -46,7 +46,7 @@ import mpmath as mp
 import numpy as np
 
 from ..core import Refusal
-from ..families.common import CAVEAT, Capacity
+from ..families.common import CAVITY_CAVEAT, Capacity
 from . import _quad as Q
 
 _MEZARD = "Mezard, J. Phys. A 22, 2181 (1989)"
@@ -63,7 +63,7 @@ class GardnerPoint:
     S: object
     stability: object
     kappa: object
-    caveat: str = CAVEAT
+    caveat: str = CAVITY_CAVEAT
 
 
 def _series(x):                           # x H(x)/phi(x), asymptotic (x >= 25)
@@ -224,4 +224,5 @@ def capacity(kappa_key) -> Capacity:
         else:
             note = "kappa < 0: cavity stability < 0 at capacity; RS alpha_c only an upper bound"
         return Capacity(ac, bool(lam >= 0), "rs", "spherical", k, lam,
-                        "cavity route (q -> 1 of the closure): " + note)
+                        "cavity route (q -> 1 of the closure): " + note,
+                        caveat=CAVITY_CAVEAT)

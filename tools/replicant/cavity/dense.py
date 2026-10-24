@@ -57,7 +57,8 @@ Beyond" (1987), ch. V; J_ij ~ N(0, 1/N), field h, beta = 1/T):
 
 Honest label: the cavity method (clustering of the Gibbs measure, Gaussian
 cavity fields, the RS single-state assumption) is physics-level, not proven
-here; outputs carry CAVEAT.  Numbers carry quadrature error only (float64).
+here; outputs carry CAVITY_CAVEAT (families/common.py), not the replica CAVEAT.
+Numbers carry quadrature error only (float64).
 """
 import math
 from dataclasses import dataclass
@@ -67,7 +68,7 @@ import mpmath as mp
 import numpy as np
 
 from ..core import Refusal, State, Step, run_pipeline
-from ..families.common import CAVEAT, RSSolution
+from ..families.common import CAVITY_CAVEAT, RSSolution
 from . import _quad as Q
 from .dense_hopfield import HopfieldCavity, energy as _hop_energy
 from .dense_perceptron import GardnerCavity, capacity as _capacity
@@ -224,7 +225,7 @@ def _sk_close(beta, h, require_stable, law, site):
     mbf = lncosh + b * b * law.thermal_of(q) / 2 + b * e_j / 2
     lam = 1 - avg(lambda u, z: site.response(u)**2, q)
     sol = RSSolution(mp.mpf(q), mp.mpf(-mbf / b), mp.mpf(e_j - hh * mag), bool(lam >= 0),
-                     mp.mpf(lam), CAVEAT)
+                     mp.mpf(lam), CAVITY_CAVEAT)
     if require_stable and not sol.stable:
         raise Refusal("unstable:rs", f"cavity stability lambda = 1 - beta^2 E(1 - m^2)^2 = "
                       f"{mp.nstr(lam, 6)} < 0 at beta={beta}, h={h} (chi_SG diverges; the "

@@ -22,7 +22,7 @@ from replicant.cavity import dense as D
 from replicant.cavity import (cavity_gardner_capacity, cavity_gardner_entropy,
                               cavity_hopfield_rs, cavity_sk_rs, run_cavity)
 from replicant.core import Refusal, State, run_pipeline
-from replicant.families.common import CAVEAT
+from replicant.families.common import CAVITY_CAVEAT
 from replicant.families.hopfield import hopfield_rs
 from replicant.families.perceptron import gardner_capacity, gardner_entropy
 from replicant.families.sk import sk_rs
@@ -62,7 +62,7 @@ def test_cavity_sk_equals_replica_sk():
     for beta, h in (("1.5", "0"), ("0.9", "0.3")):
         c, r = cavity_sk_rs(beta, h), sk_rs(beta, h)
         assert _sk_agree(c, r), (beta, h, c, r)
-        assert c.q > 0 and c.caveat == CAVEAT
+        assert c.q > 0 and c.caveat == CAVITY_CAVEAT
     # paramagnet: h = 0 above T_c the cavity field has zero variance, q = 0 exactly
     c, r = cavity_sk_rs("0.9"), sk_rs("0.9")
     assert c.q == 0 == r.q and _sk_agree(c, r), (c, r)
@@ -85,7 +85,7 @@ def test_cavity_hopfield_equals_replica_hopfield():
         for br in ("retrieval", "spinglass"):
             c, r = cavity_hopfield_rs(a, b, branch=br), hopfield_rs(a, b, branch=br)
             assert _hop_agree(c, r), (a, b, br, c, r)
-            assert c.caveat == CAVEAT and "cavity" in c.note
+            assert c.caveat == CAVITY_CAVEAT and "cavity" in c.note
     c, r = cavity_hopfield_rs("0.05", "0.8", branch="paramagnet"), \
         hopfield_rs("0.05", "0.8", branch="paramagnet")
     assert c.m == c.q == c.r == 0 and _hop_agree(c, r), (c, r)
@@ -154,7 +154,8 @@ def test_cavity_perceptron_equals_replica_gardner_spherical():
     c0 = cavity_gardner_capacity("spherical")
     assert check(load("perceptron")["spherical_capacity_kappa0"], c0.alpha_c,
                  label="cavity alpha_c(0)").ok, c0
-    assert abs(c0.alpha_c - 2) < mp.mpf("1e-12") and c0.ansatz == "rs" and c0.caveat == CAVEAT
+    assert abs(c0.alpha_c - 2) < mp.mpf("1e-12") and c0.ansatz == "rs"
+    assert c0.caveat == CAVITY_CAVEAT
     k = mp.mpf("0.5")
     c, r = cavity_gardner_capacity("spherical", k), gardner_capacity("spherical", k)
     with mp.workdps(30):        # the spherical integral formula, closed form

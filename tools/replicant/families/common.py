@@ -57,6 +57,7 @@ class Capacity:
     caveat: str = CAVEAT
 
 CAVITY_CAVEAT = ("physics-level: cavity / population-dynamics results assume clustering "
-                 "(decorrelated cavity fields), a single RS state and tree-like local "
-                 "structure; not proven; population-dynamics outputs are statistical "
-                 "(value +- stderr from independent runs), not certified")
+                 "(decorrelated cavity fields), a single RS state or the stated RSB "
+                 "structure, and Gaussian (dense) or tree-like (sparse) cavity fields; not "
+                 "proven; population-dynamics outputs are statistical (value +- stderr from "
+                 "independent runs), not certified")
