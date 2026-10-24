@@ -1,0 +1,226 @@
+"""Catalog: published calculations as recorded pipelines of typed Steps.
+
+  catalog() -> dict[str, CatalogEntry]      the v1 entries (built once)
+  check_ref(entry, ref) -> RefOutcome       run the entry where `ref` says, compare
+  UNCLAIMED                                 bank keys no entry reproduces, with reasons
+
+An entry is a ModelSpec, its citation, the routes it has ("replica" = the level-(b)
+family pipeline; "cavity" = the cavity pipeline), one list of Steps per route, and the
+banked keys it reproduces (RefCheck).  Each family call is wrapped as a core.Step with
+its citation, so a run returns a core.Trace a reader can follow to the paper.  Steps
+read State["params"] and add to State["values"] (plus "errors": numerical error bars,
+"statistical": the value keys that come from sampling, "notes").  A step that does not
+apply to the given parameters (e.g. a T = 0 headline when beta is given) is recorded
+in the trace as "skipped: ...", never silently dropped.
+
+Values that come from a saddle point carry values["ansatz"] and values["stable"]
+(True / False / None = not established by the pipeline); compose.Result turns that into
+the finality statement.  Honest labels: every route is physics-level (replica n -> 0 and
+RS/1RSB ansaetze, or the cavity clustering assumptions); population-dynamics numbers are
+statistical (value +- stderr over independent runs), never certified.
+
+Matching to model specifications (which entry a spec is, which is nearest) lives in
+compose.py; the entries themselves in catalog_entries.py and catalog_sparse.py.
+"""
+import math
+from dataclasses import dataclass, field
+from typing import Callable
+
+import mpmath as mp
+
+from .core import Refusal, State, Step, run_pipeline
+from .refdata import check, load
+from .spec import ModelSpec
+
+
+@dataclass(frozen=True, eq=False)
+class RefCheck:
+    """Banked key `file`/`key` is reproduced by running the entry on `route` with
+    `params` and reading `extract(values)`.  Statistical keys are compared in a 99%
+    Student-t band on hypot(stderr, tol), stderr = error(errors), df = runs - 1."""
+    file: str
+    key: str
+    extract: Callable[[dict], object]
+    statistical: bool = False
+    params: dict = field(default_factory=dict)
+    route: str = "replica"
+    slow: bool = False
+    error: Callable[[dict], object] | None = None
+    runs: int | None = None
+
+
+@dataclass(frozen=True)
+class RefOutcome:
+    file: str
+    key: str
+    ok: bool
+    got: str
+    want: str
+    tol: str
+    statistical: bool
+    detail: str = ""
+
+
+@dataclass(frozen=True, eq=False)
+class CatalogEntry:
+    name: str
+    spec: ModelSpec
+    steps: list            # the default route's Steps (route_steps[default_route])
+    cite: str
+    routes: set
+    refs: list
+    run: Callable[..., dict]          # run(route=None, **params) -> values
+    route_steps: dict = field(default_factory=dict)
+    caveats: dict = field(default_factory=dict)       # route -> honest label
+    description: str = ""
+    default_route: str = "replica"
+
+    def execute(self, route=None, **params):
+        """(final State, Trace) of the route's pipeline at `params`."""
+        route = route or self.default_route
+        if route not in self.routes:
+            raise Refusal(f"missing-step:route:{route}",
+                          f"catalog entry {self.name!r} has routes "
+                          f"{', '.join(sorted(self.routes))}")
+        init = State(params=dict(params), values={}, errors={}, statistical=(), notes=(),
+                     step_note="")
+        return run_pipeline(self.route_steps[route], init)
+
+
+@dataclass(frozen=True)
+class Out:
+    values: dict
+    note: str = ""
+    errors: dict = field(default_factory=dict)
+    statistical: tuple = ()
+    notes: tuple = ()
+
+
+def fstep(name, cite, compute, *, when=None, skip=""):
+    """A family call as a Step: compute(params) -> Out.  `when(params)` False -> the
+    step is recorded as skipped (with `skip` as the reason) and changes no value."""
+    def apply(s):
+        p = s["params"]
+        if when is not None and not when(p):
+            return s.with_(step_note=f"skipped: {skip}")
+        out = compute(p)
+        return s.with_(values={**s["values"], **out.values},
+                       errors={**s["errors"], **out.errors},
+                       statistical=tuple(dict.fromkeys(s["statistical"] + tuple(out.statistical))),
+                       notes=s["notes"] + tuple(out.notes),
+                       step_note=out.note or "computed " + ", ".join(out.values))
+
+    return Step(name, lambda s: [] if "params" in s else ["params"], apply, cite,
+                lambda s: s["step_note"])
+
+
+def entry(name, spec, cite, route_steps, refs, caveats, description, default_route="replica"):
+    holder = {}
+
+    def run(route=None, **params):
+        return holder["e"].execute(route, **params)[0]["values"]
+
+    e = CatalogEntry(name, spec, route_steps[default_route], cite, set(route_steps), refs, run,
+                     route_steps, caveats, description, default_route)
+    holder["e"] = e
+    return e
+
+
+def has(*keys):
+    return lambda p: all(p.get(k) is not None for k in keys)
+
+
+def lacks(*keys):
+    return lambda p: all(p.get(k) is None for k in keys)
+
+
+def mpf30(x):
+    """Decimal string of an mpf at 30 digits (an mpf keeps its own precision; str()
+    would print only the global 15)."""
+    return mp.nstr(x, 30) if isinstance(x, mp.mpf) else x
+
+
+# ---- bank keys no entry claims ---------------------------------------------------------
+_HELD_OUT = ("Ising perceptron: held out of the catalog on purpose (Task 16 composes it "
+             "from the spherical perceptron entry, and the composer must not look its "
+             "answer up); level (b) gardner_capacity('ising') reproduces it in "
+             "tests/test_perceptron.py")
+UNCLAIMED = {
+    ("sk", "fullrsb_ground_energy"):
+        "literature-only full-RSB (Parisi) value: no full-RSB solver in the catalog until "
+        "Task 17 (families/parisi.py)",
+    ("sk", "at_small_field_coefficient"):
+        "an h -> 0 extrapolation of h^2/(1 - T_AT)^3 over three AT-line points, done in "
+        "tests/test_sk.py (slow): not the output of any pipeline step",
+    ("perceptron", "ising_rs_capacity"): _HELD_OUT,
+    ("perceptron", "ising_1rsb_capacity"): _HELD_OUT,
+    ("perceptron", "ising_1rsb_q"): _HELD_OUT,
+    ("perceptron", "ising_1rsb_qhat"): _HELD_OUT,
+    ("hopfield", "low_alpha_error_prefactor"):
+        "an alpha -> 0 extrapolation of (1 - m) e^{1/(2 alpha)}/sqrt(alpha) from two T = 0 "
+        "points, done in tests/test_hopfield.py: not a pipeline output",
+    ("hopfield", "tg_sqrt_alpha_coefficient"):
+        "located by bisection on the existence of the spin-glass branch in "
+        "tests/test_hopfield.py (slow): not a pipeline output",
+    ("hopfield", "alpha_c_rs_max_over_T"):
+        "the maximum over T of alpha_c(T), located by a three-point scan in "
+        "tests/test_hopfield.py (slow): not a pipeline output",
+}
+
+
+# ---- reference checks --------------------------------------------------------------------
+_RUNS = {}
+
+
+def _freeze(p):
+    return tuple(sorted((k, tuple(v) if isinstance(v, list) else v) for k, v in p.items()))
+
+
+def run_cached(e: CatalogEntry, route, params):
+    """(values, errors) of one run, memoised per (entry, route, params) in this process
+    (several banked keys come from one population-dynamics run)."""
+    key = (e.name, route, _freeze(params))
+    if key not in _RUNS:
+        state, _ = e.execute(route, **params)
+        _RUNS[key] = (state["values"], state["errors"])
+    return _RUNS[key]
+
+
+def compare(e: CatalogEntry, ref: RefCheck, values, errors) -> RefOutcome:
+    want = load(ref.file)[ref.key]
+    try:
+        got = ref.extract(values)
+    except (KeyError, TypeError) as exc:
+        raise Refusal("precondition:reference-quantity",
+                      f"{e.name}: {ref.file}/{ref.key} not in this run's values ({exc!r})")
+    if not ref.statistical:
+        c = check(want, mpf30(got), label=f"{e.name}:{ref.key}")
+        return RefOutcome(ref.file, ref.key, c.ok, c.got, c.want, c.tol, False)
+    from .cavity._stats import t_quantile
+    err = float(ref.error(errors))
+    t = t_quantile(0.995, ref.runs - 1)
+    band = t * math.hypot(err, float(want.tol))
+    ok = abs(float(got) - float(want.value)) <= band
+    return RefOutcome(ref.file, ref.key, ok, repr(float(got)), want.value, want.tol, True,
+                      f"stderr {err:.3g}, 99% Student-t band {band:.3g} (t = {t:.4g}, "
+                      f"df = {ref.runs - 1})")
+
+
+def check_ref(e: CatalogEntry, ref: RefCheck) -> RefOutcome:
+    values, errors = run_cached(e, ref.route, ref.params)
+    return compare(e, ref, values, errors)
+
+
+_CATALOG = {}
+
+
+def catalog() -> dict:
+    if not _CATALOG:
+        from .catalog_entries import dense_entries
+        from .catalog_sparse import sparse_entries
+        for e in dense_entries() + sparse_entries():
+            _CATALOG[e.name] = e
+    return dict(_CATALOG)
+
+
+__all__ = ["CatalogEntry", "RefCheck", "RefOutcome", "UNCLAIMED", "catalog", "check_ref"]

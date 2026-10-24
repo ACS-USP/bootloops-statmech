@@ -1,0 +1,97 @@
+"""CLI: `python3 -m replicant list | run <entry|spec.json> [--route R] [--param k=v ...]
+[--out result.json]` (run with tools/ on the path).  The default tier calls
+replicant.cli.main in-process (stdout / stderr captured); one slow test runs the real
+module entry point in a subprocess."""
+import io
+import json
+import os
+import subprocess
+import sys
+import tempfile
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from replicant.catalog import catalog
+from replicant.cli import main, parse_param
+from replicant.testing import slow
+
+TOOLS = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def _main(argv):
+    out, err = io.StringIO(), io.StringIO()
+    code = main(argv, stdout=out, stderr=err)
+    return code, out.getvalue(), err.getvalue()
+
+
+def test_cli_list_names_all_entries():
+    code, out, _ = _main(["list"])
+    assert code == 0
+    for name, e in catalog().items():
+        line = next(l for l in out.splitlines() if l.split()[0] == name)
+        assert ",".join(sorted(e.routes)) in line and e.cite.split(";")[0] in line, line
+
+
+def test_cli_refusal_prints_REFUSED_and_exits_2():
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "spec.json")
+        with open(path, "w") as f:
+            json.dump({"family": "xyz", "variables": "ising", "disorder": "gaussian"}, f)
+        code, out, err = _main(["run", path, "--out", os.path.join(d, "r.json")])
+        assert code == 2 and not os.path.exists(os.path.join(d, "r.json"))
+    assert err.startswith("REFUSED: missing-step:family:xyz: "), err
+    code, _, err = _main(["run", "pspin", "--route", "cavity"])
+    assert code == 2 and err.startswith("REFUSED: missing-step:route:cavity: "), err
+    code, _, err = _main(["run", "no_such_entry"])
+    assert code == 2 and err.startswith("REFUSED: "), err
+
+
+def test_cli_writes_json_and_rendered_trace():
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "result.json")
+        code, out, err = _main(["run", "sk", "--param", "beta=2", "--param", "h=0",
+                                "--out", path])
+        assert code == 0, err
+        with open(path) as f:
+            res = json.load(f)
+    assert res["rigor"] == "physics-level" and res["route"] == "replica"
+    assert res["stable"] is False and res["final"] is False
+    assert float(res["values"]["q"]) > 0.4 and res["values"]["ansatz"] == "rs"
+    assert res["report"]["kind"] == "catalog" and res["report"]["adapted"] == []
+    assert res["trace"]["steps"] == [s.name for s in catalog()["sk"].steps]
+    assert any("NOT final" in n for n in res["notes"])
+    assert res["params"] == {"beta": 2, "h": 0}
+    # the rendered trace goes to stderr, with citations
+    assert "sk-rs-saddle [Sherrington" in err and "1. " in err, err
+
+
+def test_cli_json_spec_composes_and_prints_to_stdout():
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "spec.json")
+        with open(path, "w") as f:
+            json.dump({"family": "sk", "variables": "ising", "disorder": "gaussian",
+                       "params": {"beta": None, "h": None}}, f)
+        code, out, err = _main(["run", path, "--param", "beta=2", "--param", "h=0"])
+    assert code == 0, err
+    res = json.loads(out)
+    assert res["report"]["kind"] == "catalog" and res["stable"] is False
+    assert {r["key"] for r in res["references"]} == {"tc", "rs_ground_energy",
+                                                     "rsb1_ground_energy"}
+    assert all(r["ok"] for r in res["references"])
+
+
+def test_cli_param_parsing():
+    assert parse_param("alpha=0.5") == ("alpha", 0.5)
+    assert parse_param("k=2") == ("k", 2)
+    assert parse_param("learning=bayes") == ("learning", "bayes")
+    assert parse_param("ys=0.3,0.5,0.7") == ("ys", (0.3, 0.5, 0.7))
+    assert parse_param("require_stable=true") == ("require_stable", True)
+
+
+@slow
+def test_cli_module_entry_point_in_subprocess():
+    p = subprocess.run([sys.executable, "-m", "replicant", "list"], cwd=TOOLS,
+                       capture_output=True, text=True, timeout=60)
+    assert p.returncode == 0 and "sk" in p.stdout, p.stderr
+    p = subprocess.run([sys.executable, "-m", "replicant", "run", "pspin", "--route", "cavity"],
+                       cwd=TOOLS, capture_output=True, text=True, timeout=60)
+    assert p.returncode == 2 and p.stderr.startswith("REFUSED: missing-step:route:cavity"), p

@@ -1,0 +1,294 @@
+"""Catalog entries for the fully connected families (level (b)) and their dense cavity
+routes: REM, SK, spherical p-spin, spherical perceptron, teacher-student, Hopfield.
+
+Conventions are the families' own (stated in each families/*.py docstring):
+  REM       2^N i.i.d. energies of variance N_scale N; default N_scale = 1/2, Derrida's
+            J = 1 normalisation (beta_c = 2 sqrt(ln 2)), in which the bank is written.
+  SK        J_ij ~ N(0, 1/N), field h, beta = 1/T.
+  p-spin    spherical, J = 1, couplings of variance p!/(2 N^(p-1)); default p = 3.
+  perceptron spherical J.J = N, P = alpha N Gaussian patterns, margin kappa (default 0).
+  teacher-student  spherical teacher and student, noiseless labels; learning gibbs|bayes.
+  Hopfield  AGS: p = alpha N +-1 patterns, one condensed pattern, beta = 1/T.
+Run parameters: with no state point (no beta / alpha) an entry computes its headline
+quantities (transitions, capacities, ground energies); with one it solves the saddle
+there.  Every number is the family function's own output; nothing is retyped.
+"""
+import mpmath as mp
+
+from .agree import default_spec
+from .catalog import Out, RefCheck, entry, fstep, has, lacks
+from .cavity import dense
+from .cavity.dense_hopfield import energy as hopfield_cavity_energy
+from .core import Refusal, Step
+from .families import pspin as P
+from .families.common import CAVEAT, CAVITY_CAVEAT
+from .families.hopfield import hopfield_alpha_c, hopfield_rs, hopfield_t0
+from .families.perceptron import gardner_capacity, gardner_entropy
+from .families.pspin import pspin_critical_temperature, pspin_spherical_1rsb
+from .families.rem import rem_1rsb, rem_critical_beta, rem_free_energy
+from .families.sk import sk_1rsb, sk_ground_energy, sk_replicon, sk_rs
+from .families.teacher_student import asymptotic_constant, teacher_student_error
+from .spec import ModelSpec
+
+SK_CITE = ("Sherrington & Kirkpatrick, PRL 35, 1792 (1975); de Almeida & Thouless, "
+           "J. Phys. A 11, 983 (1978); Parisi, PRL 43, 1754 (1979)")
+REM_CITE = "Derrida, PRL 45, 79 (1980); Phys. Rev. B 24, 2613 (1981)"
+PSPIN_CITE = "Crisanti & Sommers, Z. Phys. B 87, 341 (1992)"
+GARDNER_CITE = "Gardner, J. Phys. A 21, 257 (1988); Gardner & Derrida, J. Phys. A 21, 271 (1988)"
+MEZARD_CITE = "Mezard, J. Phys. A 22, 2181 (1989)"
+TS_CITE = ("Gyorgyi, Phys. Rev. A 41, 7097 (1990); Seung, Sompolinsky & Tishby, Phys. Rev. A "
+           "45, 6056 (1992); Opper & Haussler, PRL 66, 2677 (1991)")
+AGS_CITE = ("Amit, Gutfreund & Sompolinsky, PRL 55, 1530 (1985); Ann. Phys. 173, 30 (1987)")
+MPV = "Mezard, Parisi & Virasoro, Spin Glass Theory and Beyond (1987), ch. V"
+
+
+def _saddle(ansatz, stable, **values):
+    return {"ansatz": ansatz, "stable": stable, **values}
+
+
+def cavity_route(model, required, collect, cite):
+    """[select the dense cavity model] + the four cavity Steps of cavity/dense.py +
+    [read the observables off the solution]."""
+    def select(s):
+        missing = [k for k in required if s["params"].get(k) is None]
+        if missing:
+            raise Refusal("precondition:state-point",
+                          f"the {model} cavity route needs {', '.join(missing)}")
+        return s.with_(model=dense.MODELS[model], step_note=f"cavity model {model!r}")
+
+    def read(s):
+        out = collect(s["solution"], s["params"])
+        return s.with_(values={**s["values"], **out}, step_note="read " + ", ".join(out))
+
+    note = lambda s: s["step_note"]
+    return ([Step("cavity-model", lambda s: [], select, MPV, note)]
+            + dense.cavity_steps(dense.MODELS[model])
+            + [Step("cavity-observables", lambda s: [] if "solution" in s else ["solution"],
+                    read, cite, note)])
+
+
+# ---- REM -----------------------------------------------------------------------------
+def _rem_scale(p):
+    return mp.mpf(p.get("N_scale", "0.5"))
+
+
+def _rem_tc(p):
+    with mp.workdps(30):
+        bc = rem_critical_beta(N_scale=_rem_scale(p))
+        return Out({"N_scale": _rem_scale(p), "beta_c": bc, "T_c": 1 / bc})
+
+
+def _rem_saddle(p):
+    with mp.workdps(30):
+        s, b = _rem_scale(p), mp.mpf(p["beta"])
+        bc = rem_critical_beta(N_scale=s)
+        if b <= bc:
+            f = rem_free_energy(b, N_scale=s)
+            return Out(_saddle("rs", None, f=f, q=mp.mpf(0)),
+                       "paramagnet (beta <= beta_c): annealed = quenched, -beta f = ln 2 "
+                       "+ N_scale beta^2/2")
+        sol = rem_1rsb(b, N_scale=s)
+        return Out(_saddle("1rsb", None, q0=sol.q0, q1=sol.q1, m=sol.m, f=sol.f, e=sol.e,
+                           beta=b), "frozen 1RSB, m = beta_c/beta")
+
+
+def rem():
+    steps = [fstep("rem-critical-temperature", REM_CITE + " (s(e) = ln 2 - e^2/(2 N_scale))",
+                   _rem_tc),
+             fstep("rem-saddle", REM_CITE + "; 1RSB form: Mezard, Parisi & Virasoro (1987)",
+                   _rem_saddle, when=has("beta"), skip="no beta given")]
+    refs = [RefCheck("rem", "tc_derrida", lambda v: v["T_c"]),
+            RefCheck("rem", "ground_energy_derrida", lambda v: v["f"], params={"beta": 3}),
+            RefCheck("rem", "m_times_beta_over_beta_c", lambda v: v["m"] * v["beta"] / v["beta_c"],
+                     params={"beta": 3})]
+    return entry("rem", ModelSpec("rem", "ising", "gaussian"), REM_CITE, {"replica": steps},
+                 refs, {"replica": CAVEAT}, "random energy model: T_c, frozen 1RSB phase")
+
+
+# ---- SK ------------------------------------------------------------------------------
+def _ansatz_is(name):
+    return lambda p: p.get("beta") is not None and p.get("ansatz", "rs") == name
+
+
+def _sk_tc(p):
+    b = mp.findroot(lambda x: sk_replicon(x, 0, q=0), mp.mpf("0.9"))
+    return Out({"tc": 1 / b}, "T_c: root of the q = 0 replicon 1 - beta^2")
+
+
+def _sk_e0(p):
+    return Out({"rs_ground_energy": sk_ground_energy("rs"),
+                "rsb1_ground_energy": sk_ground_energy("1rsb")})
+
+
+def _sk_rs(p):
+    s = sk_rs(p["beta"], p.get("h", 0))
+    return Out(_saddle("rs", s.stable, q=s.q, f=s.f, e=s.e, replicon=s.replicon),
+               f"RS saddle, replicon {mp.nstr(s.replicon, 6)}")
+
+
+def _sk_1rsb(p):
+    s = sk_1rsb(p["beta"], p.get("h", 0))
+    return Out(_saddle("1rsb", None, q0=s.q0, q1=s.q1, m=s.m, f=s.f, e=s.e),
+               "1RSB saddle (its own stability is not computed)")
+
+
+def sk():
+    steps = [fstep("sk-critical-temperature", SK_CITE.split(";")[0], _sk_tc,
+                   when=lacks("beta"), skip="beta given (state point)"),
+             fstep("sk-ground-energy", SK_CITE.split(";")[0] + " (RS); Parisi, PRL 43, 1754 "
+                   "(1979) (1RSB)", _sk_e0, when=lacks("beta"), skip="beta given (state point)"),
+             fstep("sk-rs-saddle", "; ".join(SK_CITE.split("; ")[:2]), _sk_rs,
+                   when=_ansatz_is("rs"), skip="no beta, or ansatz != rs"),
+             fstep("sk-1rsb-saddle", "Parisi, PRL 43, 1754 (1979)", _sk_1rsb,
+                   when=_ansatz_is("1rsb"), skip="no beta, or ansatz != 1rsb")]
+    cav = cavity_route("sk", ("beta",), lambda s, p: _saddle(
+        "rs", s.stable, q=s.q, f=s.f, e=s.e, replicon=s.replicon), MPV)
+    refs = [RefCheck("sk", "tc", lambda v: v["tc"]),
+            RefCheck("sk", "rs_ground_energy", lambda v: v["rs_ground_energy"]),
+            RefCheck("sk", "rsb1_ground_energy", lambda v: v["rsb1_ground_energy"])]
+    return entry("sk", default_spec("sk"), SK_CITE, {"replica": steps, "cavity": cav}, refs,
+                 {"replica": CAVEAT, "cavity": CAVITY_CAVEAT},
+                 "Sherrington-Kirkpatrick: RS, AT stability, 1RSB")
+
+
+# ---- spherical p-spin ----------------------------------------------------------------
+def _pspin_t(p):
+    k = p.get("p", 3)
+    with mp.workdps(30):
+        return Out({"p": k, "T_s": pspin_critical_temperature(k),
+                    "T_d": pspin_critical_temperature(k, kind="dynamic"),
+                    "q_s": 1 - P._y(k)},
+                   "T_s and q_s = 1 - y at m = 1; T_d closed form")
+
+
+def _pspin_1rsb(p):
+    s = pspin_spherical_1rsb(p.get("p", 3), p["beta"])
+    return Out(_saddle("1rsb", None, q0=s.q0, q1=s.q1, m=s.m, f=s.f, e=s.e),
+               "1RSB, audited as a local maximum of f in (q0, q, m); replicon not computed")
+
+
+def pspin():
+    steps = [fstep("pspin-transitions", PSPIN_CITE + "; Castellani & Cavagna, J. Stat. Mech. "
+                   "(2005) P05012 (T_d)", _pspin_t),
+             fstep("pspin-1rsb", PSPIN_CITE, _pspin_1rsb, when=has("beta"), skip="no beta given")]
+    refs = [RefCheck("pspin", "ts_p3", lambda v: v["T_s"]),
+            RefCheck("pspin", "td_p3", lambda v: v["T_d"]),
+            RefCheck("pspin", "qs_p3", lambda v: v["q_s"]),
+            RefCheck("pspin", "e0_p3", lambda v: v["e"], params={"beta": 10000}, slow=True)]
+    return entry("pspin", ModelSpec("pspin", "spherical", "gaussian", params={"p": 3}),
+                 PSPIN_CITE, {"replica": steps}, refs, {"replica": CAVEAT},
+                 "spherical p-spin: static and dynamic transitions, 1RSB")
+
+
+# ---- spherical perceptron ----------------------------------------------------------------
+def _gardner_cap(fn):
+    def go(p):
+        c = fn("spherical", p.get("kappa", 0))
+        return Out({"alpha_c": c.alpha_c, "capacity_replicon": c.replicon,
+                    "capacity_stable": c.stable}, c.note)
+    return go
+
+
+def _gardner_s(p):
+    S = gardner_entropy(p["alpha"], "spherical", p.get("kappa", 0))
+    return Out(_saddle("rs", True, S=S),
+               "RS entropy; gardner_entropy refuses (unstable:rs) where the replicon < 0")
+
+
+def perceptron():
+    steps = [fstep("gardner-capacity", GARDNER_CITE.split(";")[0], _gardner_cap(gardner_capacity)),
+             fstep("gardner-entropy", GARDNER_CITE.split(";")[0], _gardner_s, when=has("alpha"),
+                   skip="no alpha given")]
+    cav = ([fstep("cavity-capacity", MEZARD_CITE, _gardner_cap(dense.cavity_gardner_capacity))]
+           + cavity_route("perceptron", (), lambda s, p: _saddle(
+               "rs", None if s.stability is None else bool(s.stability > 0), q=s.q, S=s.S,
+               stability=s.stability), MEZARD_CITE))
+    refs = [RefCheck("perceptron", "spherical_capacity_kappa0", lambda v: v["alpha_c"]),
+            RefCheck("perceptron", "spherical_capacity_kappa0", lambda v: v["alpha_c"],
+                     route="cavity")]
+    return entry("perceptron", default_spec("perceptron"), GARDNER_CITE,
+                 {"replica": steps, "cavity": cav}, refs,
+                 {"replica": CAVEAT, "cavity": CAVITY_CAVEAT},
+                 "spherical perceptron (Gardner volume): capacity alpha_c(kappa), entropy")
+
+
+# ---- teacher-student -------------------------------------------------------------------
+def _ts_const(p):
+    return Out({"gibbs_asymptotic_constant": asymptotic_constant("gibbs"),
+                "bayes_asymptotic_constant": asymptotic_constant("bayes")},
+               "lim alpha eps(alpha): sqrt(2)/I (Gibbs), 1/I (Bayes)")
+
+
+def _ts_curve(p):
+    learning = p.get("learning", "gibbs")
+    eps = teacher_student_error(p["alpha"], learning)
+    return Out(_saddle("rs", None, eps=eps, learning=learning),
+               "RS on the Nishimori line q = R; RS stability is argued (convex version "
+               "space) but not computed by the family")
+
+
+def teacher_student():
+    steps = [fstep("ts-asymptotic-constants", TS_CITE, _ts_const, when=lacks("alpha"),
+                   skip="alpha given (state point)"),
+             fstep("ts-learning-curve", TS_CITE, _ts_curve, when=has("alpha"),
+                   skip="no alpha given")]
+    refs = [RefCheck("perceptron", "gibbs_asymptotic_constant",
+                     lambda v: v["gibbs_asymptotic_constant"]),
+            RefCheck("perceptron", "bayes_asymptotic_constant",
+                     lambda v: v["bayes_asymptotic_constant"])]
+    spec = ModelSpec("teacher_student", "spherical", "gaussian", prior="teacher")
+    return entry("teacher_student", spec, TS_CITE, {"replica": steps}, refs,
+                 {"replica": CAVEAT}, "teacher-student perceptron: Gibbs and Bayes learning curves")
+
+
+# ---- Hopfield -----------------------------------------------------------------------------
+def _hop_t0(p):
+    ac = hopfield_alpha_c()
+    t0 = hopfield_t0(ac, "retrieval")
+    return Out({"alpha_c_T0": ac, "m_at_alpha_c_T0": t0.m, "energy_at_alpha_c_T0": t0.E},
+               "T = 0 erf reduction: double root of the retrieval equation")
+
+
+def _hop_global(p):
+    with mp.workdps(30):
+        d = lambda a: hopfield_t0(a, "retrieval").E - hopfield_t0(a, "spinglass").E
+        a = mp.findroot(d, (mp.mpf("0.045"), mp.mpf("0.055")), solver="secant")
+    return Out({"alpha_global_T0": a},
+               "T = 0: root of E_retrieval - E_spinglass (RS vs RS; the SG state is AT-unstable)")
+
+
+def _hop_rs(p):
+    s = hopfield_rs(p["alpha"], p["beta"], branch=p.get("branch", "retrieval"))
+    return Out(_saddle("rs", s.stable, m=s.m, q=s.q, r=s.r, f=s.f, replicon=s.replicon,
+                       branch=s.branch), s.note)
+
+
+def _hop_cavity(s, p):
+    e = hopfield_cavity_energy(s.m, s.q, s.r, float(p["alpha"]), float(p["beta"]))
+    return _saddle("rs", s.stable, m=s.m, q=s.q, r=s.r, e=mp.mpf(e), replicon=s.replicon,
+                   branch=s.branch)
+
+
+def hopfield():
+    t0 = "Amit, Gutfreund & Sompolinsky, PRL 55, 1530 (1985), Eqs. (9)-(11)"
+    steps = [fstep("hopfield-t0-capacity", t0, _hop_t0, when=lacks("alpha"),
+                   skip="alpha given (state point)"),
+             fstep("hopfield-t0-global-minimum", t0, _hop_global, when=lacks("alpha"),
+                   skip="alpha given (state point)"),
+             fstep("hopfield-rs", AGS_CITE, _hop_rs, when=has("alpha", "beta"),
+                   skip="needs alpha and beta")]
+    cav = cavity_route("hopfield", ("alpha", "beta"), _hop_cavity, AGS_CITE)
+    refs = [RefCheck("hopfield", k, (lambda key: lambda v: v[key])(k))
+            for k in ("alpha_c_T0", "m_at_alpha_c_T0", "energy_at_alpha_c_T0",
+                      "alpha_global_T0")]
+    return entry("hopfield", default_spec("hopfield"), AGS_CITE,
+                 {"replica": steps, "cavity": cav}, refs,
+                 {"replica": CAVEAT, "cavity": CAVITY_CAVEAT},
+                 "Hopfield (AGS), RS with branch control: retrieval capacity, T = 0 energies")
+
+
+def dense_entries():
+    return [rem(), sk(), pspin(), perceptron(), teacher_student(), hopfield()]
+
+
+__all__ = ["dense_entries"]
