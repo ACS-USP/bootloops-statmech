@@ -43,6 +43,10 @@ The registered packages, grouped as the index groups them:
   ring-basis member), Annihilator, Ansatzer, Galois, Rankscreen.
 - **Exact statistics and evidence** — Mixalot (with Boxwalk, the exact box-moment
   contiguity walker, as member), Popcorn, POSQ, and JaCK & Jill.
+- **Statistical mechanics of disordered systems** — Replicant (published replica-method and
+  cavity-method calculations as recorded, citation-bearing steps with named refusals, a
+  composer for nearby models, and a LaTeX derivation writer; physics-level results, not
+  proofs).
 - **Operations** — Turnstile (admission control for long jobs on a shared machine:
   priority token, RAM and CPU-width ledgers; formerly Bigram-queue) ships under
   [`../../ops/`](../../ops/README.md), not `tools/`, and has its own page outside the

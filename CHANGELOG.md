@@ -4,6 +4,27 @@ All notable changes to BootLoops are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/) (1.0.x = fixes and tool additions that change nothing existing, 1.x.0 = changes to existing tools).
 
+## Unreleased
+
+### Added
+- `replicant`: published replica-method and cavity-method calculations of disordered systems as
+  typed, recorded steps (each with its citation and named preconditions; a missing one is a named
+  refusal, never a silent fallback), with per-value finality labels (stable, unstable,
+  not-computed, exact-by-literature) and checks against banked, cited reference values. v1
+  catalog: random energy model, Sherrington-Kirkpatrick (RS, AT stability, 1RSB, full RSB in the
+  slow tier), spherical p-spin, spherical perceptron (Gardner capacity), teacher-student learning
+  curves, Hopfield (AGS), sparse +-J spin glass (Viana-Bray / Bethe lattice, RS and 1RSB). Routes:
+  replica (symbolic level (a) derivation and level (b) family pipelines, with agreement tests) and
+  cavity (dense, sparse BP / population dynamics, sparse 1RSB). A composer adapts a catalogued
+  derivation to a nearby model and reports what it reused, adapted or could not do; a LaTeX writer
+  renders any run as a derivation document (`python3 -m replicant list|run ... --latex out.tex
+  [--pdf]`). Held-out evidence: the composed +-J SK model and the composed Ising perceptron are
+  checked by independent routes (enumeration, bank targets, an annealed bound) with positive
+  controls; its limits are stated in the GUIDE (the Ising perceptron 4/pi RS endpoint is not
+  checked, small-N enumeration is coarse, the +-J agreement tests the adapted step and not
+  universality). Results are physics-level, not proofs; population-dynamics results are
+  statistical. Battery: `python3 tools/replicant/selftest.py` (about 16 s; `--full` about 6 min).
+
 ## 1.0.1 (2026-10-09)
 
 ### Added

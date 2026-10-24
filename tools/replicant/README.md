@@ -1,25 +1,49 @@
 # replicant
 
-Published replica/cavity calculations as typed, recorded steps: each step
-names its preconditions and its citation, a missing precondition is a named
-refusal (`precondition:<name>`), and every run returns a trace.
+Published replica-method and cavity-method calculations of disordered systems as typed,
+recorded steps. Each step names its preconditions and its citation; a missing precondition
+is a named refusal (`precondition:<name>`, `missing-step:<hook>`, ...), never a silent
+fallback; every run returns a trace, a per-value finality label (`stable`, `unstable`,
+`not-computed`, `exact-by-literature`) and a comparison with banked, cited reference values.
+Results are physics-level (the n -> 0 continuation and the RS/RSB ansaetze are not proved);
+population-dynamics results are statistical. Full documentation: [GUIDE.md](GUIDE.md).
 
-Battery: `python3 tools/replicant/selftest.py [--full]`.
+## Quick start
 
-CLI (from `tools/`): `python3 -m replicant list` prints the catalog (entries, routes,
-citations); `python3 -m replicant run <entry|spec.json> [--route replica|cavity]
-[--param k=v ...] [--out result.json]` composes and runs a calculation (catalog.py,
-compose.py, cli.py), writes the JSON result and prints the step trace to stderr; a
-refusal prints `REFUSED: <reason>: <detail>` and exits 2.
+From the repository root:
 
-LaTeX (latex.py): `python3 -m replicant run <entry|spec.json> ... --latex out.tex [--pdf]`
-writes the calculation as a paper appendix: model, route, every step with its equations
-(level (a) rendered from the sympy objects in the State; the family code's equations in
-sympy form or cited), the solution with per-value finality, stability, the
-banked-versus-computed check table, the honest labels and a bibliography from the
-citations.  Writing a document checks nothing: the displayed sympy equations (and a few
-cited ones, by hand-coded evaluation) are checked against the code by tests/test_latex.py
--- the first point of each in the default tier, all three points and the solver-based
-ones with --full.  `--pdf` compiles it with tectonic or pdflatex and warns
-(OverfullDisplay) if a display is wider than the page.  A refused run writes its partial
-derivation and the reason.
+```
+python3 tools/replicant/selftest.py                        # default battery, about 16 s
+cd tools && python3 -m replicant list                      # the 7 catalog entries
+python3 -m replicant run perceptron --param alpha=1.5 --out result.json --latex p.tex
+```
+
+`run` also takes a spec file for a model near a catalogued one
+(`python3 -m replicant run spec.json --param beta=1.5 --param h=0`; schema in the GUIDE),
+`--route cavity` for the entries that have a cavity route, and `--pdf` (with `--latex`) to
+compile the derivation.
+
+## Layout
+
+- `core.py`, `spec.py`, `testing.py`: steps, state, trace, `Refusal`, `ModelSpec`, the `@slow` marker.
+- `refdata.py`, `reference/*.json`: the reference store, banked cited values (schema in
+  `reference/_schema.md`).
+- `derive*.py`, `gauss.py`, `ansatz.py`, `agree.py`, `solve.py`, `solve_derived.py`: level (a),
+  the symbolic derivation (replicate, average, order parameters, RS ansatz, n -> 0,
+  stationarity) and the solver for the derived equations.
+- `families/`: level (b), the published pipelines (SK, REM, p-spin, perceptron, teacher-student,
+  Hopfield, Parisi full RSB).
+- `cavity/`: dense cavity, sparse BP / population dynamics, sparse 1RSB.
+- `catalog*.py`, `compose.py`, `cli.py`, `__main__.py`: the 7-entry catalog, the composer,
+  the command line.
+- `latex*.py`, `tex*.py`, `derive_tex.py`: the LaTeX derivation writer.
+- `tests/`, `selftest.py`: the battery.
+
+## Test tiers
+
+- Default: `python3 tools/replicant/selftest.py` (235 tests, about 16 s). Also
+  `python3 run_selftests.py replicant` from the repository root.
+- Full: `python3 tools/replicant/selftest.py --full` adds the 68 `@slow` tests (full RSB,
+  population dynamics at reference sizes, solver-based checks); about 6 minutes.
+- `@slow` is a plain function attribute honoured by `selftest.py` only. pytest ignores the
+  marker and would run every test, slow ones included.
