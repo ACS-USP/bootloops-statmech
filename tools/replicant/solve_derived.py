@@ -1,7 +1,8 @@
 """Generic numerical solution of DERIVED RS equations (level (a) -> numbers).
 
   solve_derived_rs(spec, *, branch=None, quad="fast", dps=20, seed="0.5", seeds=None,
-                   gh_nodes=80, audit_tol=None, **params) -> DerivedRSSolution
+                   gh_nodes=80, audit_tol=None, derived=None, **params) -> DerivedRSSolution
+  lift_numeric_beta(spec, params) -> (spec, params, notes)  (step 1 below)
 
 No family name appears in this module: everything model-specific arrives
 through agree.derive_rs(spec) (the stationarity equations d phi/d p = 0, the
@@ -151,10 +152,9 @@ def _is_number(v):
 
 # ---- the solver ---------------------------------------------------------------------
 
-def solve_derived_rs(spec: ModelSpec, *, branch=None, quad="fast", dps=20, seed="0.5",
-                     seeds=None, gh_nodes=80, audit_tol=None, **params) -> DerivedRSSolution:
-    if quad not in _QUADS:
-        raise Refusal("precondition:known-quadrature", f"quad = {quad!r}: use {_QUADS}")
+def lift_numeric_beta(spec: ModelSpec, params: dict):
+    """(spec, params, notes): a numeric spec.params["beta"] is replaced by the symbol
+    beta and its value moved to `params` (so the entropy can be derived)."""
     notes = []
     b = spec.params.get("beta")
     if b is not None and _is_number(b):
@@ -164,7 +164,22 @@ def solve_derived_rs(spec: ModelSpec, *, branch=None, quad="fast", dps=20, seed=
         params = {**params, "beta": params.get("beta", b)}
         spec = replace(spec, params={**spec.params, "beta": D.BETA})
         notes.append("numeric spec.params beta lifted to the symbol beta (entropy)")
-    eqs, state, trace = agree.derive_rs(spec)
+    return spec, params, notes
+
+
+def solve_derived_rs(spec: ModelSpec, *, branch=None, quad="fast", dps=20, seed="0.5",
+                     seeds=None, gh_nodes=80, audit_tol=None, derived=None,
+                     **params) -> DerivedRSSolution:
+    """`derived` = (equations, State, Trace) of a derivation already run for THIS spec
+    (the composer runs its own level-(a) steps); None runs agree.derive_rs(spec)."""
+    if quad not in _QUADS:
+        raise Refusal("precondition:known-quadrature", f"quad = {quad!r}: use {_QUADS}")
+    spec, params, notes = lift_numeric_beta(spec, params)
+    if derived is not None and notes:
+        raise Refusal("precondition:symbolic-beta",
+                      "`derived` was given for a spec with numeric beta: lift it first "
+                      "(lift_numeric_beta) and derive at symbolic beta")
+    eqs, state, trace = derived if derived is not None else agree.derive_rs(spec)
     tol = mp.mpf(audit_tol) if audit_tol is not None else max(mp.mpf("1e-12"),
                                                                 mp.mpf(10)**(2 - dps))
     with mp.workdps(dps + 3):

@@ -280,6 +280,11 @@ class Family:
     order_parameters: Callable  # (averaged, n, sum_pairs) -> Reduction, or
                                 #   (energy, correction, missing order | None)
     variables: tuple = ("ising",)   # spec.variables this family accepts
+    # spec.constraint / spec.prior values the hooks implement (declarative: the hooks
+    # do not read these fields, so anything else would be silently ignored; the
+    # composer refuses it instead)
+    constraints: tuple = (None,)
+    priors: tuple = (None,)
 
 
 FAMILIES = {"sk": Family(lambda n, b, spec=None: _sk_formal(n, b, _field(spec) if spec else 0),

@@ -151,7 +151,8 @@ def _hopfield_order_parameters(avg, n, sum_pairs):
 
 D.FAMILIES["perceptron"] = D.Family(
     _perceptron_formal, _no_annealed, lambda d: d == "gaussian",
-    _perceptron_average, _perceptron_order_parameters, variables=("spherical", "ising"))
+    _perceptron_average, _perceptron_order_parameters, variables=("spherical", "ising"),
+    constraints=("margin kappa",))
 D.FAMILIES["hopfield"] = D.Family(
     _hopfield_formal, _no_annealed, lambda d: d == "pm_one",
     _hopfield_average, _hopfield_order_parameters, variables=("ising",))
