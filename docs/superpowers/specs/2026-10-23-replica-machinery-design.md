@@ -96,8 +96,11 @@ in v1 scope.
 Random energy model; sparse-graph entries with a cavity route (e.g.
 Viana–Bray / Ising spin glass on a random regular or Erdős–Rényi graph);
 Sherrington–Kirkpatrick (RS, Almeida–Thouless line,
-1RSB, Parisi full RSB); spherical and Ising perceptron (Gardner capacity);
-Hopfield (Amit–Gutfreund–Sompolinsky); teacher–student perceptron learning
+1RSB, Parisi full RSB); spherical perceptron (Gardner capacity; the Ising
+perceptron is deliberately NOT a catalog entry: it is the held-out model of
+the verification section, composed from the spherical entry, and its
+Gardner-Derrida and Krauth-Mezard numbers are banked as independent
+targets); Hopfield (Amit–Gutfreund–Sompolinsky); teacher–student perceptron learning
 curves; spherical p-spin. Reference values are taken from the papers with
 citation during the build, never from memory, and each entry is also pinned
 by a route that does not use the paper's number (closed form where one
@@ -177,7 +180,46 @@ package name.
   integrals can be enclosed; optional elsewhere. `replicant` stays a
   working name until approval.
 
-## Not committed
+## Status
 
-This document is not committed; no product code, scaffolding, or
-dependencies exist yet.
+Implemented in v1 as of the commit that adds `tools/replicant/GUIDE.md`; the
+package GUIDE (`tools/replicant/GUIDE.md`) is the current description of what
+exists, its refusals and its honest limits.
+
+## As built
+
+Deviations of the implementation from the text above, taken from the build
+ledger:
+
+- **Ising perceptron.** Not a catalog entry (see Initial catalog); it is the
+  held-out model. Its RS replicon is not derived at level (a): the composed
+  solution reports stability unknown (`stable = None`), hence not final. The
+  composed solver is slow (17-20 s per point at alpha >= 1.1), so the
+  4/pi RS endpoint is not checked for the composed model.
+- **Level (a) coverage.** Task 10 had to extend the derivation (step-function
+  constraint, Hebbian couplings, generic solver for derived RS equations); a
+  generic `solve_derived_rs` was added before the composer. Some model pieces
+  (perceptron Theta constraint, Hopfield condensed-pattern term) are
+  hand-supplied family hooks, documented as such; the replicon is derived for
+  the SK site only.
+- **Cavity route.** It is an independent derivation, not independent evidence
+  for the RS ansatz: both routes close on the same RS equations. Sparse 1RSB
+  at finite T uses a population of populations: at m = 1 it reduces to RS up
+  to a finite-inner-population dynamical bias of about +0.002 to +0.003 in the
+  energy estimator (not removed); the (m, T) window where it is reliable was
+  not mapped.
+- **TAP and dynamics** are excluded; `rigor` is always "physics-level".
+- **Full RSB** is a K-level extrapolation of Parisi staircases in the slow
+  tier (K <= 9 at T = 0, K <= 5 at finite T), with a stated error band, not a
+  PDE solve.
+- **Conventions.** The replica free energy is maximised, so the SK 1RSB ground
+  energy lies above the RS one (the first plan text had the direction
+  reversed). REM energies have variance N * N_scale; the family default is
+  N_scale = 1, the catalog entry and the banked values use Derrida's
+  N_scale = 1/2 (the plan's normalisation statement was self-contradictory).
+- **Reference digits** for papers behind paywalls were read from open secondary
+  sources; each bank entry says so.
+- **LaTeX derivation writer** (not in the original spec) was added at the
+  user's request; held-out models also render a derivation.
+- **Time standard.** The default battery takes about 16 s; the slow tier
+  (`--full`) about 6 minutes.
