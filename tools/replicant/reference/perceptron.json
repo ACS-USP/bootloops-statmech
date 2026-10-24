@@ -1,0 +1,44 @@
+{
+  "spherical_capacity_kappa0": {
+    "value": "2",
+    "tol": "1e-20",
+    "cite": "Gardner, J. Phys. A 21, 257 (1988) and Cover, IEEE Trans. Electron. Comput. 14, 326 (1965) (originals not fetched); value read from Gyorgyi, arXiv:cond-mat/0010025, Sec. II E 1 ('alpha_c = Mc/N ... approaches, with probability 1, the value alpha_c = 2'), from Franz & Parisi, arXiv:1501.03397, Eq. (2) and text ('alpha(0) = 2'), and from Pastore, Rotondo, Erba & Gherardi, arXiv:2005.10002, Eq. (17) (alpha_c = 2 from Cover's theorem). Convention: J.J = N, constraint J.xi/sqrt(N) >= kappa, kappa = 0",
+    "independent_route": "(1) Cover's count of separable dichotomies by its recurrence C(N,p+1) = C(N,p) + C(N-1,p) in exact integers (no replicas, no closed form): the separable fraction is exactly 1/2 at p = 2N and a steepening sigmoid around alpha = 2; (2) replicant's own RS saddle parametrised by q, alpha(q) = q/((1-q) E[(phi/H)^2]), evaluated at q -> 1"
+  },
+  "ising_rs_capacity": {
+    "value": "1.2732395447351626862",
+    "tol": "1e-15",
+    "cite": "Gardner & Derrida, J. Phys. A 21, 271 (1988) (original not fetched); read from Gyorgyi, arXiv:cond-mat/0010025, Sec. II E 2: 'The RS solution formally exists beyond the transition and stays locally, i. e., AT-stable up to alpha = 4/pi'. The paper states the closed form 4/pi; value = its decimal. Gyorgyi's 'AT-stable up to 4/pi' is NOT reproduced by replicant (our replicon turns negative near alpha = 1.015, see families/perceptron.py); the q -> 1 endpoint 4/pi itself is reproduced",
+    "independent_route": "replicant's own RS saddle of the Ising volume parametrised by qhat (q = E tanh^2(sqrt(qhat) z), alpha(qhat) = qhat (1-q)/E[(phi/H)^2], explicit, no root finding) climbs towards it as qhat -> infinity (tests at qhat = 1e2, 1e3, 1e4); the closed form (2/pi)/int_{-kappa}^inf Dt (t+kappa)^2 is our own q -> 1 asymptotics"
+  },
+  "ising_1rsb_capacity": {
+    "value": "0.8330785995",
+    "tol": "1e-9",
+    "cite": "Krauth & Mezard, J. Phys. France 50, 3057 (1989) (original not fetched; quoted as 'alpha_c ~ 0.833' in Gyorgyi, arXiv:cond-mat/0010025, Sec. II E 2, and in Huang, arXiv:2404.18902). Digits read from Ding & Sun, arXiv:1809.07742, Eq. (153): alpha_lb = 0.833078599, alpha_ub = 0.833078600 bracket the Krauth-Mezard alpha_* (root of the RS entropy G_*(alpha), their Prop. 1.3); value = bracket midpoint, tol = bracket half-width rounded up. Conventions: J in {-1,+1}^N, Gaussian patterns, kappa = 0",
+    "independent_route": "replicant's own frozen-1RSB solve: with q1 = 1 the 1RSB volume is S_RS(q0)/m, stationary in m only where S_RS = 0, so alpha_c is the root of replicant's RS entropy, found by secant on the saddle parametrised by qhat (does not use the paper's number); plus exact small-N enumeration (N = 11, 13), statistical and finite-size, which excludes the RS value 4/pi"
+  },
+  "ising_1rsb_q": {
+    "value": "0.5639490799",
+    "tol": "5e-10",
+    "cite": "Ding & Sun, arXiv:1809.07742, Eq. (153): q_lb = 0.56394907949, q_ub = 0.56394908030 bracket q_*(alpha_*), the RS overlap at the Krauth-Mezard threshold; value = midpoint, tol = half-width rounded up",
+    "independent_route": "replicant's own RS saddle at its own root of the RS entropy (gardner_capacity('ising', ansatz='1rsb').point.q)"
+  },
+  "ising_1rsb_qhat": {
+    "value": "2.5763513162",
+    "tol": "6.3e-9",
+    "cite": "Ding & Sun, arXiv:1809.07742, Eq. (153): psi_lb = 2.5763513100, psi_ub = 2.5763513224 bracket psi_* = R(q_*, alpha_*), the conjugate field (our qhat) at the Krauth-Mezard threshold; value = midpoint, tol = half-width rounded up",
+    "independent_route": "replicant's own RS saddle at its own root of the RS entropy (gardner_capacity('ising', ansatz='1rsb').point.qhat)"
+  },
+  "gibbs_asymptotic_constant": {
+    "value": "0.625",
+    "tol": "5e-4",
+    "cite": "Seung, Sompolinsky & Tishby, Phys. Rev. A 45, 6056 (1992) (original not fetched); read from Buhot, Torres Moreno & Gordon, arXiv:cond-mat/9703183, Sec. I: Gibbs generalization error 'vanishes ... like eps_g ~ 0.625/alpha [1]', [1] = Seung et al. Meaning: lim alpha * eps_Gibbs(alpha). tol = 3-digit rounding",
+    "independent_route": "replicant's own RS saddle R/sqrt(1-R) = (alpha/pi) int Dt exp(-R t^2/2)/H(-sqrt(R) t), solved at alpha = 100, 1000: alpha * arccos(R)/pi approaches the closed form sqrt(2)/I, I = int Dt exp(-t^2/2)/H(-t) (our own large-alpha expansion, 0.624658...)"
+  },
+  "bayes_asymptotic_constant": {
+    "value": "0.442",
+    "tol": "5e-4",
+    "cite": "Opper & Haussler, Phys. Rev. Lett. 66, 2677 (1991) (original not fetched); read from Buhot, Torres Moreno & Gordon, arXiv:cond-mat/9703183, Sec. I: 'the bayesian generalization error vanishes like eps_g ~ 0.442/alpha, in the limit of large alpha'; their Eq. (15a) is the Gibbs equation with R_Gibbs = R_Bayes^2 (citing Opper & Haussler). tol = 3-digit rounding",
+    "independent_route": "replicant: R_Bayes = sqrt(R_Gibbs) on our own Gibbs saddle, alpha * arccos(sqrt(R))/pi at alpha = 100, 1000 approaches the closed form 1/I (0.441700...)"
+  }
+}
