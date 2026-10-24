@@ -1,0 +1,36 @@
+{
+  "tc": {
+    "value": "1",
+    "tol": "1e-12",
+    "cite": "Sherrington & Kirkpatrick, Phys. Rev. Lett. 35, 1792 (1975), doi:10.1103/PhysRevLett.35.1792 (original, paywalled, not fetched); value read from Crisanti, Rizzo & Temesvari, Eur. Phys. J. B (2003), arXiv:cond-mat/0302538, Sec. 3 (expansions around H = 0 and T = Tc = 1, J = 1)",
+    "independent_route": "linearised RS equation: q = E tanh^2(beta sqrt(q) z) = beta^2 q + O(q^2), so q > 0 bifurcates at beta = 1; tests check q = 0 at beta = 0.9 and q > 0 at beta = 1.1 with replicant's own solver"
+  },
+  "rs_ground_energy": {
+    "value": "-0.79788",
+    "tol": "1e-5",
+    "cite": "Sherrington & Kirkpatrick, Phys. Rev. Lett. 35, 1792 (1975), doi:10.1103/PhysRevLett.35.1792 (original, not fetched); value read from Stojnic, arXiv:2507.09247 (2025), Table 3, row '1 (full)' (RS): 0.79788, reported as -E0",
+    "independent_route": "closed form -sqrt(2/pi): T = 0 limit of e = -beta(1-q^2)/2 with beta(1-q) -> 2 phi(0) = E|z|; replicant computes -E|z| by quadrature and the test checks it against -sqrt(2/pi) to 1e-20"
+  },
+  "at_small_field_coefficient": {
+    "value": "1.33333333333333333333",
+    "tol": "2e-3",
+    "cite": "de Almeida & Thouless, J. Phys. A 11, 983 (1978), doi:10.1088/0305-4470/11/5/028 (original, paywalled, not fetched); coefficient read from Singh & Young, Phys. Rev. E 96, 012127 (2017), arXiv:1705.01164, Fig. 3 (asymptotic SK AT line h = (4/3)^(1/2) (Tc - T)^(3/2), J = Tc = 1). Meaning: h_AT^2 = c (1 - T)^3 + ... as h -> 0",
+    "independent_route": "replicant's own AT line: root in beta of the replicon 1 - beta^2 E sech^4(beta(h + sqrt(q) z)) at h = 0.01, 0.02, 0.04, ratio h^2/(1-T)^3 extrapolated to 1-T = 0 (slow test); tol covers the extrapolation error"
+  },
+  "rsb1_ground_energy": {
+    "value": "-0.76526",
+    "tol": "1e-5",
+    "cite": "Stojnic, arXiv:2507.09247 (2025), Table 3, row '2 (full)' (one-step RSB, q0 = 0.4768, q1 -> 1): 0.76526, reported as -E0. Original 1RSB: Parisi, J. Phys. A 13, L115 (1980), doi:10.1088/0305-4470/13/4/009 (not fetched: publisher blocked the download)",
+    "independent_route": "replicant's own T = 0 1RSB solve: stationary point in (q0, mu = beta m) of E(q0, mu) = mu(1-q0^2)/4 - (1/mu) E_z ln E_y exp(mu |sqrt(q0) z + sqrt(1-q0) y|), derived here from the finite-T 1RSB functional (q1 -> 1, m -> 0 at fixed beta m); does not use the paper's number"
+  },
+  "fullrsb_ground_energy": {
+    "value": "-0.7631667265",
+    "tol": "1e-4",
+    "cite": "Oppermann, Schmidt & Sherrington, Phys. Rev. Lett. 98, 127201 (2007), arXiv:cond-mat/0608581: E_inf = -0.7631667265(6) (k-RSB extrapolation); same digits in Schmidt & Oppermann, arXiv:0801.1756 (2008): -0.763166726566547",
+    "independent_route": "reference only (used in Task 16): not yet computed by replicant. Two independent published methods agree to 5e-5 (Crisanti-Rizzo infinite-RSB PDE vs Oppermann et al. high-order k-RSB); Task 16's own Parisi solve is the planned replicant route",
+    "sources_disagree": [
+      {"value": "-0.76321", "cite": "Crisanti & Rizzo, Phys. Rev. E 65, 046137 (2002), arXiv:cond-mat/0111037: E0 = -0.76321 +- 0.00003"},
+      {"value": "-0.7633", "cite": "Parisi, J. Phys. A 13, L115 (1980): -0.7633 +- 0.0001, as quoted in Crisanti & Rizzo (2002), arXiv:cond-mat/0111037 (original not fetched)"}
+    ]
+  }
+}
