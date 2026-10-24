@@ -621,13 +621,32 @@ def replica_limit() -> Step:
 
 def rs_stationarity() -> Step:
     """d phi / d p = 0 for every RS order parameter p (unsimplified: exp ratios,
-    explicit z factors; compare with agree.equations_agree)."""
+    explicit z factors; compare with agree.equations_agree).  An equation sympy decides
+    from the parameters' assumptions is a Refusal: no-solution (cannot vanish where the
+    order parameters live) or precondition:order-parameter-determined (phi free of p)."""
     def requires(state):
         return [] if "rs_free" in state else ["rs_free"]
 
     def apply(state):
         P = state["rs_free"]
-        return state.with_(rs_equations=[sp.Eq(sp.diff(P.expr, p), 0) for p in P.params])
+        eqs = []
+        for p in P.params:
+            d = sp.diff(P.expr, p)
+            e = sp.Eq(d, 0)
+            # sympy decides some equations outright from the symbols' assumptions (q, qhat
+            # > 0): False = no stationary point in the declared domain, True = phi does
+            # not depend on p.  Either is a named refusal, never a malformed equation list.
+            if e is sp.false:
+                dom = ", ".join(f"{x} > 0" if x.is_positive else f"{x} real" for x in P.params)
+                raise Refusal("no-solution",
+                              f"d phi/d {p} = {d} cannot vanish for the declared domain of "
+                              f"the order parameters ({dom}): the RS functional has no "
+                              "stationary point there")
+            if e is sp.true:
+                raise Refusal("precondition:order-parameter-determined",
+                              f"phi does not depend on {p}: no equation fixes it")
+            eqs.append(e)
+        return state.with_(rs_equations=eqs)
 
     return Step("rs-stationarity", requires, apply,
                 note=lambda s: "d/d" + ", d/d".join(str(p) for p in s["rs_free"].params),
