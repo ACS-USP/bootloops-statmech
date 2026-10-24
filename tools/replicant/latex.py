@@ -337,8 +337,9 @@ def _refusal_body(r, bib):
     route = getattr(r, "route", None)
     out = ["\\section{Refused calculation}\n" + prose(
         f"Refused: {r.reason}" + (f" at step {r.step}" if r.step else "") +
-        (f": {r.detail}" if r.detail else "") + ". No value is reported; the steps "
-        "applied before the refusal are shown below.") + "\n"]
+        (f": {r.detail}" if r.detail else "") + ". No value is reported as a result; "
+        "numbers in the trace are diagnostics of the refused computation, not results. "
+        "The steps applied before the refusal are shown below.") + "\n"]
     out.append("\\section{Partial derivation}\n" + (
         "".join(_entry(k, e, bib, e.tex, LEVEL_A_CITE) for k, e in enumerate(entries, 1))
         or escape("The refusal came before any step was applied.") + "\n"))

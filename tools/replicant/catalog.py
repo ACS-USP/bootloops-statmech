@@ -123,6 +123,9 @@ class CatalogEntry:
     # diagnostics).  Every other value key must have a finality declaration.
     finality: dict = field(default_factory=dict)
     meta: frozenset = frozenset()
+    # route -> frozenset of the run-parameter names that route's steps read (the composer
+    # refuses any other name: precondition:known-parameter, never silently ignored)
+    parameters: dict = field(default_factory=dict)
 
     def finality_of(self, values):
         """{key: Stability} for the physical values of one run; a key with no
@@ -185,15 +188,19 @@ def fstep(name, cite, compute, *, when=None, skip=""):
 
 
 def entry(name, spec, cite, route_steps, refs, caveats, description, default_route="replica",
-          finality=None, meta=()):
+          finality=None, meta=(), parameters=None):
     holder = {}
+    if set(parameters or {}) != set(route_steps):
+        raise ValueError(f"catalog entry {name!r}: declare the run parameters of every route "
+                         f"({', '.join(sorted(route_steps))})")
 
     def run(route=None, **params):
         return holder["e"].execute(route, **params)[0]["values"]
 
     e = CatalogEntry(name, spec, route_steps[default_route], cite, set(route_steps), refs, run,
                      route_steps, caveats, description, default_route, dict(finality or {}),
-                     frozenset(meta) | {"ansatz", "stable"})
+                     frozenset(meta) | {"ansatz", "stable"},
+                     {r: frozenset(v) for r, v in (parameters or {}).items()})
     holder["e"] = e
     return e
 

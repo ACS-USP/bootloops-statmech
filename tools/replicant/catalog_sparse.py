@@ -158,7 +158,9 @@ def viana_bray():
                  {"cavity": CAVITY_CAVEAT},
                  "sparse +-J spin glass (Viana-Bray / Bethe lattice): BP and population "
                  "dynamics, RS and 1RSB", default_route="cavity", finality=_finality(),
-                 meta=("phase",))
+                 meta=("phase",),
+                 parameters={"cavity": ("graph", "k", "c", "J", "beta", "ansatz", "m")
+                             + _PD_KEYS + _POP_KEYS + _GGS_KEYS})
 
 
 def _finality():

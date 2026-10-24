@@ -235,6 +235,36 @@ def test_refusal_renders_partial_derivation():
         assert escape("the sk cavity route needs beta") in render_latex(r)
 
 
+def test_refusal_document_says_trace_numbers_are_diagnostics():
+    """Final review, Minor 5: the partial trace below a require_final refusal prints q,
+    phi, replicon digits, so the document must not claim that no number appears."""
+    try:
+        compose(catalog()["sk"].spec).run(beta=2, require_final=True)
+    except Refusal as r:
+        ref = r
+    else:
+        raise AssertionError("SK RS at beta = 2 is unstable: require_final must refuse")
+    doc = render_latex(ref)
+    assert "No value is reported; " not in doc
+    flat = " ".join(doc.split())
+    assert ("No value is reported as a result; numbers in the trace are diagnostics of the "
+            "refused computation, not results.") in flat, flat[:800]
+
+
+def test_pdflatex_argv_disables_shell_escape_and_guards_the_path():
+    """Final review, Minor 3: argv only (no engine is run)."""
+    from pathlib import Path
+    from replicant.latex_pdf import engine_commands
+    runs = engine_commands("/usr/bin/pdflatex", Path("-evil.tex"))
+    assert len(runs) == 2 and runs[0] == runs[1]
+    assert "-no-shell-escape" in runs[0] and runs[0][-1] == "./-evil.tex", runs[0]
+    assert not any(a.startswith("-") and a.endswith(".tex") for a in runs[0]), runs[0]
+    runs = engine_commands("/usr/bin/pdflatex", Path("/tmp/d/doc.tex"))
+    assert runs[0][-1] == "/tmp/d/doc.tex" and "-output-directory=/tmp/d" in runs[0]
+    (t,) = engine_commands("/opt/bin/tectonic", Path("-x/-y.tex"))
+    assert t[-1] == "./-x/-y.tex" and t[t.index("--outdir") + 1] == "./-x", t
+
+
 def test_statistical_and_physics_labels_present():
     for name, route in _routes():
         doc = _doc(name, route)

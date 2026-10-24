@@ -262,6 +262,204 @@ def test_reference_checks_available_through_result():
     assert {c.key for c in checks} == {"spherical_capacity_kappa0"}
 
 
+# ---- run parameters of catalog entries (final review, Important 1) ----------------------
+# The parameter names the GUIDE's INPUTS line and worked examples use, per entry and route.
+_DOCUMENTED = {
+    ("rem", "replica"): {"beta", "N_scale"},
+    ("sk", "replica"): {"beta", "h", "fullrsb", "ansatz"},
+    ("sk", "cavity"): {"beta", "h"},
+    ("pspin", "replica"): {"p", "beta"},
+    ("perceptron", "replica"): {"alpha", "kappa"},
+    ("perceptron", "cavity"): {"alpha", "kappa"},
+    ("teacher_student", "replica"): {"alpha", "learning"},
+    ("hopfield", "replica"): {"alpha", "beta", "branch"},
+    ("hopfield", "cavity"): {"alpha", "beta", "branch"},
+    ("viana_bray", "cavity"): {"graph", "k", "c", "J", "beta", "ansatz", "m", "ys", "pop",
+                               "inner", "sweeps", "burn_in", "runs", "seed",
+                               "require_equilibrated"},
+}
+
+
+def test_catalog_run_refuses_an_unknown_parameter_naming_the_accepted_ones():
+    """A typo'd run parameter (kapa for kappa) is refused before anything runs, never
+    silently ignored (it would yield the kappa = 0 answer labelled final)."""
+    e = catalog()["perceptron"]
+    r = _refusal(lambda: compose(e.spec).run(alpha="1.5", kapa="0.3"))
+    assert r.reason == "precondition:known-parameter", r
+    assert "kapa" in r.detail and "alpha, kappa" in r.detail, r.detail
+    # the perceptron entry is RS only: an ansatz parameter is not one of its parameters
+    r = _refusal(lambda: compose(e.spec).run(alpha="1.5", ansatz="1rsb"))
+    assert r.reason == "precondition:known-parameter" and "ansatz" in r.detail, r
+    r = _refusal(lambda: compose(catalog()["sk"].spec, "cavity").run(beta=2, fullrsb=True))
+    assert r.reason == "precondition:known-parameter" and "fullrsb" in r.detail, r
+
+
+def test_declared_parameters_cover_the_documented_names_and_the_banked_runs():
+    cat = catalog()
+    assert {(n, r) for n, e in cat.items() for r in e.routes} == set(_DOCUMENTED)
+    for (name, route), names in _DOCUMENTED.items():
+        assert names <= cat[name].parameters[route], (name, route,
+                                                      names - cat[name].parameters[route])
+    for name, e in cat.items():
+        for ref in e.refs:
+            assert set(ref.params) <= e.parameters[ref.route], (name, ref.key)
+        numeric = {k for k, v in e.spec.params.items() if not getattr(v, "free_symbols", None)}
+        assert numeric <= e.parameters[e.default_route], name
+
+
+def test_composed_path_still_notes_unused_parameters():
+    res = compose(_sk("pm_one")).run(beta="1.5", h=0, dps=12, quad="gh", foo=1)
+    assert any("unused parameters ['foo']" in n for n in res.notes), res.notes
+
+
+# ---- perceptron entropy finality (final review, Important 2) ----------------------------
+def test_perceptron_entropy_finality_is_its_computed_replicon():
+    e = catalog()["perceptron"]
+    res = compose(e.spec).run(alpha="0.5")
+    lam = res.values["replicon"]
+    assert lam > 0 and res.finality["S"].state == "stable", (lam, res.finality["S"])
+    assert res.values["stable"] is True
+    res = compose(e.spec).run(alpha="1.5", kappa=-1)
+    lam = res.values["replicon"]
+    assert res.finality["S"].state == ("stable" if lam > 0 else "unstable"), (lam, res.finality)
+    assert res.finality["alpha_c"].state == "unstable"
+
+
+def test_perceptron_entropy_label_follows_a_negative_replicon():
+    """Positive control: if gardner_entropy's refusal were relaxed and the replicon came
+    back negative, the entropy is labelled unstable (not the old hard-coded stable)."""
+    import dataclasses
+    from replicant import catalog_entries as CE
+    orig = CE.gardner_entropy_point
+
+    def bypassed(alpha, variables, kappa=0):
+        S, pt = orig(alpha, variables, kappa)
+        return S, dataclasses.replace(pt, replicon=mp.mpf("-0.25"))
+
+    CE.gardner_entropy_point = bypassed
+    try:
+        res = compose(catalog()["perceptron"].spec).run(alpha="0.5")
+    finally:
+        CE.gardner_entropy_point = orig
+    assert res.finality["S"].state == "unstable" and res.values["stable"] is False
+    assert res.values["replicon"] == mp.mpf("-0.25") and not res.final
+
+
+def test_teacher_student_gibbs_finality_states_the_nishimori_argument():
+    """Final review, Minor 6: the exact-by-literature label of eps (Gibbs) rests on
+    Gibbs learning being posterior sampling (families/teacher_student.py: J uniform on
+    the version space, a uniform spherical teacher prior); the note says so."""
+    res = compose(catalog()["teacher_student"].spec).run(alpha=2)
+    st = res.finality["eps"]
+    assert st.state == "exact-by-literature" and res.values["learning"] == "gibbs"
+    assert ("Gibbs learning on the version space with a uniform prior is posterior sampling, "
+            "so the Nishimori identity applies (overlap concentration of Barbier et al.)"
+            ) in st.note, st.note
+
+
+# ---- composer invariants (final review, Minors 4 and 8) ---------------------------------
+def test_compose_level_a_step_mismatch_is_an_error_not_an_assert():
+    """The step-list invariant holds under python -O too (no bare assert)."""
+    import replicant.compose as C
+    orig = C.level_a_steps
+    near = nearest_entry(_sk("pm_one")).spec
+    C.level_a_steps = lambda spec, *a, **k: orig(spec, *a, **k)[:-1] if spec == near \
+        else orig(spec, *a, **k)
+    try:
+        compose(_sk("pm_one"))
+    except ValueError as exc:
+        assert "level-(a) step" in str(exc), exc
+    else:
+        raise AssertionError("a step-list mismatch must raise")
+    finally:
+        C.level_a_steps = orig
+
+
+def test_hooks_used_names_every_registry_a_step_consults():
+    """Pin compose.hooks_used against what the level-(a) steps actually look up, for the
+    cheap composed SK pm_one solve: derive.FAMILIES (which Family hook is called),
+    derive.SITES, derive.LAWS and solve_derived._DISCRETE are replaced by recording
+    wrappers (restored in finally) and every step runs once.  Pinned: the fields a step
+    touches are a SUBSET of the fields hooks_used names for it, and each object it names
+    for a touched registry is the one the step fetched.  Limit (why not equality):
+    rs-ansatz reads the site only through the functional built by
+    introduce-order-parameters, and the constraint / prior entries of average-disorder are
+    declarative (Family.constraints / priors are checked by the composer, not read by any
+    step), so those names cannot be observed as lookups."""
+    import dataclasses
+    from replicant import solve_derived as SD
+    from replicant.compose import hooks_used, level_a_steps
+    from replicant.core import State, run_pipeline
+    spec = _sk("pm_one")
+    touched, cur = {}, [None]
+
+    def rec(field, obj):
+        touched.setdefault(cur[0], {}).setdefault(field, []).append(obj)
+        return obj
+
+    class RecDict(dict):
+        def __init__(self, field, d):
+            super().__init__(d)
+            self.field = field
+
+        def __getitem__(self, k):
+            return rec(self.field, dict.__getitem__(self, k))
+
+        def get(self, k, default=None):
+            return rec(self.field, dict.get(self, k, default))
+
+        def __contains__(self, k):
+            rec(self.field, dict.get(self, k))
+            return dict.__contains__(self, k)
+
+    class RecTuple(tuple):
+        def __contains__(self, k):
+            rec("variables", tuple.__contains__(self, k))
+            return tuple.__contains__(self, k)
+
+    def wrap_family(fam):
+        hooks = {}
+        for f in dataclasses.fields(fam):
+            v = getattr(fam, f.name)
+            if callable(v):
+                hooks[f.name] = (lambda v, n: lambda *a, **k: (rec("family", getattr(fam, n)),
+                                                              v(*a, **k))[1])(v, f.name)
+        return dataclasses.replace(fam, **hooks)
+
+    saved = [(D, "FAMILIES", D.FAMILIES), (D, "SITES", D.SITES), (D, "LAWS", D.LAWS),
+             (SD, "_DISCRETE", SD._DISCRETE)]
+    steps = level_a_steps(spec, {"beta": "1.5", "h": 0}, {"dps": 12, "quad": "gh"})
+
+    def tagged(st):
+        def on(fn):
+            def g(s):
+                cur[0] = st.name
+                return fn(s)
+            return g
+        return dataclasses.replace(st, requires=on(st.requires), apply=on(st.apply))
+
+    D.FAMILIES = RecDict("family", {k: wrap_family(v) for k, v in D.FAMILIES.items()})
+    D.SITES, D.LAWS = RecDict("variables", D.SITES), RecDict("disorder", D.LAWS)
+    SD._DISCRETE = RecTuple(SD._DISCRETE)
+    try:
+        run_pipeline([tagged(s) for s in steps], State())
+    finally:
+        for mod, n, v in saved:
+            setattr(mod, n, v)
+    assert set(touched) <= set(LEVEL_A_STEPS), touched
+    assert touched.get("replicate") and touched.get("average-disorder"), touched
+    for step in LEVEL_A_STEPS:
+        named, seen = hooks_used(step, spec), touched.get(step, {})
+        assert set(seen) <= set(named), (step, set(seen) - set(named))
+        for field, objs in seen.items():
+            if field == "family":     # the Family hook hooks_used names is one called here
+                assert any(o is named["family"] for o in objs), (step, objs)
+            elif field == "variables" and step == "solve-derived":
+                assert named["variables"] in objs, (step, objs)
+            else:
+                assert any(o is named[field] for o in objs), (step, field, objs)
+
+
 # ---- slow: composed solves -------------------------------------------------------------
 @slow
 def test_composed_ising_perceptron_is_not_presented_as_final():

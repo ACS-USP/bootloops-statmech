@@ -292,16 +292,25 @@ def _solve_alpha(variables, alpha, k):
 
 def gardner_entropy(alpha, variables, kappa=0):
     """RS entropy density of the version space at load alpha (see conventions)."""
+    return gardner_entropy_point(alpha, variables, kappa)[0]
+
+
+def gardner_entropy_point(alpha, variables, kappa=0):
+    """(S, RSPoint | None): gardner_entropy's value and the RS saddle it was read from
+    (same refusals), so a caller can report the computed replicon.  The point is the
+    q = 0 saddle at alpha = 0 (replicon 1) and None for the spherical alpha >= alpha_c
+    (S = -inf: no saddle, the version space is empty)."""
     with _prec():
         k = _check(variables, kappa)
         a = mp.mpf(alpha)
         if not a >= 0:
             raise Refusal("precondition:nonnegative-alpha", f"alpha = {alpha}")
         if a == 0:
-            return mp.mpf(0) if variables == "spherical" else mp.log(2)
+            pt = gardner_rs_point(variables, 0, k)
+            return (mp.mpf(0) if variables == "spherical" else mp.log(2)), pt
         ac = gardner_capacity(variables, k).alpha_c
         if variables == "spherical" and a >= ac:
-            return mp.ninf          # q -> 1: the version space is empty (prob. -> 1)
+            return mp.ninf, None    # q -> 1: the version space is empty (prob. -> 1)
         if variables == "ising" and a >= ac:
             raise Refusal("no-solution", f"alpha = {mp.nstr(a, 8)} >= RS endpoint "
                           f"{mp.nstr(ac, 8)}: no RS saddle (the 1RSB capacity is lower)")
@@ -314,7 +323,7 @@ def gardner_entropy(alpha, variables, kappa=0):
                           f"RS entropy {mp.nstr(pt.S, 6)} < 0 at alpha = {mp.nstr(a, 8)}: beyond "
                           "the frozen-1RSB capacity no solutions remain; see "
                           "gardner_capacity('ising', ansatz='1rsb')")
-        return pt.S
+        return pt.S, pt
 
 
 # ---- capacity ---------------------------------------------------------------

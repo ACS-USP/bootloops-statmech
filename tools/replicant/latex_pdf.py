@@ -1,6 +1,8 @@
 """PDF compilation of a written document, and the overfull-display audit.
 
-  compile_pdf(tex) -> Path       tectonic (preferred, --keep-logs) or pdflatex (twice);
+  compile_pdf(tex) -> Path       tectonic (preferred, --keep-logs) or pdflatex (twice,
+                                 -no-shell-escape; engine_commands builds the argv, a
+                                 path starting with "-" is passed as ./path);
                                  no engine: Refusal precondition:tex-engine; a failed run:
                                  tex-engine:failed, or tex-engine:unavailable when the log
                                  says the engine could not fetch its packages
@@ -47,18 +49,29 @@ def overfull(log, min_pt=1.0):
     return out
 
 
+def _arg(path):
+    """A path as an argv word that cannot be read as an option."""
+    s = str(path)
+    return "./" + s if s.startswith("-") else s
+
+
+def engine_commands(engine, tex: Path):
+    """The argv list(s) compile_pdf runs for `engine` on `tex` (pdflatex: twice, for the
+    citations, with shell escape disabled)."""
+    tex = Path(tex)
+    d = _arg(tex.parent)
+    if Path(engine).name == "tectonic":
+        return [[engine, "--chatter", "minimal", "--keep-logs", "--outdir", d, _arg(tex)]]
+    return [[engine, "-no-shell-escape", "-interaction=nonstopmode", "-halt-on-error",
+             f"-output-directory={d}", _arg(tex)]] * 2
+
+
 def compile_pdf(tex: Path, *, min_pt=1.0) -> Path:
     tex = Path(tex)
     engine = shutil.which("tectonic") or shutil.which("pdflatex")
     if engine is None:
         raise Refusal("precondition:tex-engine", "neither tectonic nor pdflatex is on PATH")
-    d = str(tex.parent)
-    if Path(engine).name == "tectonic":
-        runs = [[engine, "--chatter", "minimal", "--keep-logs", "--outdir", d, str(tex)]]
-    else:
-        runs = [[engine, "-interaction=nonstopmode", "-halt-on-error",
-                 f"-output-directory={d}", str(tex)]] * 2      # twice: citations
-    for cmd in runs:
+    for cmd in engine_commands(engine, tex):
         p = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
         if p.returncode != 0:
             log = (p.stdout + p.stderr)[-1500:]

@@ -95,6 +95,23 @@ def test_cli_unexpected_error_prints_ERROR_and_exits_1():
     assert code == 1 and err.startswith("ERROR: ") and "Traceback" not in err, err
 
 
+def test_cli_unknown_parameter_is_refused_with_exit_2():
+    """Final review, Important 1: a typo'd or undeclared parameter is REFUSED, not
+    ignored (the reproduction ran RS at kappa = 0 and reported final: true)."""
+    code, out, err = _main(["run", "perceptron", "--param", "alpha=1.5", "--param",
+                            "ansatz=1rsb", "--param", "kapa=0.3"])
+    assert code == 2 and out == "", (code, out)
+    assert err.startswith("REFUSED: precondition:known-parameter: "), err
+    assert "ansatz, kapa" in err and "accepted: alpha, kappa" in err, err
+
+
+def test_selftest_summary_line_states_the_full_tier_cost():
+    from replicant.selftest import summary_line
+    line = summary_line(235, 0, 68)
+    assert line.startswith("replicant selftest: 235 passed, 0 failed, 68 skipped "), line
+    assert "--full" in line and "6-7 minutes" in line, line
+
+
 @slow
 def test_cli_module_entry_point_in_subprocess():
     p = subprocess.run([sys.executable, "-m", "replicant", "list"], cwd=TOOLS,

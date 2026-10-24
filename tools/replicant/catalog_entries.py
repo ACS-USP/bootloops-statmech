@@ -25,7 +25,7 @@ from .core import Refusal, Step
 from .families import pspin as P
 from .families.common import CAVEAT, CAVITY_CAVEAT
 from .families.hopfield import hopfield_alpha_c, hopfield_rs, hopfield_t0
-from .families.perceptron import gardner_capacity, gardner_entropy
+from .families.perceptron import gardner_capacity, gardner_entropy_point
 from .families.pspin import pspin_critical_temperature, pspin_spherical_1rsb
 from .families.rem import rem_1rsb, rem_critical_beta, rem_free_energy
 from .families.parisi import PARISI_CITE, krsb_ground_energy, parisi_ground_energy
@@ -112,7 +112,8 @@ def rem():
     fin = {k: exact for k in ("beta_c", "T_c", "f", "q", "q0", "q1", "m", "e")}
     return entry("rem", ModelSpec("rem", "ising", "gaussian"), REM_CITE, {"replica": steps},
                  refs, {"replica": CAVEAT}, "random energy model: T_c, frozen 1RSB phase",
-                 finality=fin, meta=("N_scale", "beta"))
+                 finality=fin, meta=("N_scale", "beta"),
+                 parameters={"replica": ("beta", "N_scale")})
 
 
 # ---- SK ------------------------------------------------------------------------------
@@ -200,7 +201,9 @@ def sk():
     return entry("sk", default_spec("sk"), SK_CITE, {"replica": steps, "cavity": cav}, refs,
                  {"replica": CAVEAT, "cavity": CAVITY_CAVEAT},
                  "Sherrington-Kirkpatrick: RS, AT stability, 1RSB, full RSB (flag)", finality=fin,
-                 meta=("rs_replicon_T0p5",))
+                 meta=("rs_replicon_T0p5",),
+                 parameters={"replica": ("beta", "h", "ansatz", "fullrsb"),
+                             "cavity": ("beta", "h", "require_stable")})
 
 
 # ---- spherical p-spin ----------------------------------------------------------------
@@ -238,7 +241,7 @@ def pspin():
     return entry("pspin", ModelSpec("pspin", "spherical", "gaussian", params={"p": 3}),
                  PSPIN_CITE, {"replica": steps}, refs, {"replica": CAVEAT},
                  "spherical p-spin: static and dynamic transitions, 1RSB", finality=fin,
-                 meta=("p",))
+                 meta=("p",), parameters={"replica": ("p", "beta")})
 
 
 # ---- spherical perceptron ----------------------------------------------------------------
@@ -251,9 +254,13 @@ def _gardner_cap(fn):
 
 
 def _gardner_s(p):
-    S = gardner_entropy(p["alpha"], "spherical", p.get("kappa", 0))
-    return Out(_saddle("rs", True, S=S),
-               "RS entropy; gardner_entropy refuses (unstable:rs) where the replicon < 0")
+    S, pt = gardner_entropy_point(p["alpha"], "spherical", p.get("kappa", 0))
+    if pt is None:              # alpha >= alpha_c: S = -inf, no saddle to test
+        return Out(_saddle("rs", None, S=S), "alpha >= alpha_c: empty version space, "
+                   "S = -inf; no RS saddle, so no replicon")
+    return Out(_saddle("rs", bool(pt.replicon > 0), S=S, replicon=pt.replicon),
+               f"RS entropy, replicon {mp.nstr(pt.replicon, 6)} (gardner_entropy refuses, "
+               "unstable:rs, where the replicon < 0)")
 
 
 def perceptron():
@@ -274,9 +281,15 @@ def perceptron():
                  finality={"alpha_c": lambda v: from_flag(
                                v["capacity_stable"], "rs", GARDNER_CITE.split(";")[0],
                                f"computed replicon at capacity {v['capacity_replicon']}"),
-                           "S": saddle(GARDNER_CITE.split(";")[0]),
+                           "S": lambda v: from_flag(
+                               v.get("stable"), "rs", GARDNER_CITE.split(";")[0],
+                               f"computed RS replicon {mp.nstr(v['replicon'], 6)}"
+                               if "replicon" in v else ""),
+                           "replicon": saddle(GARDNER_CITE.split(";")[0]),
                            "q": saddle(MEZARD_CITE)},
-                 meta=("capacity_replicon", "capacity_stable", "stability"))
+                 meta=("capacity_replicon", "capacity_stable", "stability"),
+                 parameters={"replica": ("alpha", "kappa"),
+                             "cavity": ("alpha", "kappa", "variables")})
 
 
 # ---- teacher-student -------------------------------------------------------------------
@@ -308,11 +321,15 @@ def teacher_student():
                       "Barbier, Krzakala, Macris, Miolane & Zdeborova, PNAS 116, 5451 (2019) "
                       "(the RS formula is proved for Bayes-optimal generalized linear models)",
                       "Gibbs sampling of the version space is Bayes-consistent with the teacher "
-                      "prior (Nishimori line q = R), so both curves are on the proved RS branch")
+                      "prior (Nishimori line q = R), so both curves are on the proved RS branch. "
+                      "Gibbs learning on the version space with a uniform prior is posterior "
+                      "sampling, so the Nishimori identity applies (overlap concentration of "
+                      "Barbier et al.)")
     fin = {k: exact for k in ("gibbs_asymptotic_constant", "bayes_asymptotic_constant", "eps")}
     return entry("teacher_student", spec, TS_CITE, {"replica": steps}, refs,
                  {"replica": CAVEAT}, "teacher-student perceptron: Gibbs and Bayes learning curves",
-                 finality=fin, meta=("learning",))
+                 finality=fin, meta=("learning",),
+                 parameters={"replica": ("alpha", "learning")})
 
 
 # ---- Hopfield -----------------------------------------------------------------------------
@@ -367,7 +384,9 @@ def hopfield():
                  {"replica": steps, "cavity": cav}, refs,
                  {"replica": CAVEAT, "cavity": CAVITY_CAVEAT},
                  "Hopfield (AGS), RS with branch control: retrieval capacity, T = 0 energies",
-                 finality=fin, meta=("branch",))
+                 finality=fin, meta=("branch",),
+                 parameters={"replica": ("alpha", "beta", "branch"),
+                             "cavity": ("alpha", "beta", "branch")})
 
 
 def dense_entries():

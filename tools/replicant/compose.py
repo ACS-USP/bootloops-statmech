@@ -12,7 +12,11 @@ the same family, the one agreeing on most of (constraint, prior), ties broken by
 (variables, disorder), then by catalog order; no entry of that family -> None.
 
 Catalog spec: the entry's pipeline for the route (level (b), or its cavity route) is
-reused whole: report.reused = its step names, adapted = missing = [].
+reused whole: report.reused = its step names, adapted = missing = [].  Its run
+parameters (spec.params numbers + run(**params)) must be names the route reads
+(CatalogEntry.parameters[route]); any other name is refused precondition:known-parameter
+(detail: the offending and the accepted names), never silently ignored.  (A composed
+calculation instead notes "unused parameters [...]", solve_derived.py.)
 
 Any other spec: the calculation is assembled from the level-(a) steps
   replicate -> average-disorder -> introduce-order-parameters -> rs-ansatz ->
@@ -207,6 +211,12 @@ class ComposedCalculation:
     def _run_catalog(self, require_final, params):
         p = {**{k: v for k, v in self.spec.params.items()
                 if not (isinstance(v, sp.Basic) and v.free_symbols)}, **params}
+        accepted = self.entry.parameters.get(self.route, frozenset())
+        unknown = sorted(set(p) - accepted)
+        if unknown:
+            raise Refusal("precondition:known-parameter",
+                          f"catalog entry {self.entry.name!r} ({self.route} route) does not "
+                          f"read {', '.join(unknown)}; accepted: {', '.join(sorted(accepted))}")
         state, trace = self.entry.execute(self.route, **p)
         values = state["values"]
         res = Result(dict(values), trace, errors=dict(state["errors"]),
@@ -324,7 +334,10 @@ def _compose(spec, route):
         relative = (f"level-(a) derivation of catalog entry {near.name!r} (spec "
                     f"{dict(zip(FIELDS, _key(near.spec)))})")
         theirs = level_a_steps(near.spec)
-        assert [s.name for s in theirs] == [s.name for s in steps] == list(LEVEL_A_STEPS)
+        if not [s.name for s in theirs] == [s.name for s in steps] == list(LEVEL_A_STEPS):
+            raise ValueError(f"level-(a) step lists differ: {[s.name for s in steps]} (spec) "
+                             f"vs {[s.name for s in theirs]} ({near.name!r}); expected "
+                             f"{list(LEVEL_A_STEPS)}")
         for st in steps:
             mine, other = hooks_used(st.name, spec), hooks_used(st.name, near.spec)
             diffs = [f for f in mine if mine[f] != other[f]]

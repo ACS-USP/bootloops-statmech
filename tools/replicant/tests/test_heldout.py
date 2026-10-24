@@ -438,11 +438,12 @@ def test_wrong_ansatz_is_rejected():
 _FAMILY_FUNCS = {
     "replicant.families.sk": ("sk_rs", "sk_replicon", "sk_1rsb", "sk_ground_energy",
                               "sk_at_temperature", "rs_equations_symbolic"),
-    "replicant.families.perceptron": ("gardner_entropy", "gardner_capacity",
-                                      "gardner_rs_point", "gardner_capacity_curve",
+    "replicant.families.perceptron": ("gardner_entropy", "gardner_entropy_point",
+                                      "gardner_capacity", "gardner_rs_point",
+                                      "gardner_capacity_curve",
                                       "rs_equations_symbolic"),
     "replicant.catalog_entries": ("sk_rs", "sk_replicon", "sk_1rsb", "sk_ground_energy",
-                                  "gardner_entropy", "gardner_capacity"),
+                                  "gardner_entropy_point", "gardner_capacity"),
 }
 
 

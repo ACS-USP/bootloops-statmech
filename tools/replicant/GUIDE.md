@@ -86,13 +86,19 @@ state point: all roots found from seeded searches, an audit residual, a computed
 `from replicant.latex import render_latex, write_latex` (`write_latex(result, path, pdf=False)`; a
 `Refusal` is also accepted and writes its partial derivation).
 
-INPUTS: a catalog entry name or a spec.json (above); run parameters by entry:
-`rem`: `beta`, `N_scale` (default 1/2, Derrida's normalization); `sk`: `beta`, `h`, `fullrsb` (flag, slow
-tier); `pspin`: `p` (default 3), `beta`; `perceptron`: `alpha`, `kappa` (default 0); `teacher_student`:
-`alpha`, `learning` (`gibbs`|`bayes`); `hopfield`: `alpha`, `beta`, `branch`; `viana_bray`: `graph`
-(`regular` with excess degree `k`, or `poisson` with mean degree `c`), `J`, `beta`, `ansatz`
-(`rs`|`1rsb`), `m`, `ys`, and the sampling knobs `pop`, `inner`, `sweeps`, `burn_in`, `runs`, `seed`,
-`require_equilibrated`. Without `beta` an entry returns its T = 0 / critical headline values.
+INPUTS: a catalog entry name or a spec.json (above); run parameters by entry (exactly the names each
+route reads, `CatalogEntry.parameters[route]`; any other name, e.g. a typo `kapa`, is refused
+`precondition:known-parameter` with the accepted names, never ignored):
+`rem`: `beta`, `N_scale` (default 1/2, Derrida's normalization); `sk` replica: `beta`, `h`, `ansatz`
+(`rs`|`1rsb`, at a `beta`), `fullrsb` (flag, slow tier); `sk` cavity: `beta`, `h`, `require_stable`;
+`pspin`: `p` (default 3), `beta`; `perceptron` replica: `alpha`, `kappa` (default 0); `perceptron`
+cavity: `alpha`, `kappa`, `variables` (`spherical`; `ising` is refused `not-implemented:cavity-ising`);
+`teacher_student`: `alpha`, `learning` (`gibbs`|`bayes`); `hopfield` (both routes): `alpha`, `beta`,
+`branch`; `viana_bray`: `graph` (`regular` with excess degree `k`, or `poisson` with mean degree `c`),
+`J`, `beta`, `ansatz` (`rs`|`1rsb`), `m`, `ys`, and the sampling knobs `pop`, `inner`, `sweeps`,
+`burn_in`, `runs`, `seed`, `require_equilibrated`, `field`, `init_field`, `init_spread`, `init`,
+`bary_samples`. Without `beta` an entry returns its T = 0 / critical headline values. A composed spec
+(not a catalog entry) does not refuse an unknown name: its notes list "unused parameters [...]".
 
 OUTPUTS: the `Result` object (`values`, `errors`, `rigor`, `route`, `stable`, `final`, `finality`,
 `statistical`, `notes`, `params`, `report`, `trace`, `entry`, `spec`; `reference_checks(slow=False)`
@@ -116,7 +122,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `missing-step:family:<f>`, `:site:<v>`, `:disorder:<d>`, `:constraint:<c>`, `:prior:<p>` | composer: the level-(a) hook the spec needs does not exist (the detail names what exists and the nearest catalog entry) |
 | `missing-step:route:<r>` | unknown route, entry without that route, or cavity for a spec outside the catalog (no generic cavity composer) |
 | `missing-step:derivation:<name>` | a requested document needs a derivation the entry does not provide |
-| `precondition:<name>` | an input or state precondition fails (state point incomplete: `state-point`; out-of-range or non-numeric input; `rs-reducible`, `rs-site-trace-form`, `supported-disorder-law`, `nonnegative-alpha`, `finite-kappa`, `known-ansatz`, `known-graph`, `tex-engine`, `latex-path`, `known-target`, `complete-spec`, ... and the step preconditions of the derivation) |
+| `precondition:<name>` | an input or state precondition fails (state point incomplete: `state-point`; out-of-range or non-numeric input; `known-parameter`, `rs-reducible`, `rs-site-trace-form`, `supported-disorder-law`, `nonnegative-alpha`, `finite-kappa`, `known-ansatz`, `known-graph`, `tex-engine`, `latex-path`, `known-target`, `complete-spec`, ... and the step preconditions of the derivation) |
 | `unstable:<ansatz>` | `require_final` or `require_stable`: a computed stability is negative (RS replicon or cavity lambda < 0) |
 | `unknown-stability:rs` | `require_final`: an RS value whose stability is not computed |
 | `not-final:<ansatz>` | `require_final`: a non-RS value that is not final |
@@ -136,7 +142,7 @@ CATALOG (v1; `list` shows the live table; values at the default / banked state p
 | `rem` random energy model | replica | `beta_c` 1.66511 (`T_c` 0.600561, N_scale 1/2) | `T_c`, frozen ground energy, 1RSB `m beta/beta_c = 1` (Derrida) | exact-by-literature (1RSB) |
 | `sk` Sherrington-Kirkpatrick | replica, cavity | `tc` 1; RS `-sqrt(2/pi)` = -0.797885; 1RSB -0.765259; at `beta`: RS `q, f, e, replicon` | `tc`, RS, 1RSB; slow tier: 2RSB -0.76361, 3RSB -0.76331, full-RSB -0.763166 | `tc` stable; RS ground energy unstable; 1RSB not-computed; full RSB exact-by-literature (slow) |
 | `pspin` spherical p-spin | replica | p = 3: `T_s` 0.586054, `T_d` 0.612372, `q_s` 0.645007 | `T_s`, `T_d`, `q_s`; slow: `e0` -1.172 | exact-by-literature (1RSB) |
-| `perceptron` spherical (Gardner) | replica, cavity | `alpha_c(kappa=0)` = 2; entropy at `alpha` | `alpha_c`, both routes | stable (RS exact for kappa >= 0; kappa < 0 returns the RS value labelled unstable and not final; a spherical 1RSB request is refused, `not-implemented:spherical-rsb`) |
+| `perceptron` spherical (Gardner) | replica, cavity | `alpha_c(kappa=0)` = 2; entropy `S` and its `replicon` at `alpha` | `alpha_c`, both routes | `alpha_c` stable for kappa >= 0 (RS exact), unstable and not final for kappa < 0; `S` carries its own computed replicon label. The entry is RS only: `--param ansatz=1rsb` is refused `precondition:known-parameter`; in Python `gardner_capacity("spherical", ansatz="1rsb")` is refused `not-implemented:spherical-rsb` |
 | `teacher_student` | replica | Gibbs 0.624658 / Bayes 0.441700 asymptotic constants (`eps ~ c/alpha`) | both constants (bank tol is a 3-digit rounding) | exact-by-literature |
 | `hopfield` (AGS) | replica, cavity | `alpha_c(T=0)` 0.137906, `m` 0.967417, `E` -0.501445, `alpha_global` 0.051854 | all four (Steffan-Kuehn; AGS 0.051 for the global one) | T = 0 values not-computed; state-point values carry their replicon |
 | `viana_bray` sparse +-J | cavity | `beta_c` (3-regular) 0.881374; T = 0 RS `p0` 1/3, `e0` -23/18; factorized 1RSB -1.27231, mu* 0.4174 | those, plus slow/statistical population-dynamics RS and 1RSB at k = 5, T = 0.8 | `beta_c` stable; the rest not-computed |
@@ -163,13 +169,15 @@ banked in `reference/perceptron.json` as independent targets. Honest limits:
 - The annealed bound does not detect the spherical-site swap (the other checks do).
 - Enumeration slack c/N with c = 1 is an assumption of the test.
 
-ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 235 tests, about 16 s on a laptop; also `python3 run_selftests.py replicant`) covers the core and refusal paths, the symbolic
+ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 247 tests, about 17 s on a
+laptop; also `python3 run_selftests.py replicant`) covers the core and refusal paths, the symbolic
 derivation against independent expressions, level agreement (a)=(b) for every family where both exist,
 every catalog entry against its banked non-slow values, the cavity routes, the composer and the held-out
-models, the CLI and the LaTeX writer (displayed equations re-checked numerically). `--full` adds 68 `@slow`
-tests (full-RSB Parisi up to K = 9, population dynamics at reference sizes, the Hopfield replicon scans, the
-p-spin T -> 0 energy, solver-based composed and LaTeX checks, a PDF compile when a TeX engine is present) and takes
-about 6 minutes; run it before merging a change to a family. The `@slow` marker is honoured by
+models, the CLI and the LaTeX writer (displayed equations re-checked numerically). `--full` adds 68
+`@slow` tests (full-RSB Parisi up to K = 9, population dynamics at reference sizes, the Hopfield replicon
+scans, the p-spin T -> 0 energy, solver-based composed and LaTeX checks, a PDF compile when a TeX engine
+is present) and takes about 6-7 minutes on a laptop (measured 6 min 42 s); run it before merging a
+change to a family. The `@slow` marker is honoured by
 `selftest.py` only: pytest ignores it and would run everything. Level agreement between the derivation
 and the pipelines is a consistency check, not new evidence for the ansatz; the cavity route reproducing
 the replica RS equations is an independent derivation but NOT independent evidence for the RS ansatz.
@@ -201,10 +209,15 @@ KNOWN HAZARDS:
 - LaTeX writer: a heuristic converter turns code notation into math; some fragments stay in code font and
   a very wide expression can overrun the margin (`--pdf` warns `OverfullDisplay`). Writing a document
   checks nothing by itself; the checks are `tests/test_latex.py`.
-- Spherical perceptron: above capacity the entropy is -inf (empty version space). kappa < 0 returns the
-  RS value labelled `unstable` and `final: false` (e.g. `--param alpha=1.5 --param kappa=-1` gives
-  `alpha_c` 13.27, replicon -1.106); only a spherical 1RSB request is refused
-  (`not-implemented:spherical-rsb`). Hopfield cavity gives the energy, not `f`.
+- Spherical perceptron: above capacity the entropy is -inf (empty version space; no saddle, so `S` is
+  `not-computed`). For kappa < 0 the capacity is labelled `unstable` and `final: false` (the entropy
+  carries its own computed label: `S` is labelled by the sign of the RS replicon at that `alpha`, and
+  `gardner_entropy` refuses `unstable:rs` where it is negative); e.g. `--param alpha=1.5 --param
+  kappa=-1` gives `alpha_c` 13.27 with capacity replicon -1.106 (unstable) and `S` with its own
+  replicon. The entry has no `ansatz` parameter: through the CLI or `compose(...).run`, `--param
+  ansatz=1rsb` is refused `precondition:known-parameter`; at the Python level
+  `gardner_capacity("spherical", ansatz="1rsb")` is refused `not-implemented:spherical-rsb`. Hopfield
+  cavity gives the energy, not `f`.
 - Level (a) hook names differ: the Theta rule refuses as `known-gaussian-integral`, the exp rule as
   `gaussian-integrable`. At K = 8 the top Hessian eigenvalue (about -2.6e-8) is near the finite-difference
   noise floor, so negative-definiteness is weakly established at the highest levels. The slow-tier catalog
@@ -212,9 +225,10 @@ KNOWN HAZARDS:
   in `tests/test_parisi.py`. The `exact-by-literature` label of full RSB rests on the cited published
   Parisi value (Talagrand, Panchenko), not on this package's K-level extrapolation, whose band is stated
   separately.
-- Banked values often come from secondary open sources where the original is paywalled; each bank entry
-  names the source its digits were read from (`reference/*.json`, field `cite`), and where the cite says
-  the original was not fetched the digits come from the secondary source named there. Check the originals by hand before quoting a digit.
+- Banked values often come from secondary open sources where the original is paywalled; each bank
+  entry names the source its digits were read from (`reference/*.json`, field `cite`), and where the
+  cite says the original was not fetched the digits come from the secondary source named there. Check
+  the originals by hand before quoting a digit.
 
 RELATED: none upstream or downstream in this repository. Arbitrary precision is plain mpmath (no ball
 enclosures; `baller` is not used).
