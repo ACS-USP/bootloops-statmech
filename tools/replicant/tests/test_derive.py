@@ -46,49 +46,49 @@ def test_sk_gaussian_annealed_exact():
     assert sp.simplify(got - (N*sp.log(2) + beta**2*(N - 1)/4)) == 0
     # Brute force: E exp(beta J s_i s_j) = exp(beta^2 (s_i s_j)^2 / (2N)),
     # the exact Gaussian moment, summed over all 2^N states.
-    mp.mp.dps = 40
-    b = Fraction(7, 10)
-    for N_ in range(2, 11):
-        total = mp.mpf(0)
-        for s in _configs(N_):
-            expo = sum(b**2 * (s[i]*s[j])**2 / (2*N_)
-                       for i in range(N_) for j in range(i + 1, N_))
-            total += mp.exp(mp.mpf(expo.numerator) / expo.denominator)
-        want = got.subs({N: N_, beta: sp.Rational(7, 10)})
-        assert abs(mp.log(total) - mp.mpf(sp.N(want, 40))) < mp.mpf("1e-30")
+    with mp.workdps(40):
+        b = Fraction(7, 10)
+        for N_ in range(2, 11):
+            total = mp.mpf(0)
+            for s in _configs(N_):
+                expo = sum(b**2 * (s[i]*s[j])**2 / (2*N_)
+                           for i in range(N_) for j in range(i + 1, N_))
+                total += mp.exp(mp.mpf(expo.numerator) / expo.denominator)
+            want = got.subs({N: N_, beta: sp.Rational(7, 10)})
+            assert abs(mp.log(total) - mp.mpf(sp.N(want, 40))) < mp.mpf("1e-30")
 
 
 def test_sk_pm_one_annealed_exact():
     got = annealed_log_Z(_sk("pm_one"), N)
     want = N*sp.log(2) + (N*(N - 1)/2)*sp.log(sp.cosh(beta/sp.sqrt(N)))
     assert sp.simplify(got - want) == 0
-    mp.mp.dps = 40
-    b = mp.mpf(7) / 10
-    # N <= 4: average over every coupling sign pattern, no cosh identity used.
-    for N_ in range(2, 5):
-        pairs = [(i, j) for i in range(N_) for j in range(i + 1, N_)]
-        J = 1 / mp.sqrt(N_)
-        total = mp.mpf(0)
-        for signs in itertools.product((1, -1), repeat=len(pairs)):
+    with mp.workdps(40):
+        b = mp.mpf(7) / 10
+        # N <= 4: average over every coupling sign pattern, no cosh identity used.
+        for N_ in range(2, 5):
+            pairs = [(i, j) for i in range(N_) for j in range(i + 1, N_)]
+            J = 1 / mp.sqrt(N_)
+            total = mp.mpf(0)
+            for signs in itertools.product((1, -1), repeat=len(pairs)):
+                for s in _configs(N_):
+                    total += mp.exp(b * J * sum(g * s[i] * s[j]
+                                                for g, (i, j) in zip(signs, pairs)))
+            avg = total / 2**len(pairs)
+            val = got.subs({N: N_, beta: sp.Rational(7, 10)})
+            assert abs(mp.log(avg) - mp.mpf(sp.N(val, 40))) < mp.mpf("1e-30")
+        # N <= 10: per-pair exact average over the two signs, all 2^N states.
+        for N_ in range(5, 11):
+            J = 1 / mp.sqrt(N_)
+            total = mp.mpf(0)
             for s in _configs(N_):
-                total += mp.exp(b * J * sum(g * s[i] * s[j]
-                                            for g, (i, j) in zip(signs, pairs)))
-        avg = total / 2**len(pairs)
-        val = got.subs({N: N_, beta: sp.Rational(7, 10)})
-        assert abs(mp.log(avg) - mp.mpf(sp.N(val, 40))) < mp.mpf("1e-30")
-    # N <= 10: per-pair exact average over the two signs, all 2^N states.
-    for N_ in range(5, 11):
-        J = 1 / mp.sqrt(N_)
-        total = mp.mpf(0)
-        for s in _configs(N_):
-            term = mp.mpf(1)
-            for i in range(N_):
-                for j in range(i + 1, N_):
-                    t = b * J * s[i] * s[j]
-                    term *= (mp.exp(t) + mp.exp(-t)) / 2
-            total += term
-        val = got.subs({N: N_, beta: sp.Rational(7, 10)})
-        assert abs(mp.log(total) - mp.mpf(sp.N(val, 40))) < mp.mpf("1e-30")
+                term = mp.mpf(1)
+                for i in range(N_):
+                    for j in range(i + 1, N_):
+                        t = b * J * s[i] * s[j]
+                        term *= (mp.exp(t) + mp.exp(-t)) / 2
+                total += term
+            val = got.subs({N: N_, beta: sp.Rational(7, 10)})
+            assert abs(mp.log(total) - mp.mpf(sp.N(val, 40))) < mp.mpf("1e-30")
 
 
 def test_unsupported_disorder_refuses():
