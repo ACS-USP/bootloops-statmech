@@ -1,157 +1,127 @@
 """Generic numerical solution of DERIVED RS equations (level (a) -> numbers).
 
-  solve_derived_rs(spec, *, branch=None, seed="0.5", seeds=None, dps=20, **params)
-      -> DerivedRSSolution(values, free_energy, residual, equations_used, trace,
-                           stable, caveat, branch, entropy, method, note)
+  solve_derived_rs(spec, *, branch=None, quad="fast", dps=20, seed="0.5", seeds=None,
+                   gh_nodes=80, audit_tol=None, **params) -> DerivedRSSolution
 
-What it does, with no family name anywhere in this module (everything
-model-specific arrives through agree.derive_rs(spec): the stationarity
-equations d phi / d p = 0, the declared unknowns p = RSFree.params, and phi):
- 1. Parameters.  Every free symbol of the equations that is not a declared
-    unknown needs a value: from `params` (by symbol name; strings or numbers),
-    else a Refusal.  Numbers given inside spec.params are already in the
-    derivation.
+No family name appears in this module: everything model-specific arrives
+through agree.derive_rs(spec) (the stationarity equations d phi/d p = 0, the
+declared unknowns p = RSFree.params, phi itself, the recorded site traces) and
+derive_replicon.replicon(state).
+ 1. Parameters.  Every free symbol of the equations or of phi that is not a
+    declared unknown needs a value from `params` (by symbol name), else a
+    Refusal.  A numeric spec.params["beta"] is lifted back to the symbol beta
+    (and its value moved to `params`) so that the entropy can be derived.
  2. Canonical form.  lhs - rhs, expectations split by linearity, one round of
-    Gaussian integration by parts on bare z factors (gauss.linear, gauss.stein),
-    then merged into one expectation per equation (gauss._merge_linear), which
-    also cancels the sqrt(qhat)/sqrt(qhat) that integration by parts leaves.
+    Gaussian integration by parts (gauss.linear, gauss.stein), erfc kept as
+    written (_derived_num.safe).
  3. Elimination.  Unknowns are tried in reverse declared order (conjugates and
-    extras before the primary overlap): an unknown x is eliminated through an
-    equation in which it occurs linearly and outside every expectation,
-    x = S(others), when S does not contain x and no earlier S contains x
-    (an acyclic evaluation order).  Eliminated values are computed numerically
-    from the remaining unknowns, never substituted symbolically (no nested
-    expectations).  SK: qhat = beta^2 q; Ising perceptron: qhat from the d/dq
-    equation.
- 4. Remaining unknowns u.  If each remaining equation can be rearranged as
-    u_k = F_k(u) (u_k linear outside the expectations; any such rearrangement
-    has the same roots, and the residual audit checks the original system):
-      one unknown   solve.fixed_point(F, seed, branch=branch): branch-aware,
-                    branches "trivial" (u = 0, F(0) = 0), "nontrivial", ...
-      several       damped iteration u <- (u + F(u))/2 from `seeds`, polished
-                    by mp.findroot (mdnewton); branch "trivial" if all u = 0.
-    Otherwise (e.g. the spherical perceptron, q/(2(1-q)^2) + alpha E[...] = 0)
-    mp.findroot on the residual from `seeds` (secant for one unknown).
-    Default seeds: (0.5, 0.25, 0.75, 0.1, 0.9) for every unknown.
- 5. Audit.  max |lhs - rhs| over ALL derived equations (eliminated ones too) at
-    the solution must be < 1e-12, else Refusal("no-solution").
- 6. Outputs.  free_energy = phi at the solution, phi = lim (1/(N n)) ln E Z^n
+    extras before the primary overlap): x is eliminated through an equation in
+    which it occurs linearly and outside every expectation, x = S(others), when
+    S does not contain x and no earlier S contains x (acyclic order).  Eliminated
+    values are computed numerically (no nested expectations).  SK: qhat = beta^2 q.
+ 4. Candidates.  If each remaining equation can be rearranged as u_k = F_k(u)
+    (u_k linear outside the expectations; any rearrangement has the same roots,
+    and the audit checks the original system):
+      one unknown   solve.fixed_point(F, seed) with the FULL seed sweep: every
+                    branch it sees is a candidate;
+      several       damped iteration u <- u + gamma (F(u) - u) from the seeds (each
+                    seed value for all unknowns, and with one unknown set to 0;
+                    gamma = 1/2, halved when the step grows); in the float search a
+                    non-converged iterate is handed to mdnewton (float);
+    otherwise, one unknown: sign changes of the residual between consecutive
+    sorted seeds, refined by the Illinois method; several: mp.findroot mdnewton
+    from the seeds.  Default seeds (0.5, 0.25, 0.75, 0.1, 0.9, 0.99).  Only
+    attracting points of the damped map (or bracketed roots) are found: an
+    absent branch means "not found from these seeds".
+    quad="fast" (default): the search runs in float64 Gauss-Hermite
+    (`gh_nodes`), each candidate is then polished by findroot in mpmath at `dps`
+    with the main quadrature; if the float search finds nothing the mpmath
+    search is run.  quad="mp": search and polish in mpmath.  quad="gh": float
+    Gauss-Hermite only, no polish (for sweeps; the audit then measures its error).
+ 5. Audit, per candidate.  Every derived equation (eliminated ones too) is
+    re-evaluated at the candidate with an INDEPENDENT quadrature
+    (_derived_num.Num.audit: Gauss-Legendre, other split, dps + 6), and
+    max |lhs - rhs| there must be < audit_tol (default max(1e-12, 10^(2-dps))).
+    quad_error = max |main - independent| over the equations and phi.  A
+    candidate that fails is dropped (named in the note); none left -> Refusal.
+ 6. Selection.  Distinct audited roots are returned in `roots` (name, values,
+    phi, residual, quad_error).  "trivial" = all unknowns 0; the others are
+    "nontrivial" if there is one, else "nontrivial-1", "nontrivial-2", ...
+    ordered by decreasing phi.  branch=None: the unique nontrivial root, else
+    the trivial one (noted); several nontrivial roots without a selector ->
+    Refusal("ambiguous:several-saddles") listing them.  branch="<name>" picks
+    by name ("nontrivial" refuses when there are several).
+ 7. Outputs.  free_energy = phi at the solution, phi = lim (1/(N n)) ln E Z^n
     (RS): -beta f for a thermal model, the entropy (log volume / log count per
-    variable) for a constraint-satisfaction model such as the perceptron.
-    entropy: phi - beta d phi/d beta when phi depends on a symbol named beta
-    (stationarity makes the partial the total derivative), phi itself when no
-    temperature enters, None when beta was fixed numerically inside spec.params.
-    stable: False when the variables are discrete (spec.variables "ising": a
-    counting measure, entropy >= 0) and the RS entropy is negative (RS is then
-    wrong, as for the Ising perceptron beyond alpha ~ 0.83); otherwise None.
-    The replicon (de Almeida-Thouless) eigenvalue is NOT derived at level (a):
-    the RS steps reduce the functional on the RS manifold only, so the
-    transverse Hessian (SK: 1 - beta^2 E sech^4) is not available here and no
-    stability is claimed from it (the family modules compute it at level (b)).
-    No capacity or threshold is computed: this solves the RS equations at the
-    given parameters only.
+    variable) for the perceptron.  entropy = phi - beta d phi/d beta when phi
+    depends on beta, else phi.  replicon: derive_replicon (SK-type pair-
+    separable energy with an Ising site), else None.
+    STABILITY CONTRACT: stable is True only when the replicon was derived and is
+    > 0 (and the entropy check below passes); False when the replicon is < 0, or
+    when the variables are discrete (spec.variables "ising": counting measure)
+    and the RS entropy is < 0; None means UNKNOWN (replicon not derived for this
+    family): a composer must treat None as unknown and never present that RS
+    answer as final.  No capacity or threshold is computed.
 
-Numerics: mpmath at `dps` (default 20) under mp.workdps (the caller's precision
-is restored); every GaussE is lambdified once (cse) and integrated by
-solve.gauss_expect (tanh-sinh on [-inf, -6, 0, 6, inf]); erfc is kept as
-written (sympy would turn erfc(-x) into 2 - erfc(x), losing all digits in the
-tail and dividing by 0 in phi/H).  The quadrature is not
-validated for sharply varying integrands (e.g. the perceptron at q -> 1); the
-audit and the tests against the family solvers are the check.
+Numerics: mpmath under mp.workdps (the caller's precision is restored).  The
+main quadrature is not validated for sharply varying integrands (perceptron at
+q -> 1, large beta); quad_error and the independent audit are the check.
 Honest label (CAVEAT): the equations are physics-level (replica n -> 0, RS
 ansatz); a solution of them is an RS saddle, not a proof that RS is correct.
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import mpmath as mp
 import sympy as sp
 
 from . import agree
+from . import derive as D
+from ._derived_num import Num, safe
 from .core import Refusal, Trace, TraceEntry
+from .derive_replicon import replicon as derive_replicon
 from .families.common import CAVEAT
-from .gauss import GaussE, _merge_linear, _sympy_point, linear, stein
-from .solve import fixed_point, gauss_expect
+from .gauss import GaussE, _sympy_point, linear, stein
+from .solve import fixed_point
 from .spec import ModelSpec
 
-_DEFAULT_SEEDS = ("0.5", "0.25", "0.75", "0.1", "0.9")
-_AUDIT = "1e-12"
+_DEFAULT_SEEDS = ("0.5", "0.25", "0.75", "0.1", "0.9", "0.99")
 _DISCRETE = ("ising",)          # spec.variables with a counting measure (entropy >= 0)
+_QUADS = ("fast", "mp", "gh")
+_SAME = mp.mpf("1e-8")
+_ZERO = mp.mpf("1e-10")
 
 
 @dataclass(frozen=True)
 class DerivedRSSolution:
     values: dict                 # unknown name -> mpf (eliminated ones included)
-    free_energy: object          # phi at the solution (see module docstring), or None
-    residual: object             # max |lhs - rhs| over all derived equations
+    free_energy: object          # phi at the solution (module docstring)
+    residual: object             # max |lhs - rhs|, all equations, INDEPENDENT quadrature
     equations_used: list         # the derived sympy equations (symbolic parameters)
     trace: Trace                 # the derivation's trace plus a "solve-derived" entry
-    stable: bool | None
+    stable: bool | None          # None = UNKNOWN (see the stability contract)
     caveat: str = CAVEAT
     branch: str = ""
     entropy: object = None
     method: str = ""
     note: str = ""
     params: dict = field(default_factory=dict)
-
-
-# ---- compiled numeric evaluation ---------------------------------------------------
-
-class _Erfc(sp.Function):
-    """erfc kept as written: sympy rewrites erfc(-x) as 2 - erfc(x) (e.g. once
-    kappa = 0 is substituted), which loses every digit where erfc(x) -> 0
-    (H(x) -> 1 far in the Gaussian tail) and divides by 0 in phi/H.  Same
-    derivative; evaluated by mpmath.erfc."""
-    def fdiff(self, argindex=1):
-        u = self.args[0]
-        return -2 * sp.exp(-u**2) / sp.sqrt(sp.pi)
-
-
-def _safe(expr):
-    return sp.sympify(expr).replace(lambda e: isinstance(e, sp.erfc),
-                                    lambda e: _Erfc(e.args[0]))
-
-
-_MODULES = [{"_Erfc": mp.erfc}, "mpmath"]
-
-
-class _Num:
-    """expr(args) numerically: each GaussE atom by gauss_expect, the rest by an
-    mpmath lambdify.  Returns mpf, or mpc when the value is not real."""
-
-    def __init__(self, expr, args, dps):
-        self.dps = dps
-        atoms = sorted(expr.atoms(GaussE), key=str)
-        if len(atoms) > 1:
-            expr = _merge_linear(expr, atoms)
-            atoms = sorted(expr.atoms(GaussE), key=str)
-        if any(a.f.atoms(GaussE) for a in atoms):
-            raise Refusal("precondition:no-nested-expectation", str(expr))
-        dum = [sp.Dummy(f"G{k}") for k in range(len(atoms))]
-        self.inner = [sp.lambdify([a.z] + list(args), a.f, _MODULES, cse=True)
-                      for a in atoms]
-        self.outer = sp.lambdify(dum + list(args), expr.xreplace(dict(zip(atoms, dum))),
-                                 _MODULES)
-
-    def __call__(self, vals):
-        g = [gauss_expect(lambda z, f=f: f(z, *vals), dps=self.dps) for f in self.inner]
-        v = self.outer(*g, *vals)
-        if isinstance(v, mp.mpc) and v.imag == 0:
-            v = v.real
-        return v if isinstance(v, (mp.mpf, mp.mpc)) else mp.mpf(v)
+    quad_error: object = None    # max |main - independent quadrature| (equations, phi)
+    replicon: object = None      # derived lambda_R at the solution, or None
+    roots: list = field(default_factory=list)   # every audited root: dicts
 
 
 def _masked(e, fn):
     atoms = sorted(e.atoms(GaussE), key=str)
     dum = [sp.Dummy("G") for _ in atoms]
     back = dict(zip(dum, atoms))
-    r = fn(sp.expand(e.xreplace(dict(zip(atoms, dum)))), set(dum))
+    r = fn(sp.expand(e.xreplace(dict(zip(atoms, dum)))))
     return None if r is None else tuple(sp.sympify(x).xreplace(back) for x in r)
 
 
 def _linear_outside(e, x):
-    """(c1, c0) with e = c1 x + c0, x not in c1 and absent from every expectation
-    of c1; c0 may hold x inside expectations.  None otherwise."""
-    def go(m, dum):
+    """(c1, c0) with e = c1 x + c0 and x absent from c1 (expectations included);
+    c0 may hold x inside expectations.  None otherwise."""
+    def go(m):
         try:
             p = sp.Poly(m, x)
         except sp.PolynomialError:
@@ -167,203 +137,363 @@ def _in_expectation(e, x):
     return any(x in g.free_symbols for g in e.atoms(GaussE))
 
 
+def _distinct(cands, tol):
+    out = []
+    for u in cands:
+        if not any(max(abs(mp.mpf(a) - mp.mpf(b)) for a, b in zip(u, v)) < tol for v in out):
+            out.append(u)
+    return out
+
+
+def _is_number(v):
+    return not (isinstance(v, sp.Basic) and v.free_symbols)
+
+
 # ---- the solver ---------------------------------------------------------------------
 
-def solve_derived_rs(spec: ModelSpec, *, branch=None, seed="0.5", seeds=None, dps=20,
-                     **params) -> DerivedRSSolution:
+def solve_derived_rs(spec: ModelSpec, *, branch=None, quad="fast", dps=20, seed="0.5",
+                     seeds=None, gh_nodes=80, audit_tol=None, **params) -> DerivedRSSolution:
+    if quad not in _QUADS:
+        raise Refusal("precondition:known-quadrature", f"quad = {quad!r}: use {_QUADS}")
+    notes = []
+    b = spec.params.get("beta")
+    if b is not None and _is_number(b):
+        if "beta" in params and sp.sympify(params["beta"]) != sp.sympify(b):
+            raise Refusal("precondition:consistent-parameters",
+                          f"beta = {b} in spec.params and {params['beta']} in params")
+        params = {**params, "beta": params.get("beta", b)}
+        spec = replace(spec, params={**spec.params, "beta": D.BETA})
+        notes.append("numeric spec.params beta lifted to the symbol beta (entropy)")
     eqs, state, trace = agree.derive_rs(spec)
-    phi = state["rs_free"].expr
-    unknowns = list(state["rs_free"].params)
-    with mp.workdps(dps + 5):
-        return _solve(spec, eqs, phi, unknowns, trace, branch, seed,
-                      tuple(seeds or _DEFAULT_SEEDS), dps, params)
+    tol = mp.mpf(audit_tol) if audit_tol is not None else max(mp.mpf("1e-12"),
+                                                                mp.mpf(10)**(2 - dps))
+    with mp.workdps(dps + 3):
+        return _Solver(spec, eqs, state, trace, branch, quad, dps, seed,
+                       tuple(seeds or _DEFAULT_SEEDS), gh_nodes, tol, params, notes).run()
 
 
-def _solve(spec, eqs, phi, unknowns, trace, branch, seed, seeds, dps, params):
-    unames = {u.name for u in unknowns}
-    free = {s for e in eqs for s in (e.lhs - e.rhs).free_symbols} | phi.free_symbols
-    by_name = {s.name: s for s in free if s.name not in unames}
-    missing = sorted(set(by_name) - set(params))
-    if missing:
-        raise Refusal("precondition:complete-point",
-                      f"no value for parameter(s) {missing} (unknowns: {sorted(unames)})")
-    unused = sorted(set(params) - set(by_name))
-    point = _sympy_point({by_name[k]: v for k, v in params.items() if k in by_name}, dps + 5)
-    canon = [linear(stein(_safe(e.lhs - e.rhs).subs(point))) for e in eqs]
+class _Solver:
+    def __init__(self, spec, eqs, state, trace, branch, quad, dps, seed, seeds, gh, tol,
+                 params, notes):
+        self.spec, self.eqs, self.state, self.trace = spec, eqs, state, trace
+        self.branch, self.quad, self.dps, self.seed, self.seeds = branch, quad, dps, seed, seeds
+        self.gh, self.tol, self.params, self.notes = gh, tol, params, notes
+        self.phi = safe(state["rs_free"].expr)
+        self.unknowns = list(state["rs_free"].params)
 
-    # elimination of unknowns that occur linearly outside the expectations
-    elim, rest, notes = [], list(range(len(canon))), []
-    for x in reversed(unknowns):
-        if len(elim) == len(unknowns) - 1:       # keep at least one unknown to solve for
-            break
+    def num(self, expr):
+        return Num(expr, self.order, self.dps, self.gh)
+
+    # -- setup: parameters, canonical form, elimination, fixed-point forms --
+    def setup(self):
+        unames = {u.name for u in self.unknowns}
+        free = {s for e in self.eqs for s in (e.lhs - e.rhs).free_symbols} | self.phi.free_symbols
+        self.by_name = {s.name: s for s in free if s.name not in unames}
+        missing = sorted(set(self.by_name) - set(self.params))
+        if missing:
+            raise Refusal("precondition:complete-point",
+                          f"no value for parameter(s) {missing} (unknowns: {sorted(unames)})")
+        unused = sorted(set(self.params) - set(self.by_name))
+        if unused:
+            self.notes.append(f"unused parameters {unused}")
+        self.point = _sympy_point({self.by_name[k]: v for k, v in self.params.items()
+                                   if k in self.by_name}, self.dps + 15)
+        canon = [linear(stein(safe(e.lhs - e.rhs).subs(self.point))) for e in self.eqs]
+        elim, rest = [], list(range(len(canon)))
+        for x in reversed(self.unknowns):
+            if len(elim) == len(self.unknowns) - 1:      # keep one unknown to solve for
+                break
+            for k in rest:
+                e = canon[k]
+                if _in_expectation(e, x):
+                    continue
+                lin = _linear_outside(e, x)
+                if lin is None:
+                    continue
+                S = sp.expand(-lin[1] / lin[0])
+                if S.has(x) or any(Sj.has(x) for _, Sj in elim):
+                    continue
+                elim.append((x, S))
+                rest.remove(k)
+                self.notes.append(f"eliminated {x} = {S}")
+                break
+        self.left = [u for u in self.unknowns if u not in {x for x, _ in elim}]
+        if len(self.left) != len(rest):
+            raise Refusal("precondition:square-system",
+                          f"{len(rest)} equation(s) for unknowns {self.left} after elimination")
+        self.order = self.left + [x for x, _ in elim]
+        self.elim = [self.num(S) for _, S in elim]
+        self.canon = [self.num(e) for e in canon]
+        self.phi_num = self.num(self.phi.subs(self.point))
+        forms, used = [], set()
         for k in rest:
-            e = canon[k]
-            if _in_expectation(e, x):
-                continue
-            lin = _linear_outside(e, x)
-            if lin is None:
-                continue
-            S = sp.expand(-lin[1] / lin[0])
-            if S.has(x) or any(Sj.has(x) for _, Sj in elim):
-                continue
-            elim.append((x, S))
-            rest.remove(k)
-            notes.append(f"eliminated {x} = {S}")
-            break
-    left = [u for u in unknowns if u not in {x for x, _ in elim}]
-    if len(left) != len(rest):
-        raise Refusal("precondition:square-system",
-                      f"{len(rest)} equation(s) for unknowns {left} after elimination")
-    order = left + [x for x, _ in elim]          # argument order of every compiled function
-    comp_elim = [(x, _Num(S, order, dps)) for x, S in elim]
+            for x in self.left:
+                lin = None if x in used else _linear_outside(canon[k], x)
+                if lin is not None:
+                    forms.append((x, sp.expand(-lin[1] / lin[0])))
+                    used.add(x)
+                    break
+            else:
+                forms = None
+                break
+        if forms is not None:
+            forms.sort(key=lambda p: self.left.index(p[0]))
+            self.F = [self.num(F) for _, F in forms]
+        else:
+            self.F = None
+            self.R = [self.canon[k] for k in rest]
 
-    def full(u):
-        vals = list(u) + [mp.mpf(0)] * len(elim)
-        for j, (x, f) in enumerate(comp_elim):
-            vals[len(left) + j] = f(vals)
+    # -- evaluation with a chosen quadrature --
+    def full(self, u, how):
+        vals = list(u) + [0] * len(self.elim)
+        for j, f in enumerate(self.elim):
+            vals[len(self.left) + j] = getattr(f, how)(vals)
         return vals
 
-    # fixed-point form u_k = F_k(u), one remaining equation per remaining unknown
-    forms, used = [], set()
-    for k in rest:
-        for x in left:
-            if x in used:
+    def G(self, u, how):
+        """Residual of the solved form at u: F(u) - u, or the raw residual."""
+        vals = self.full(u, how)
+        if self.F is not None:
+            return [getattr(f, how)(vals) - x for f, x in zip(self.F, u)]
+        return [getattr(r, how)(vals) for r in self.R]
+
+    # -- candidate search --
+    def _vector_seeds(self):
+        k = len(self.left)
+        out = [[s] * k for s in self.seeds]
+        if k > 1:
+            out += [[s if i != j else "0" for i in range(k)] for s in self.seeds[:2]
+                    for j in range(k)]
+        return out
+
+    def search(self, how):
+        """Candidate roots (lists of numbers) found with evaluator `how`."""
+        cands = []
+        to = (lambda v: mp.mpf(v)) if how == "fast" else (lambda v: v)
+        if self.F is not None and len(self.left) == 1:
+            F = lambda x: to(self.F[0].__getattribute__(how)(self.full([x], how)))
+            dps, tol = (15, "1e-11") if how == "fast" else (self.dps + 3, mp.mpf(10)**-self.dps)
+            try:
+                fp = fixed_point(F, mp.mpf(self.seed), dps=dps, tol=tol)
+            except Refusal:
+                return []
+            return [[v] for _, v in fp.branch_values]
+        if self.F is None and len(self.left) == 1:
+            return self._brackets(how, to)
+        fast = how == "fast"
+        stop, maxit = (mp.mpf("1e-12"), 5000) if fast else (mp.mpf("1e-4"), 400)
+        newton = lambda u: mp.findroot(lambda *x: [to(g) for g in self.G(list(x), how)], u,
+                                       solver="mdnewton", tol=mp.mpf("1e-20"), maxsteps=50,
+                                       verify=False)
+        for s in self._vector_seeds():
+            u = [mp.mpf(x) for x in s]
+            try:
+                if self.F is not None:
+                    u, ok = self._damped(u, how, to, stop, maxit)
+                    if not ok and not fast:
+                        continue
+                    if not ok:          # float: Newton from the last iterate is cheap
+                        with mp.workdps(15):
+                            r = newton(u)
+                        u = [r[i] for i in range(len(u))]
+                        if max(abs(to(g)) for g in self.G(u, how)) > mp.mpf("1e-9"):
+                            continue
+                else:
+                    with mp.workdps(15 if fast else self.dps + 3):
+                        r = newton(u)
+                    u = [r[i] for i in range(len(u))]
+                if any(isinstance(v, mp.mpc) for v in u):
+                    continue
+            except (ValueError, TypeError, ZeroDivisionError, OverflowError, Refusal):
                 continue
-            lin = _linear_outside(canon[k], x)
-            if lin is not None:
-                forms.append((x, sp.expand(-lin[1] / lin[0])))
-                used.add(x)
-                break
+            cands.append(u)
+        return cands
+
+    def _damped(self, u, how, to, stop, maxit):
+        """u <- u + gamma (F(u) - u), gamma = 1/2 halved (down to 1/1024) whenever the
+        step grows.  Returns (last iterate, converged)."""
+        gamma, last = mp.mpf("0.5"), None
+        for _ in range(maxit):
+            g = [to(x) for x in self.G(u, how)]
+            size = max(abs(x) for x in g)
+            if size < stop:
+                return u, True
+            if last is not None and size > last and gamma > mp.mpf(1) / 1024:
+                gamma /= 2
+            last = size
+            u = [x + gamma * d for x, d in zip(u, g)]
+        return u, False
+
+    def _brackets(self, how, to):
+        """One unknown, no fixed-point form: sign changes of the residual between
+        consecutive sorted seeds, each refined by the Illinois method."""
+        pts, cands = sorted({mp.mpf(x) for x in self.seeds}), []
+        vals = []
+        for x in pts:
+            try:
+                v = to(self.G([x], how)[0])
+                vals.append(v if isinstance(v, mp.mpf) else None)
+            except (ValueError, TypeError, ZeroDivisionError, OverflowError):
+                vals.append(None)
+        with mp.workdps(15 if how == "fast" else self.dps + 3):
+            for (a, fa), (b, fb) in zip(zip(pts, vals), zip(pts[1:], vals[1:])):
+                if fa is None or fb is None or (fa > 0) == (fb > 0):
+                    continue
+                try:
+                    r = mp.findroot(lambda x: to(self.G([x], how)[0]), (a, b),
+                                    solver="illinois", tol=mp.mpf("1e-24"), maxsteps=100,
+                                    verify=False)
+                except (ValueError, TypeError, ZeroDivisionError, OverflowError):
+                    continue
+                if isinstance(r, mp.mpf):
+                    cands.append([r])
+        return cands
+
+    def polish(self, u):
+        """findroot in mpmath (main quadrature) from candidate u; exact 0 kept."""
+        u = [mp.mpf(v) for v in u]
+        if all(abs(v) < _ZERO for v in u):
+            z = [mp.mpf(0)] * len(u)
+            try:
+                if max(abs(g) for g in self.G(z, "mp")) < mp.mpf(10)**-self.dps:
+                    return z
+            except (ValueError, TypeError, ZeroDivisionError):
+                pass
+        try:
+            r = mp.findroot(lambda *x: self.G(list(x), "mp") if len(u) > 1 else
+                            self.G(list(x), "mp")[0], u if len(u) > 1 else u[0],
+                            solver="secant" if len(u) == 1 else "mdnewton",
+                            tol=mp.mpf(10)**(-self.dps - 1), maxsteps=30, verify=False)
+        except (ValueError, TypeError, ZeroDivisionError, OverflowError):
+            return None
+        u = [r] if len(u) == 1 else [r[i] for i in range(len(u))]
+        if any(isinstance(v, mp.mpc) for v in u):
+            return None
+        try:
+            if max(abs(g) for g in self.G(u, "mp")) > mp.mpf(10)**(2 - self.dps):
+                return None
+        except (ValueError, TypeError, ZeroDivisionError):
+            return None
+        return u
+
+    def candidates(self):
+        if self.quad in ("fast", "gh"):
+            found = _distinct(self.search("fast"), mp.mpf("1e-6"))
+            if self.quad == "gh":
+                self.method = f"float Gauss-Hermite ({self.gh} nodes) only, no polish"
+                return found, "fast"
+            pol = [p for p in (self.polish(u) for u in found) if p is not None]
+            if pol:
+                self.method = (f"search in float Gauss-Hermite ({self.gh} nodes), "
+                               f"polished by mp.findroot at dps {self.dps}")
+                return pol, "mp"
+            self.notes.append("float search found no polishable root: mpmath search")
+        found = _distinct(self.search("mp"), _SAME)
+        self.method = f"search and polish in mpmath at dps {self.dps}"
+        if self.F is None or len(self.left) > 1:
+            found = [p for p in (self.polish(u) for u in found) if p is not None]
+        return found, "mp"
+
+    # -- audit, selection, outputs --
+    def audit(self, u, how):
+        vals = self.full(u, how)
+        vals_mp = [mp.mpf(v) for v in vals]
+        fns = self.canon + [self.phi_num]
+        main = [getattr(f, how)(vals) for f in fns]
+        ind = [f.audit(vals_mp) for f in fns]
+        if any(isinstance(v, (mp.mpc, complex)) for v in main + ind):
+            return None
+        res = max(abs(v) for v in ind[:-1])
+        qerr = max(abs(mp.mpf(a) - b) for a, b in zip(main, ind))
+        return {"values": dict(zip(map(str, self.order), vals_mp)), "phi": ind[-1],
+                "phi_main": mp.mpf(main[-1]), "residual": res, "quad_error": qerr,
+                "_u": [mp.mpf(v) for v in u]}
+
+    def run(self):
+        self.setup()
+        found, how = self.candidates()
+        roots, dropped = [], []
+        for u in found:
+            if any(max(abs(mp.mpf(a) - b) for a, b in zip(u, r["_u"])) < _SAME for r in roots):
+                continue
+            try:
+                r = self.audit(u, how)
+            except (ValueError, TypeError, ZeroDivisionError, OverflowError):
+                r = None
+            if r is None or not r["residual"] < self.tol:
+                dropped.append((u, None if r is None else r["residual"]))
+                continue
+            roots.append(r)
+        if dropped:
+            self.notes.append("dropped by the independent audit: " + "; ".join(
+                f"{[mp.nstr(mp.mpf(v), 8) for v in u]} (residual "
+                f"{'n/a' if res is None else mp.nstr(res, 3)})" for u, res in dropped))
+        if not roots:
+            raise Refusal("no-solution", "audit: no candidate root of the derived RS "
+                          f"equations in {self.left} passes the independent audit "
+                          f"(tol {mp.nstr(self.tol, 3)}; {self.method}; "
+                          + "; ".join(self.notes) + ")")
+        triv = [r for r in roots if all(abs(v) < _ZERO for v in r["_u"])]
+        non = sorted((r for r in roots if r not in triv), key=lambda r: -r["phi"])
+        for r in triv:
+            r["name"] = "trivial"
+        for k, r in enumerate(non, 1):
+            r["name"] = "nontrivial" if len(non) == 1 else f"nontrivial-{k}"
+        table = [{k: v for k, v in r.items() if not k.startswith("_")} for r in triv + non]
+        listing = "; ".join(f"{r['name']}: " + ", ".join(
+            f"{k}={mp.nstr(v, 10)}" for k, v in r["values"].items())
+            + f", phi={mp.nstr(r['phi'], 10)}" for r in table)
+        if self.branch is None:
+            if len(non) > 1:
+                raise Refusal("ambiguous:several-saddles",
+                              f"{len(non)} nontrivial RS roots ({listing}); pass branch= "
+                              "one of the names (ordered by decreasing phi)")
+            pick = non[0] if non else triv[0]
+            if not non:
+                self.notes.append("only the trivial branch (all unknowns 0, a fixed point "
+                                  "of the map) was found from the seeds")
         else:
-            forms = None
-            break
-    if forms is not None:
-        forms.sort(key=lambda p: left.index(p[0]))
-        Fs = [_Num(F, order, dps) for _, F in forms]
-        u, branch_name, seen, method = _fixed_point(Fs, full, left, branch, seed, seeds, dps)
-    else:
-        Rs = [_Num(canon[k], order, dps) for k in rest]
-        u, branch_name, seen, method = _roots(Rs, full, left, branch, seeds, dps)
+            hits = [r for r in triv + non if r["name"] == self.branch]
+            if not hits:
+                reason = ("ambiguous:several-saddles" if self.branch == "nontrivial" and non
+                          else "no-solution")
+                raise Refusal(reason, f"branch {self.branch!r} not found; roots: {listing}"
+                              + "".join(f"; {n}" for n in self.notes if n.startswith("dropped")))
+            pick = hits[0]
+        return self.outputs(pick, table, listing, how)
 
-    vals = full(u)
-    res_fns = [_Num(e, order, dps) for e in canon]
-    residual = max(abs(f(vals)) for f in res_fns)
-    if not residual < mp.mpf(_AUDIT):
-        raise Refusal("no-solution", f"audit: max |residual| = {mp.nstr(residual, 3)} "
-                                     f">= {_AUDIT} at {dict(zip(map(str, order), vals))}")
-    values = {str(x): v for x, v in zip(order, vals)}
-
-    phi = _safe(phi)
-    phi_n = phi.subs(point)
-    fe = _real(_Num(phi_n, order, dps)(vals))
-    betas = [s for s in phi.free_symbols if s.name == "beta"]
-    if betas:
-        b = betas[0]
-        ent = _real(_Num((phi - b * sp.diff(phi, b)).subs(point), order, dps)(vals))
-        ent_note = "entropy = phi - beta d phi/d beta"
-    elif "beta" in spec.params:
-        ent, ent_note = None, "entropy not computed: beta fixed numerically in spec.params"
-    else:
-        ent, ent_note = fe, "entropy = phi (no temperature: log count / volume per variable)"
-    stable, stab_note = None, "replicon not derived at level (a): stable = None"
-    if ent is not None and spec.variables in _DISCRETE and ent < 0:
-        stable = False
-        stab_note = (f"RS entropy {mp.nstr(ent, 6)} < 0 for discrete variables "
-                     f"({spec.variables}): RS is wrong here; replicon not derived")
-    note = "; ".join(notes + [method, f"branches seen {list(seen)}", ent_note, stab_note]
-                     + ([f"unused parameters {unused}"] if unused else [])
-                     + ["no capacity / threshold computed"])
-    if branch_name == "trivial" and branch is None:
-        note += ("; only the trivial branch (all unknowns 0, a fixed point of the map) "
-                 "was found from the seeds")
-    out = Trace()
-    for e in trace.entries:
-        out.add(e)
-    out.add(TraceEntry("solve-derived", None,
-                       f"branch {branch_name}; residual {mp.nstr(residual, 3)}; {note}"))
-    return DerivedRSSolution(values, fe, residual, list(eqs), out, stable, CAVEAT,
-                             branch_name, ent, method, note,
-                             {k: params[k] for k in by_name})
-
-
-def _real(v):
-    if isinstance(v, mp.mpc):
-        raise Refusal("no-solution", f"complex value {v} at the solution")
-    return v
-
-
-def _fixed_point(Fs, full, left, branch, seed, seeds, dps):
-    if len(Fs) == 1:
-        F = lambda x: Fs[0](full([x]))
-        try:
-            fp = fixed_point(F, mp.mpf(seed), dps=dps + 5, tol="1e-16", branch=branch)
-        except Refusal as r:
-            raise Refusal("no-solution", f"derived RS fixed point {left[0]} = F({left[0]}): "
-                                         f"{r.detail}") from None
-        return [fp.value], fp.branch, fp.branches_seen, (
-            f"solve.fixed_point on {left[0]} = F({left[0]}) (seed {seed}), branch {fp.branch}")
-    G = lambda *u: [f(full(list(u))) - x for f, x in zip(Fs, u)]
-    found = []
-    for s in seeds:
-        u = [mp.mpf(s)] * len(Fs)
-        try:
-            for _ in range(400):
-                Fu = [f(full(u)) for f in Fs]
-                if any(isinstance(v, mp.mpc) for v in Fu):
-                    raise ValueError("complex")
-                if max(abs(a - b) for a, b in zip(Fu, u)) < mp.mpf("1e-4"):
-                    break
-                u = [(a + b) / 2 for a, b in zip(u, Fu)]
-            else:
-                continue
-            r = mp.findroot(G, u, solver="mdnewton", tol=mp.mpf(10)**(-2 * dps), maxsteps=30,
-                            verify=False)
-            u = [_real(r[i]) for i in range(len(Fs))]
-        except (ValueError, TypeError, ZeroDivisionError, OverflowError, Refusal):
-            continue
-        name = "trivial" if all(abs(v) < mp.mpf("1e-10") for v in u) else "nontrivial"
-        if not any(max(abs(a - b) for a, b in zip(u, v)) < mp.mpf("1e-8") for _, v in found):
-            found.append((name, u))
-    return _pick(found, branch, left, "damped vector iteration + mdnewton from seeds "
-                 f"{list(seeds)}")
-
-
-def _roots(Rs, full, left, branch, seeds, dps):
-    found = []
-    for s in seeds:
-        u0 = [mp.mpf(s)] * len(Rs)
-        try:
-            if len(Rs) == 1:
-                r = mp.findroot(lambda x: Rs[0](full([x])), u0[0], solver="secant",
-                                tol=mp.mpf(10)**(-2 * dps), maxsteps=50, verify=False)
-                u = [_real(r)]
-            else:
-                r = mp.findroot(lambda *x: [R(full(list(x))) for R in Rs], u0,
-                                solver="mdnewton", tol=mp.mpf(10)**(-2 * dps), maxsteps=50,
-                                verify=False)
-                u = [_real(r[i]) for i in range(len(Rs))]
-            if max(abs(R(full(u))) for R in Rs) > mp.mpf(_AUDIT):
-                continue
-        except (ValueError, TypeError, ZeroDivisionError, OverflowError, Refusal):
-            continue
-        name = "trivial" if all(abs(v) < mp.mpf("1e-10") for v in u) else "nontrivial"
-        if not any(max(abs(a - b) for a, b in zip(u, v)) < mp.mpf("1e-8") for _, v in found):
-            found.append((name, u))
-    solver = "secant" if len(Rs) == 1 else "mdnewton"
-    return _pick(found, branch, left, f"mp.findroot ({solver}) on the residual from seeds "
-                 f"{list(seeds)} (no fixed-point form)")
-
-
-def _pick(found, branch, left, method):
-    seen = tuple(n for n, _ in found)
-    if not found:
-        raise Refusal("no-solution", f"no root of the derived RS equations in {left} "
-                                     f"from the seeds ({method})")
-    if branch is None:
-        pick = next((t for t in found if t[0] != "trivial"), found[0])
-    else:
-        pick = next((t for t in found if t[0] == branch), None)
-        if pick is None:
-            raise Refusal("no-solution", f"branch {branch!r} not found; seen {list(seen)} "
-                                         f"({method})")
-    return pick[1], pick[0], seen, f"{method}, branch {pick[0]}"
+    def outputs(self, pick, table, listing, how):
+        vals = [pick["values"][str(x)] for x in self.order]
+        fe = pick["phi"]
+        betas = [s for s in self.phi.free_symbols if s.name == "beta"]
+        if betas:
+            b = betas[0]
+            ent = self.num((self.phi - b * sp.diff(self.phi, b)).subs(self.point)).mp(vals)
+            ent_note = "entropy = phi - beta d phi/d beta"
+        else:
+            ent, ent_note = fe, "entropy = phi (no temperature: log count / volume per variable)"
+        rep = derive_replicon(self.state)
+        lam = None if rep.expr is None else self.num(rep.expr.subs(self.point)).mp(vals)
+        neg_ent = self.spec.variables in _DISCRETE and ent < 0
+        if lam is None:
+            stable = False if neg_ent else None
+            stab = ("stable=None means UNKNOWN: " if not neg_ent else "") + rep.note
+        else:
+            stable = bool(lam > 0) and not neg_ent
+            stab = f"replicon {mp.nstr(lam, 8)} ({rep.note})"
+        if neg_ent:
+            stab = (f"RS entropy {mp.nstr(ent, 6)} < 0 for discrete variables "
+                    f"({self.spec.variables}): RS is wrong here; " + stab)
+        note = "; ".join(self.notes + [self.method, f"roots: {listing}", ent_note, stab,
+                                       "no capacity / threshold computed"])
+        out = Trace()
+        for e in self.trace.entries:
+            out.add(e)
+        out.add(TraceEntry("solve-derived", None,
+                           f"branch {pick['name']}; stable {stable}; independent residual "
+                           f"{mp.nstr(pick['residual'], 3)}; quad_error "
+                           f"{mp.nstr(pick['quad_error'], 3)}; {note}"))
+        return DerivedRSSolution(
+            pick["values"], fe, pick["residual"], list(self.eqs), out, stable, CAVEAT,
+            pick["name"], ent, self.method, note,
+            {k: self.params[k] for k in self.by_name}, pick["quad_error"], lam, table)

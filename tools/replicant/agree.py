@@ -32,7 +32,9 @@ Canonical form.  Each side is a list of sympy.Eq.
     as generators, radicals with their defining relations, polynomial reduction).
     Route "symbolic+stein": g = mu (z h - h') with mu free of z, for h one of the
     z-dependent factors of g (a Stein boundary term, E[z h - h'] = 0 when h phi
-    -> 0 at +-infinity, checked at |z| = 12 at a random point).
+    -> 0 at +-infinity, checked at |z| = 12 at a random point).  This is an
+    identity GIVEN Stein's boundary condition: the condition is satisfied at the
+    sampled point, not mechanised (no proof of the decay is produced).
     Route "numeric" (backup, or forced): |F_a - F_b| <= tol max(1, |F_b|) at
     `npoints` (>= 3) random points, each parameter uniform in (0.2, 0.8) (so
     this route never samples kappa < 0, h < 0 or any value outside that box),

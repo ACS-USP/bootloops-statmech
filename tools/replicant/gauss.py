@@ -174,7 +174,8 @@ def linear(expr):
 
 def stein(expr):
     """One round of Gaussian integration by parts on every bare z^k factor:
-    E[z^k h] = E[z^(k-1) h'] + (k-1) E[z^(k-2) h]  (h phi -> 0 at +-infinity)."""
+    E[z^k h] = E[z^(k-1) h'] + (k-1) E[z^(k-2) h], valid when h phi -> 0 at
+    +-infinity (that boundary condition is assumed here, not checked)."""
     def one(g):
         z, out = g.z, sp.S.Zero
         for c, k, h in _terms(g.f, z):

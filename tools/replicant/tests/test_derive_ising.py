@@ -7,6 +7,12 @@ Derived by the same steps as the spherical perceptron; only the SITE changes
 Derrida 1988, Krauth-Mezard 1989; families/perceptron.py):
   q = E_z tanh^2(sqrt(qhat) z),  qhat = alpha E_t E(x)^2 / (1-q),
   x = (kappa - sqrt(q) t)/sqrt(1-q),  E = phi/H.
+NOT HELD OUT: the Ising perceptron is now derived here and compared with
+Task 8's level (b) code, so it can no longer serve as an unseen model.  Task 16
+must check the composed Ising perceptron by a route independent of Task 8: the
+Krauth-Mezard frozen-1RSB value (RS entropy S = 0 at alpha ~ 0.833 from the
+literature, not from perceptron.py), the RS endpoint 4/pi (Gardner-Derrida), or
+small-N exact enumeration of #solutions.
 """
 import os
 import sys
@@ -100,6 +106,17 @@ def test_perceptron_refuses_unsupported_variables_with_reason():
         "perceptron", "potts", "gaussian", params={"alpha": 1, "kappa": 0})))
     assert r.reason == "precondition:supported-variables", r
     assert "perceptron" in r.detail and "ising" in r.detail and "spherical" in r.detail, r.detail
+
+
+def test_ising_pipeline_equations_vanish_at_a_solved_point():
+    # cheap default-tier tie of level (b) to the running Task 8 code (one point)
+    from replicant.families import perceptron as P
+    eqs = pipeline_rs_equations("perceptron_ising")
+    s = {x.name: x for e in eqs for x in e.free_symbols}
+    with mp.workdps(16):
+        pnt = P.gardner_rs_point("ising", "0.7", "0.3")
+        pt = {s["q"]: pnt.q, s["qhat"]: pnt.qhat, s["kappa"]: pnt.kappa, s["alpha"]: pnt.alpha}
+        assert all(abs(numeric(e.lhs - e.rhs, pt, dps=14)) < 1e-12 for e in eqs)
 
 
 @slow

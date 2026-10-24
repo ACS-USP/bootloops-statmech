@@ -19,6 +19,10 @@ J.xi^mu/sqrt(N) >= kappa (families/perceptron.py conventions).  spec.variables:
                (q_aa = 1 because J_i^2 = 1); rs_ansatz reduces it by
                Hubbard-Stratonovich to -qhat/2 ... -> -qhat(1-q)/2 + E ln 2cosh.
   The hook below does not look at spec.variables: both use the same pattern term.
+  NOT HELD OUT: the Ising perceptron is derived and checked against Task 8 here;
+  Task 16 must check a composed Ising perceptron by a route independent of Task 8
+  (S = 0 at alpha ~ 0.833 from Krauth-Mezard, the RS endpoint 4/pi, or small-N
+  enumeration).
   hand-supplied: the storage constraint g(lambda) = Theta(lambda - kappa) (and,
     spherical only, the volume).
   hook asserts (rule not mechanised): lambda_a = J^a.xi/sqrt(N) is Gaussian with

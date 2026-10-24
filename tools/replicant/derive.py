@@ -449,6 +449,7 @@ class RSFunctional:
     params: tuple
     rules: tuple
     caveat: str = CAVEAT
+    sites: tuple = ()           # IsingSiteRS records of the reduced site traces
 
 
 @dataclass(frozen=True)
@@ -458,6 +459,21 @@ class RSFree:
     expr: sp.Expr
     params: tuple
     caveat: str = CAVEAT
+    sites: tuple = ()
+
+
+@dataclass(frozen=True)
+class IsingSiteRS:
+    """What rs_ansatz learned reducing one Ising site trace: the RS pair
+    coupling A (the conjugate qhat), the field B, the Hubbard-Stratonovich
+    variable z and the per-replica local field u = sqrt(A) z + B, with the
+    single-replica factor single(U) = sum_{s=+-1} exp(U s).  Read by
+    derive_replicon (the site's replicon susceptibility)."""
+    A: sp.Expr
+    B: sp.Expr
+    z: sp.Symbol
+    u: sp.Expr
+    single: sp.Lambda
 
 
 _Z = sp.Symbol("z", real=True)      # Hubbard-Stratonovich / replica-split variables
@@ -467,7 +483,7 @@ _s = sp.IndexedBase("s")
 
 def _rs_reduce(F):
     """Apply the RS ansatz to the formal symbolic-n functional F.expr."""
-    n, rules = F.n, []
+    n, rules, sites = F.n, [], []
     bases = {F.q: Q_RS}
     if F.conjugate:
         bases[F.qhat] = QHAT_RS
@@ -509,6 +525,9 @@ def _rs_reduce(F):
         hs = gauss.hubbard_stratonovich(A, S, _Z) if A != 0 else sp.exp(0 * S)
         u = (sp.cancel(sp.diff(hs.f, S) / hs.f) if isinstance(hs, gauss.GaussE) else 0) + B
         single = sp.Add(*(sp.exp(u * v) for v in (1, -1)))      # Tr over one replica
+        U = sp.Dummy("U", real=True)
+        sites.append(IsingSiteRS(A, B, _Z, u, sp.Lambda(U, sp.Add(*(sp.exp(U * v)
+                                                                   for v in (1, -1))))))
         rules.append("site: Ising s^2 = 1, Hubbard-Stratonovich on (sum_a s_a)^2, "
                      "product over replicas of identical factors -> factor^n")
         return -n * A / 2 + sp.log(gauss.GaussE(single**n, _Z))
@@ -549,7 +568,7 @@ def _rs_reduce(F):
     if e.atoms(sp.Indexed) or e.has(Tr):
         raise Refusal("precondition:rs-reducible", f"left over after RS: {e}")
     params = (Q_RS,) + ((QHAT_RS,) if F.conjugate else ()) + tuple(extra.values())
-    return e, params, tuple(dict.fromkeys(rules))
+    return e, params, tuple(dict.fromkeys(rules)), tuple(sites)
 
 
 def rs_ansatz() -> Step:
@@ -563,8 +582,8 @@ def rs_ansatz() -> Step:
 
     def apply(state):
         F = state["functional"]
-        expr, params, rules = _rs_reduce(F)
-        return state.with_(rs=RSFunctional(F.spec, F.n, expr, params, rules))
+        expr, params, rules, sites = _rs_reduce(F)
+        return state.with_(rs=RSFunctional(F.spec, F.n, expr, params, rules, sites=sites))
 
     return Step("rs-ansatz", requires, apply,
                 note=lambda s: "RS; rules: " + "; ".join(s["rs"].rules))
@@ -578,7 +597,7 @@ def replica_limit() -> Step:
     def apply(state):
         R = state["rs"]
         phi = gauss.replica_limit(R.expr, R.n)
-        return state.with_(rs_free=RSFree(R.spec, phi, R.params))
+        return state.with_(rs_free=RSFree(R.spec, phi, R.params, sites=R.sites))
 
     return Step("replica-limit", requires, apply,
                 note=lambda s: ("n -> 0: polynomial part by ansatz.n_to_zero, the rest by "
