@@ -224,7 +224,8 @@ def pspin_gardner_temperature(p, variables="spherical"):
     searched.  Spherical: the answer follows its own scan (fractions 0.02..0.99 of T_s):
     every value > 1e-6 -> refused no-transition:gardner (the pure model's case); a sign
     change -> T_G by root-finding, audited by the signs at T_G +- 1e-6 T_s; otherwise
-    (negative or marginal everywhere) refused unstable:1rsb."""
+    (negative or marginal everywhere) refused unstable:1rsb.  Two sign changes between
+    adjacent scan points would be missed (not searched)."""
     if variables == "ising":
         return mp.mpf(_ising_tg(p, CHI_R["ising"]))
     if variables != "spherical":
