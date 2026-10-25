@@ -16,7 +16,7 @@ here, not a level-(a) derivation.  The rigorous statements are random-matrix the
   sigma2, signal   noise variance and |beta|^2 (default 1, 1)
   (always)         ridgeless limit risk_ridgeless (+ bias, variance, test_mse; skipped at gamma = 1,
                    where it diverges), optimal penalty lambda_opt, risk_opt, test_mse_opt (skipped
-                   at sigma2 = 0: no positive minimiser)
+                   at sigma2 = 0: no positive minimiser; at signal = 0: lam* infinite)
   lam              ridge closed form risk, bias, variance, test_mse; with lam > 0 also the RS saddle
                    risk_rs, rs_V, rs_q, rs_m
   n (seeds)        finite-n R_X by SVD over named seeds (default 0-19; lam default 0): risk_sim
@@ -34,7 +34,7 @@ from .spec import ModelSpec
 
 HMRT = ("Hastie, Montanari, Rosset & Tibshirani, Ann. Statist. 50, 949 (2022), arXiv:1903.08560")
 DW = "Dobriban & Wager, Ann. Statist. 46, 247 (2018), arXiv:1507.03003, Thm 2.1, Eq. (8)"
-AS = "Advani & Saxe, Neural Networks 132, 428 (2020), arXiv:1710.03667, Sec. 2.2, Eq. (21)"
+AS = "Advani & Saxe, Neural Networks 132, 428 (2020), arXiv:1710.03667, Sec. 2.2, Eq. (21) at sigma_w^0 = 0"
 LGC = ("Loureiro, Gerbelot, Cui, Goldt, Krzakala, Mezard & Zdeborova, J. Stat. Mech. (2022) 114001, arXiv:2102.08127, "
        "Thm 1 (Eq. (2.8)), App. A.5 Eqs. (A.37)-(A.38)")
 CAVEAT = ("replica route: the RS saddle point of the linear student (Loureiro et al. 2022, a cited "
@@ -149,8 +149,11 @@ def ridge():
                    when=lambda p: _g(p) != 1, skip="gamma = 1: the ridgeless risk diverges "
                    "(the interpolation peak)"),
              fstep("ridge-optimal-penalty", f"{HMRT}, Cor. 5; {DW}; {AS}", _optimal,
-                   when=lambda p: R._num(p.get("sigma2", 1), "sigma2") > 0,
-                   skip="sigma2 = 0: no positive minimiser (the ridgeless limit is the infimum)"),
+                   when=lambda p: R._num(p.get("sigma2", 1), "sigma2") > 0
+                   and R._num(p.get("signal", 1), "signal") > 0,
+                   skip="sigma2 = 0: no positive minimiser (the ridgeless limit is the infimum); or "
+                   "signal = 0: lam* = sigma^2 gamma / r^2 is infinite (the null estimator "
+                   "beta_hat = 0 is optimal)"),
              fstep("ridge-closed-form", f"{HMRT}, Cor. 5, Eq. (43)", _ridge, when=has("lam"),
                    skip="no lam given"),
              fstep("ridge-replica-rs", LGC, _replica,

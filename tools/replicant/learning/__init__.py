@@ -13,8 +13,8 @@
 from .ridge import (argmin_lambda, optimal_lambda, optimal_test_error, ridge_bias_variance,
                     ridge_test_error, ridgeless_bias_variance, ridgeless_test_error)
 from .ridge_rs import RidgeRS, ridge_replica_rs
-from .ridge_sim import RidgeFit, extrapolate_in_n, ridge_ensemble, ridge_fit, ridge_simulate
+from .ridge_sim import RidgeFit, extrapolate_in_n, limit_ensemble, ridge_ensemble, ridge_fit, ridge_simulate
 
-__all__ = ["RidgeFit", "RidgeRS", "argmin_lambda", "extrapolate_in_n", "optimal_lambda", "optimal_test_error",
+__all__ = ["RidgeFit", "RidgeRS", "argmin_lambda", "extrapolate_in_n", "limit_ensemble", "optimal_lambda", "optimal_test_error",
            "ridge_bias_variance", "ridge_ensemble", "ridge_fit", "ridge_replica_rs",
            "ridge_simulate", "ridge_test_error", "ridgeless_bias_variance", "ridgeless_test_error"]

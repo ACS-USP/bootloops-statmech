@@ -72,12 +72,14 @@ def ridge(route):
             sp.Eq(sp.Symbol("R^*_{test}"), (1 + c + sp.sqrt((1 - c)**2 + 4 * A2)) / 2), source=_DW,
             check=Check((G, A2), lambda g, a2: R.optimal_test_error(g, 1, a2) + 1,
                         (("0.5", "1"), ("1", "1"), ("2", "5")), "rhs")),
-        cited("RS saddle point of the linear student, isotropic (Loureiro et al. Eq. (A.38) and Thm 1 "
-              "Eq. (2.8) with label noise; alpha = 1/gamma, lambda_L = lambda/gamma, rho = r^2)",
+        cited("RS saddle point of the linear student, isotropic (Loureiro et al. Eq. (A.38), printed with "
+              "sigma = 0; the sigma^2 term in q_hat is replicant's specialisation of their Thm 1 Eq. (2.8) "
+              "with f0(x) = x + sigma xi; alpha = 1/gamma, lambda_L = lambda/gamma, rho = r^2)",
               r"\hat V = \hat m = \frac{\alpha}{1+V},\ \hat q = \frac{\alpha(\rho+\sigma^2+q-2m)}{(1+V)^2},"
               r"\ V = \frac{1}{\lambda_L+\hat V},\ m = \frac{\hat m\rho}{\lambda_L+\hat V},\ "
               r"q = \frac{\hat q+\hat m^2\rho}{(\lambda_L+\hat V)^2},\ R = \rho+q-2m", _LGC),
-        sym("The V root of the saddle point, V (lambda_L + alpha/(1 + V)) = 1, lambda_L = lambda/gamma",
+        sym("The V root of the saddle point, V (lambda_L + alpha/(1 + V)) = 1, lambda_L = lambda/gamma "
+            "(the MP quadratic: V = gamma m(-lambda))",
             sp.Eq(sp.Symbol("V"), V), source=_LGC,
             check=Check((G, L), lambda g, lam: RS.ridge_replica_rs(g, lam).V, pts, "rhs")),
         text("Finite-n checks", "SVD fits on sampled designs over named seeds: HMRT's finite-n risk R_X "

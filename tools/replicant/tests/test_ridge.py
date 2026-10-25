@@ -135,8 +135,7 @@ def _band(n, gamma, lam, s2, r2, seeds=_SEEDS):
 
 def _limit_band(ns, case, seeds=_SEEDS):
     """Raw bands per n and the band of the 1/n extrapolation R_inf (ridge_sim.extrapolate_in_n)."""
-    raw = {n: _band(n, *case, seeds=seeds) for n in ns}
-    return raw, SIM.extrapolate_in_n(raw)
+    return SIM.limit_ensemble(ns, *case[:3], seeds, case[3])
 
 
 def _inside(band, x):
@@ -151,11 +150,13 @@ _VAR_DEFAULT = {"0.5": "1.1", "2": "1.1", "1": "1.5"}
 def test_simulation_matches_closed_form():
     """Default tier: HMRT's finite-n risk R_X from an SVD fit (ridge_sim; never calls the closed
     form) at n = 80, 160 over 20 named seeds each, extrapolated in 1/n; the 99% Student-t band of
-    R_inf (half-widths 0.037, 0.061, 0.051 at gamma = 0.5, 2 and the ridge point) contains the
+    R_inf (half-widths 0.043, 0.075, 0.061 at gamma = 0.5, 2 and the ridge point; disjoint seed
+    sets per size, ridge_sim.limit_ensemble) contains the
     closed form.  Controls planted in R._SCALE: the ridgeless risk at gamma = 2 and the ridge risk
     at gamma = 1, lam = 0.5 without their bias (shifts 0.5 and 1/3) fall outside, as do a +10%
-    variance at gamma = 0.5 and 2 (shift 0.1) and a +50% variance at the ridge point (shift 1/6;
-    +10% there, 0.033, is below this band's resolution).
+    variance at gamma = 0.5 and 2 (shift 0.1) and a +50% variance at the ridge point (shift 1/6:
+    a smoke check, about 9% relative resolution of the risk 2/3; +10% of the variance, 0.033, is
+    below this band's resolution).
     Why extrapolate: R_X's mean is off the limit by O(1/n), as large as the O(1/n) fixed-n band
     (gamma = 0.5: E R_X = p/(n - p - 1) exactly for Gaussian X, the Wishart mean; the n = 160 band
     contains 80/79; at n = 200 over seeds 0-19 the fixed-n band 1.015 +- 0.011 misses the limit 1).
@@ -164,7 +165,7 @@ def test_simulation_matches_closed_form():
         raw, inf = _limit_band((80, 160), c)
         cf = R.ridge_test_error(*c)
         assert _inside(inf, cf), (c, inf, cf)
-        assert inf.half_width < 0.07, inf
+        assert inf.half_width < 0.08, inf
         if c[0] != "0.5":
             with _Planted("bias", 0):
                 assert not _inside(inf, R.ridge_test_error(*c)), (c, inf)
@@ -178,7 +179,7 @@ def test_simulation_matches_closed_form():
 def test_simulation_matches_closed_form_large_n():
     """n = 400 and 1000, 24 named seeds per point, extrapolated in 1/n: ridgeless gamma = 0.5, 2;
     ridge at gamma = 1 (lam = 0.5) and at the optimal lam* = sigma^2 gamma / r^2 for gamma = 2,
-    r^2 = 2.  R_inf half-widths 0.006, 0.020, 0.015, 0.035.  Controls: missing bias (shifts 0.5,
+    r^2 = 2.  R_inf half-widths 0.005, 0.020, 0.018, 0.037 (disjoint seeds per size).  Controls: missing bias (shifts 0.5,
     1/3, 1.11); variance +5% at gamma = 0.5, 2 (0.05), +25% at the two ridge points (0.083, 0.044);
     raw band half-widths shrink with n."""
     seeds = tuple(range(24))
@@ -268,6 +269,8 @@ def test_ridge_refusals_are_named():
     _refuses(lambda: SIM.ridge_ensemble(50, 50, "0.1", "1", (0,)), "precondition:two-samples")
     b = SIM.ridge_ensemble(50, 50, "0.1", "1", (0, 1))
     _refuses(lambda: SIM.extrapolate_in_n({50: b}), "precondition:two-sizes")
+    _refuses(lambda: SIM.limit_ensemble((50, 75), "0.5", 0, "1", (0, 1)), "precondition:size")
+    _refuses(lambda: SIM.limit_ensemble((50, 100), "0.5", 0, "1", (0, 10**6)), "precondition:named-seeds")
 
 
 # ---- catalog entry --------------------------------------------------------------------------------
@@ -287,6 +290,10 @@ def test_catalog_entry_ridge():
     # gamma = 1: the ridgeless step is skipped (divergent), the rest runs
     res1 = compose(e.spec).run(gamma="1", lam="0.5")
     assert "risk_ridgeless" not in res1.values and "risk" in res1.values
+    # signal = 0: lam* is infinite, so the optimal-penalty step is skipped (not a refusal)
+    res0 = compose(e.spec).run(gamma="2", lam="0.1", signal=0)
+    assert "lambda_opt" not in res0.values and res0.values["risk"] == res0.values["variance"]
+    assert any("signal = 0" in s.summary for s in res0.trace.entries), [s.summary for s in res0.trace.entries]
     # finite n: statistical, never final
     res2 = compose(e.spec).run(gamma="2", lam="0.1", n=60, seeds=[0, 1, 2, 3])
     assert "risk_sim" in res2.statistical and res2.errors["risk_sim"] > 0

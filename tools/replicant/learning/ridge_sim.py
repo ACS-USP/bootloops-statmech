@@ -88,7 +88,10 @@ def ridge_ensemble(n, p, lam, sigma2, seeds, signal=1):
 def extrapolate_in_n(bands, conf=0.99):
     """{n: Band} over >= 2 sizes -> Band of R_inf in mean_n = R_inf + c / n (weighted least
     squares, weights 1 / stderr^2; stderr of R_inf from the fit covariance).  The Student-t
-    quantile uses df = min over sizes of (seeds - 1): conservative, the sizes are independent."""
+    quantile uses df = min over sizes of (seeds - 1), conservative.  The se formula needs the
+    sizes to be independent: the bands must come from DISJOINT seed sets (with the same seed,
+    default_rng draws X_n as the leading entries of the same stream, so X_80 is a reshape of the
+    top block of X_160 and the two means are correlated); limit_ensemble guarantees it."""
     from ..amp._stats import Band, t_quantile
     if len(bands) < 2:
         raise Refusal("precondition:two-sizes", "extrapolation in 1/n needs at least two sizes n")
@@ -104,4 +107,24 @@ def extrapolate_in_n(bands, conf=0.99):
     return Band(float(coef[0]), se, t * se, df, conf, t)
 
 
-__all__ = ["RidgeFit", "extrapolate_in_n", "ridge_ensemble", "ridge_fit", "ridge_simulate"]
+SIZE_SEED_OFFSET = 10**6     # seeds of the k-th size are seeds + k * SIZE_SEED_OFFSET
+
+
+def limit_ensemble(ns, gamma, lam, sigma2, seeds, signal=1):
+    """({n: Band}, Band of R_inf): ridge_ensemble at each size n (p = gamma n, must be an integer)
+    over the named seeds shifted by k * SIZE_SEED_OFFSET for the k-th size (disjoint seed sets:
+    independent sizes), then extrapolate_in_n."""
+    seeds = _checks.seeds(seeds)
+    if max(seeds) >= SIZE_SEED_OFFSET:
+        raise Refusal("precondition:named-seeds", f"seeds must be < {SIZE_SEED_OFFSET} (offset per size)")
+    g = float(_num(gamma, "gamma", positive=True))
+    raw = {}
+    for k, n in enumerate(sorted(ns)):
+        p = int(round(g * _size(n, "n")))
+        if p != g * n:
+            raise Refusal("precondition:size", f"gamma n = {g * n} is not an integer at n = {n}")
+        raw[n] = ridge_ensemble(n, p, lam, sigma2, [s + k * SIZE_SEED_OFFSET for s in seeds], signal)
+    return raw, extrapolate_in_n(raw)
+
+
+__all__ = ["SIZE_SEED_OFFSET", "RidgeFit", "extrapolate_in_n", "limit_ensemble", "ridge_ensemble", "ridge_fit", "ridge_simulate"]

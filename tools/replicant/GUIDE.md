@@ -277,7 +277,9 @@ factors). `ridge_rs.ridge_replica_rs(gamma, lam, sigma2=0, signal=1)` (lam > 0) 
 lam, V, V_hat, q, q_hat, m, m_hat, risk)`. `ridge_sim.ridge_fit(n, p, lam, sigma2, seed, signal=1)`
 -> `RidgeFit(beta, beta_hat, risk, train_residual, bias_x, variance_x, risk_x)`;
 `ridge_simulate(...)` -> R_X (float); `ridge_ensemble(n, p, lam, sigma2, seeds, signal=1)` -> 99%
-Student-t `Band`; `extrapolate_in_n({n: Band})` -> the band of R_inf in mean_n = R_inf + c/n.
+Student-t `Band`; `extrapolate_in_n({n: Band})` -> the band of R_inf in mean_n = R_inf + c/n (the
+bands must use disjoint seeds); `limit_ensemble(ns, gamma, lam, sigma2, seeds, signal=1)` -> ({n: Band},
+Band of R_inf), seeds shifted by k * 10^6 for the k-th size.
 Example: `ridge_test_error("1", "0.5", "1", "1")` -> 0.666666666666667 (2/3).
 `from replicant.latex import render_latex, write_latex` (`write_latex(result, path, pdf=False)`; a
 `Refusal` is also accepted and writes its partial derivation).
@@ -753,27 +755,30 @@ KNOWN HAZARDS:
   ridge risk grows like lam^(-1/2) as lam -> 0+ (measured: 500 at lam = 1e-6, 5000 at 1e-8). At lam*
   = sigma^2 gamma / r^2 the risk is finite at gamma = 1 and increasing in gamma on 0.1..10 (SNR 1 and
   5), below the ridgeless risk and the null risk r^2; a golden-section argmin of the closed form
-  agrees with lam* to 1e-15 and not with sigma^2 / r^2. HMRT Sec. 6.1 say the optimally tuned risk
-  "appears to have a minimum around gamma = 1"; for the well-specified isotropic model the computed
-  R* is increasing in gamma (no interior minimum), so that remark must concern another setting
-  (their misspecified Fig. 8); not banked. Replica route: replicant's formal layer does not derive
+  agrees with lam* to 1e-15 and not with sigma^2 / r^2. HMRT's minimum of the optimally tuned risk
+  "around gamma = 1" is for the misspecified model (their Sec. 1.1, isotropic features, item 3: "For a
+  misspecified model, optimally-tuned ridge regression attains its global minimum around gamma = 1");
+  in the well-specified isotropic model implemented here R* is increasing in gamma; not banked. Replica route: replicant's formal layer does not derive
   the ridge free energy (no Family with a teacher replica and a quadratic loss); the RS saddle point
   is Loureiro et al.'s Eq. (A.38) (their Thm 1 Eq. (2.8) for the label-noise term), specialised to
   isotropic design and solved without the Stieltjes transform (V by a bracketed root, q and m from
-  linear equations); it agrees with HMRT Eq. (43) to 1e-12 on a 12-point grid, and a bias or
+  linear equations; but the V equation is the MP quadratic itself, V = gamma m(-lam), so the
+  agreement checks the q, m and bias / variance algebra, not the MP law independently); it agrees
+  with HMRT Eq. (43) to 1e-12 on a 12-point grid, and a bias or
   variance error planted in `ridge._SCALE` separates them by > 1e-3. Finite n: R_X from the SVD
   (Lemma 1 identities on the sampled spectrum, averaged exactly over the training noise), 99%
-  Student-t bands over named seeds, extrapolated in 1/n because the O(1/n) offset of the mean is as
+  Student-t bands over named seeds (disjoint seed sets per size, `ridge_sim.limit_ensemble`: with
+  the same seed X_80 would be a block of X_160 and the sizes correlated), extrapolated in 1/n because the O(1/n) offset of the mean is as
   large as the band (gamma = 0.5, n = 200, seeds 0-19: 1.015 +- 0.011 misses the limit 1; the
   Wishart mean p/(n - p - 1) = 1.0101 is inside). Default tier n = 80, 160 (20 seeds; R_inf
-  half-widths 0.037, 0.061, 0.051 at gamma = 0.5, 2 and gamma = 1, lam = 0.5): the closed form is
+  half-widths 0.043, 0.075, 0.061 at gamma = 0.5, 2 and gamma = 1, lam = 0.5): the closed form is
   inside, a missing bias (shifts 0.5, 1/3) and +10% variance at gamma = 0.5, 2 (+50% at the ridge
-  point) are outside. Slow (n = 400, 1000, 24 seeds; half-widths 0.006, 0.020, 0.015, and 0.035 at
+  point) are outside. Slow (n = 400, 1000, 24 seeds; half-widths 0.005, 0.020, 0.018, and 0.037 at
   lam* for gamma = 2, r^2 = 2): missing bias, +5% variance (gamma = 0.5, 2) and +25% (ridge points)
   excluded. The sampled-noise risk |beta_hat - beta|^2 (`RidgeFit.risk`) is much noisier and right-
   skewed for gamma < 1 (seeds 0-19 at n = 200 gave 0.899 +- 0.092 against an expectation 1.0101).
   Not implemented: anisotropic covariance (HMRT Thm 2/5), misspecified or latent-space models,
-  random features, benign-overfitting spectra (Bartlett et al. 2020, not fetched), non-Gaussian
+  random features, benign-overfitting spectra (Bartlett et al. 2020: downloaded, not used, context only), non-Gaussian
   design in the simulation.
 - Banked values often come from secondary open sources where the original is paywalled; each bank
   entry names the source its digits were read from (`reference/*.json`, field `cite`), and where the
