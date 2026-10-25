@@ -56,8 +56,13 @@ compile the derivation.
   threshold, Bayes AMP with spectral start) and the two-group stochastic block model
   (`inference/sbm.py`: Kesten-Stigum line, sampler, BP with the external field); catalog entries
   `spiked_wigner` (amp) and `sbm` (cavity) (`catalog_spiked_sbm.py`, `latex_spiked_sbm.py`).
+- `learning/` (E7): ridge and ridgeless least squares on isotropic Gaussian design (`ridge.py`: the
+  Marchenko-Pastur closed forms of Hastie-Montanari-Rosset-Tibshirani, the optimal penalty;
+  `ridge_rs.py`: the RS saddle point of the linear student, a cited closed form solved here;
+  `ridge_sim.py`: SVD fits over named seeds, extrapolated in 1/n); catalog entry `ridge` (replica)
+  (`catalog_learning.py`, `latex_learning.py`).
 - `catalog*.py`, `compose.py` (+ `compose_result.py`: `Result` and the finality rule), `cli.py`,
-  `__main__.py`: the 13-entry catalog (`catalog_ts.py` holds the teacher-student entry,
+  `__main__.py`: the 14-entry catalog (`catalog_ts.py` holds the teacher-student entry,
   `catalog_pspin.py` the two p-spin entries; LaTeX in `latex_pspin.py`), the composer,
   the command line.
 - `latex*.py`, `tex*.py`, `derive_tex.py`: the LaTeX derivation writer.

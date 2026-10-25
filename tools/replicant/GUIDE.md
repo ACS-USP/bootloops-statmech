@@ -12,8 +12,8 @@ citation; a missing precondition is a named refusal, never a silent fallback; ev
 reader can follow to the paper, a per-value finality label, and a comparison with banked, cited reference
 values. Two levels: (a) a symbolic derivation (replicate, average the disorder, introduce order
 parameters, RS ansatz, n -> 0, stationarity, solve) that works for models you describe, and (b) the
-published pipelines of a catalog of 13 entries, each with a replica route and/or a cavity route (and an
-`amp` route for `sk` and `teacher_student`; the constraint-satisfaction entries `xorsat` and `ksat`, the code entry `ldpc_bec` and the block model `sbm` are cavity-only; the spiked Wigner model `spiked_wigner` is amp-only). A composer
+published pipelines of a catalog of 14 entries, each with a replica route and/or a cavity route (and an
+`amp` route for `sk` and `teacher_student`; the constraint-satisfaction entries `xorsat` and `ksat`, the code entry `ldpc_bec` and the block model `sbm` are cavity-only; the spiked Wigner model `spiked_wigner` is amp-only; the ridge-regression entry `ridge` is replica-only, its RS saddle point a cited closed form, not a level-(a) derivation). A composer
 matches a model description against the catalog, reuses what applies, adapts what it can through
 registered hooks, and says what it reused, adapted, or could not do. A LaTeX writer turns any run into a
 derivation document. For theoretical physicists and agents who need a published statistical-mechanics
@@ -115,6 +115,18 @@ CLI (from `tools/`):
   With `--param N=5000` (1.4 s; seeds 0-9): BP `bp_overlap` 0.8121 +- 0.0034, statistical; at `a=4
   b=2` (tau = 1/3) `bp_overlap` 0.0112 +- 0.0022 (a random guess has 0.0113) with every run on the
   factorized fixed point (`bp_factorized_fraction` 1).
+- Worked example, ridge regression (`ridge`, replica-only; X with i.i.d. N(0, 1) entries, |beta|^2 =
+  `signal`, gamma = p/n, ridge (X^T X + n lam I)^{-1} X^T y; values are the EXCESS risk |beta_hat -
+  beta|^2, `test_mse*` add sigma^2): `python3 -m replicant run ridge --param gamma=2 --param lam=0.1`
+  (0.5 s) -> `risk_ridgeless` 1.5 (= r^2 (1 - 1/gamma) + sigma^2/(gamma - 1) at the defaults sigma2 =
+  signal = 1), `lambda_opt` 2, `risk_opt` 0.780776 (`test_mse_opt` 1.780776 = Dobriban-Wager Eq. (8)),
+  `risk` 1.227707 (`bias` 0.506136, `variance` 0.721571), `risk_rs` equal to it (`rs_closed_form_gap` 0 at 30 digits), all final.
+  `--param gamma=1` skips the ridgeless step (the peak: it diverges) and still gives `risk_opt`
+  0.618034. With `--param n=200 --param gamma=0.5` (seeds 0-19): `risk_sim` 1.0150 +- 0.0037
+  (stderr; 99% half-width 0.0105 in `risk_sim_halfwidth99`), statistical and `not-computed`: the
+  finite-n mean is off the limit 1 by O(1/n) (exactly p/(n - p - 1) = 1.0101 in expectation), so a
+  fixed-n band need not contain the limit. `python3 -m replicant run ridge` is refused
+  `precondition:state-point` (gamma is required).
 - Worked example, amp route (`sk`, `teacher_student`; under 1 s each, measured):
   `python3 -m replicant run sk --route amp --param beta=1.5` -> `q_se` 0.352602 (the SE fixed point,
   `exact-by-literature`: Bayati-Montanari Thm 4 proves SE for AMP on Gaussian J; it is the AMP limit,
@@ -254,6 +266,19 @@ ratio)`; `sbm_sample(N, a, b, seed)` -> `SBMGraph(N, a, b, seed, labels, edges)`
 marginals, messages, field)`; `sbm_bp_ensemble(N, a, b, *, seeds, iters)` -> `BPEnsemble(overlaps,
 converged, factorized, iterations, band, ...)`; `dkmz_residual(graph, a, b, messages)`. Example:
 `spiked_state_evolution(2).q` -> 0.75; `sbm_ks_line(3).ratio` -> 3.73205080757.
+`from replicant.learning import ridge, ridge_rs, ridge_sim` (E7; gamma = p/n, lam in HMRT's
+convention, `sigma2` the noise variance, `signal` = |beta|^2; mpf at 30 digits):
+`ridge.ridge_test_error(gamma, lam, sigma2=0, signal=1)` (excess risk; lam = 0 is the ridgeless
+limit), `ridge_bias_variance(...)`, `ridgeless_test_error(gamma, sigma2, signal=1)`,
+`ridgeless_bias_variance(...)`, `optimal_lambda(gamma, sigma2, signal=1)` (= sigma2 gamma / signal),
+`optimal_test_error(...)`, `argmin_lambda(...)` (golden section on the closed form), `stieltjes_mp(gamma,
+lam)` -> (m(-lam), m'(-lam), sqrt D); `ridge._SCALE` (private planted-error hook: bias / variance
+factors). `ridge_rs.ridge_replica_rs(gamma, lam, sigma2=0, signal=1)` (lam > 0) -> `RidgeRS(gamma,
+lam, V, V_hat, q, q_hat, m, m_hat, risk)`. `ridge_sim.ridge_fit(n, p, lam, sigma2, seed, signal=1)`
+-> `RidgeFit(beta, beta_hat, risk, train_residual, bias_x, variance_x, risk_x)`;
+`ridge_simulate(...)` -> R_X (float); `ridge_ensemble(n, p, lam, sigma2, seeds, signal=1)` -> 99%
+Student-t `Band`; `extrapolate_in_n({n: Band})` -> the band of R_inf in mean_n = R_inf + c/n.
+Example: `ridge_test_error("1", "0.5", "1", "1")` -> 0.666666666666667 (2/3).
 `from replicant.latex import render_latex, write_latex` (`write_latex(result, path, pdf=False)`; a
 `Refusal` is also accepted and writes its partial derivation).
 
@@ -286,7 +311,10 @@ default gaussian), `snr` (lambda >= 0: state evolution), and for finite-N Bayes 
 > 1, else `precondition:state-point` / `precondition:snr-above-one`), `seeds` (default 0-7), `iters`
 (default 30; both need `N`); `sbm` (cavity): `a`, `b` (both, the KS margin), `c` (the KS point at
 mean degree c), and for BP `N` (needs `a`, `b`), `seeds` (default 0-9), `iters` (default 2000; both
-need `N`). Without `beta` an entry returns its T = 0 / critical headline values. A composed spec
+need `N`); `ridge` (replica): `gamma` (required, > 0), `sigma2` (default 1), `signal` (|beta|^2,
+default 1), `lam` (>= 0: the ridge closed form; > 0 also the RS saddle point), and for the finite-n
+check `n` (an int >= 10; p = round(gamma n); lam defaults to 0 there) and `seeds` (default 0-19; needs
+`n`). Without `beta` an entry returns its T = 0 / critical headline values. A composed spec
 (not a catalog entry) does not refuse an unknown name: its notes list "unused parameters [...]".
 
 OUTPUTS: the `Result` object (`values`, `errors`, `rigor`, `route`, `stable`, `final`, `finality`,
@@ -321,6 +349,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `precondition:degree-pair`, `:variable-degree-at-least-3`, `:erasure-probability`, `:enough-variables`, `:socket-count`, `:named-seeds`, `unsupported:degree-pair` | LDPC on the BEC (`inference/`): (l, r) not integers with 2 <= l < r (the design rate 1 - l/r must be positive); a threshold asked for l = 2 (eps(x) has no interior minimum: the BP threshold is the stability limit 1/(r - 1), not implemented); eps not a number in [0, 1]; N not an integer >= max(100, r); N l not divisible by r (the configuration model needs equal socket counts); malformed seeds as for XORSAT; a name not in `inference/ldpc.DEGREE_PAIRS`. `no-solution:bracket` / `:audit`: eps(x) not unimodal on its grid, or the trial entropy without exactly one sign change on (x_BP, 1) |
 | `precondition:snr`, `:known-prior`, `:snr-above-one`, `:size`, `:square-matrix`, `:symmetric-matrix`, `:finite-matrix`, `:positive-iters`, `:known-init`, `:named-seeds`, `ambiguous:several-fixed-points` | spiked Wigner (`inference/spiked.py`): lambda not a finite number >= 0 (bools refused); a prior not in `spiked.PRIORS`; finite-N AMP at lambda <= 1 (the spectral start of MV Thm 2 needs lambda > 1); N not an int >= 10; Y not N x N, not symmetric or not finite; iters < 1; an init other than `spectral`; malformed seeds as for XORSAT; more than one nontrivial SE fixed point (none for these two priors) |
 | `precondition:degree-parameters`, `unsupported:q`, `unsupported:disassortative`, `no-transition:ks-line`, `:size`, `:edge-probability`, `:sbm-graph`, `:positive-iters`, `:damping`, `:named-seeds` | block model (`inference/sbm.py`): a, b not finite numbers >= 0 or a + b = 0; q != 2; BP with a < b (the field equation is not monotone; BP did not converge at a = 0.5, b = 5.5); `sbm_ks_line(c)` with c <= 1 (tau <= c on the line); N not an int >= 10; a/N or b/N > 1; `sbm_bp` given something other than an `SBMGraph`; iters < 1; damping outside [0, 1); malformed seeds |
+| `precondition:gamma`, `:lambda`, `:sigma2`, `:signal`, `:gamma-not-one`, `:size`, `:named-seeds`, `:two-samples`, `:two-sizes`, `no-solution:bracket` | ridge (`learning/`): gamma not a finite number > 0; lam, sigma2 or signal not a finite number >= 0 (bools refused; the RS saddle point needs lam > 0; `optimal_lambda` needs signal > 0); the ridgeless limit at gamma = 1 (it diverges for sigma2 > 0, and HMRT state it for gamma != 1 only); n or p not an int >= 10; malformed seeds as for XORSAT; a band from fewer than two seeds; a 1/n extrapolation from one size; `argmin_lambda` with its minimum at an end of the search interval |
 | `unstable:<ansatz>` | `require_final` or `require_stable`: a computed stability is negative (RS replicon or cavity lambda < 0); `unstable:1rsb` also from `pspin_gardner_temperature` when the spherical scan is negative everywhere |
 | `unknown-stability:rs` | `require_final`: an RS value whose stability is not computed |
 | `not-final:<ansatz>` | `require_final`: a non-RS value that is not final |
@@ -350,6 +379,7 @@ CATALOG (v1; `list` shows the live table; values at the default / banked state p
 | `ldpc_bec` regular LDPC on the BEC | cavity | (3, 6): `eps_bp` 0.429440, `eps_map` 0.488151 (and `eps_map_area`), `x_bp`, `x_map`, `design_rate`; at `eps`: DE `de_edge_erasure`, `de_check_erasure`, `de_bit_erasure`; with `N`: peeling `peel_success_fraction`, `peel_residual_mean` | `eps_bp` (3, 6) (KRU 2010), (4, 8)-(7, 14) (Pfister slides, secondary); `eps_map` (3, 6) (MMU 2008 Ex. 4), (4, 8)-(7, 14) (KRU 2010), (3, 4), (3, 5), (4, 6), (3, 7) (KRU 2012 Table II, area route); `x_bp` and DE at eps = 0.46 (MMU Ex. 9) | `eps_bp`, `x_bp` exact-by-literature (LMSS 2001 Thm 2); `eps_map`, `x_map`, `eps_map_area` exact-by-literature (MMU Ex. 6 for (3, 6), KRU Lemma 4 otherwise); DE values exact-by-literature when converged; finite-N values not-computed (statistical) |
 | `spiked_wigner` rank-one spiked Wigner | amp | `lambda_c` 1; at `snr`: SE `gamma_se`, `q_se`, `overlap_se`, `mmse_se`, `matrix_mmse_se` (snr = 2: 0.75, 0.866025, 0.25, 0.4375); with `N`: Bayes AMP `q_amp`, `overlap_amp`, `mmse_amp`, `matrix_mmse_amp` | `lambda_c` gaussian and rademacher (LM 2019 Sec. 2.3; DAM Thm 4.3 with Lemma 3.3); gaussian `q`, `matrix_mmse` at lambda = 0.8, 1.5, 2, 3 (LM Eq. (10)); the N = 2000 AMP bands against the bank are tests (slow), not catalog checks | `lambda_c` exact-by-literature; `gamma_se`, `q_se`, `matrix_mmse_se` exact-by-literature (LM Thm 1) when the run finds the SE root to be the RS potential's global minimum; `overlap_se`, `mmse_se` exact-by-literature (MV Thm 2) for lambda > 1; finite-N values not-computed (statistical) |
 | `sbm` two-group block model | cavity | at `c`: the KS point `a_ks`, `b_ks`, `inverse_eps_ks` (c = 3: 3.732051); at `a`, `b`: `ks_margin` tau; with `N`: BP `bp_overlap` | `inverse_eps_ks` at q = 2, c = 3 (DKMZ 2011 Fig. 1: 3.73); the q = 4, c = 16 value 2.33 banked but UNCLAIMED (q = 2 only) | `ks_margin` exact-by-literature (MNS 2015 Thm 2.1 for tau <= 1 with a + b > 2; Massoulie 2014, MNS 2018 for tau > 1 with a > b), not-computed for a + b <= 2 below the line and for a < b above it; KS point exact-by-literature; `bp_overlap` not-computed (statistical) |
+| `ridge` ridge / ridgeless least squares (isotropic Gaussian design) | replica | at `gamma`: `risk_ridgeless` (+ `bias_ridgeless`, `variance_ridgeless`, `test_mse_ridgeless`; not at gamma = 1), `lambda_opt`, `risk_opt`, `test_mse_opt`; with `lam`: `risk`, `bias`, `variance`, `test_mse`, RS `risk_rs`, `rs_V`, `rs_q`, `rs_m`; with `n`: `risk_sim` | ridgeless at gamma = 0.5, 0.9, 1.1, 2, 4 (HMRT Eq. (8)); ridge at three (gamma, lam) points (HMRT Eq. (43), also through `risk_rs`); optimal test MSE at four points (Dobriban-Wager Eq. (8)); lam* at two (HMRT Cor. 5): formula evaluations at chosen points (sympy exact), the papers print formulas, not numbers | closed forms exact-by-literature (HMRT Prop. 2 / Thm 1 / Cor. 5, Thm 6 for the split; DW Thm 2.1); RS values exact-by-literature (Loureiro et al. 2022 Thm 1, specialised here with the label noise); `risk_sim` not-computed (statistical) |
 | `viana_bray` sparse +-J | cavity | `beta_c` (3-regular) 0.881374; T = 0 RS `p0` 1/3, `e0` -23/18; factorized 1RSB -1.27231, mu* 0.4174 | those, plus slow/statistical population-dynamics RS and 1RSB at k = 5, T = 0.8 | `beta_c` stable; the rest not-computed |
 
 HELD-OUT EVIDENCE (the test of REUSE; `tests/test_heldout.py`). Two models that are not catalog entries
@@ -710,6 +740,41 @@ KNOWN HAZARDS:
   sizes, the Bethe free energy, the q = 4 hard phase, BP for a < b (refused; the KS margin is
   computed, but above the line with a < b it is not-computed: the possibility theorems fetched assume
   a > b, the impossibility one is symmetric).
+- Ridge regression (E7, `learning/`, entry `ridge`). Convention HMRT (Hastie-Montanari-Rosset-
+  Tibshirani 2022): rows x_i ~ N(0, I_p) (not N(0, I_p / p)), |beta|^2 = r^2 deterministic, gamma =
+  p/n, ridge argmin (1/n)|y - X b|^2 + lam |b|^2; Dobriban-Wager use the same lam with unit noise and
+  a random beta (Var = alpha^2 I/p), Advani-Saxe use inputs of variance 1/N, alpha_AS = n/p and a
+  strength gamma_AS = lam / gamma; Loureiro et al. lam_L = lam / gamma. Reported: the EXCESS risk
+  (HMRT's R_X, no test noise); `test_mse` = risk + sigma^2 is Dobriban-Wager's predictive risk. The
+  closed form is evaluated from the Marchenko-Pastur quadratic in stable forms (m = 2/(b + sqrt D),
+  m' = m (1 + gamma m)/sqrt D, m - lam m' = (1 - lam m)/sqrt D): the printed m(z) loses log10(1/lam)
+  digits to cancellation for gamma < 1 as lam -> 0, and m - lam m' cancels for gamma > 1. The
+  peak: the ridgeless risk diverges like sigma^2/|1 - gamma| from both sides, and at gamma = 1 the
+  ridge risk grows like lam^(-1/2) as lam -> 0+ (measured: 500 at lam = 1e-6, 5000 at 1e-8). At lam*
+  = sigma^2 gamma / r^2 the risk is finite at gamma = 1 and increasing in gamma on 0.1..10 (SNR 1 and
+  5), below the ridgeless risk and the null risk r^2; a golden-section argmin of the closed form
+  agrees with lam* to 1e-15 and not with sigma^2 / r^2. HMRT Sec. 6.1 say the optimally tuned risk
+  "appears to have a minimum around gamma = 1"; for the well-specified isotropic model the computed
+  R* is increasing in gamma (no interior minimum), so that remark must concern another setting
+  (their misspecified Fig. 8); not banked. Replica route: replicant's formal layer does not derive
+  the ridge free energy (no Family with a teacher replica and a quadratic loss); the RS saddle point
+  is Loureiro et al.'s Eq. (A.38) (their Thm 1 Eq. (2.8) for the label-noise term), specialised to
+  isotropic design and solved without the Stieltjes transform (V by a bracketed root, q and m from
+  linear equations); it agrees with HMRT Eq. (43) to 1e-12 on a 12-point grid, and a bias or
+  variance error planted in `ridge._SCALE` separates them by > 1e-3. Finite n: R_X from the SVD
+  (Lemma 1 identities on the sampled spectrum, averaged exactly over the training noise), 99%
+  Student-t bands over named seeds, extrapolated in 1/n because the O(1/n) offset of the mean is as
+  large as the band (gamma = 0.5, n = 200, seeds 0-19: 1.015 +- 0.011 misses the limit 1; the
+  Wishart mean p/(n - p - 1) = 1.0101 is inside). Default tier n = 80, 160 (20 seeds; R_inf
+  half-widths 0.037, 0.061, 0.051 at gamma = 0.5, 2 and gamma = 1, lam = 0.5): the closed form is
+  inside, a missing bias (shifts 0.5, 1/3) and +10% variance at gamma = 0.5, 2 (+50% at the ridge
+  point) are outside. Slow (n = 400, 1000, 24 seeds; half-widths 0.006, 0.020, 0.015, and 0.035 at
+  lam* for gamma = 2, r^2 = 2): missing bias, +5% variance (gamma = 0.5, 2) and +25% (ridge points)
+  excluded. The sampled-noise risk |beta_hat - beta|^2 (`RidgeFit.risk`) is much noisier and right-
+  skewed for gamma < 1 (seeds 0-19 at n = 200 gave 0.899 +- 0.092 against an expectation 1.0101).
+  Not implemented: anisotropic covariance (HMRT Thm 2/5), misspecified or latent-space models,
+  random features, benign-overfitting spectra (Bartlett et al. 2020, not fetched), non-Gaussian
+  design in the simulation.
 - Banked values often come from secondary open sources where the original is paywalled; each bank
   entry names the source its digits were read from (`reference/*.json`, field `cite`), and where the
   cite says the original was not fetched the digits come from the secondary source named there. Check

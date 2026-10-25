@@ -282,6 +282,7 @@ _DOCUMENTED = {
     ("ldpc_bec", "cavity"): {"l", "r", "eps", "N", "seeds"},
     ("spiked_wigner", "amp"): {"snr", "prior", "N", "seeds", "iters"},
     ("sbm", "cavity"): {"a", "b", "c", "N", "seeds", "iters"},
+    ("ridge", "replica"): {"gamma", "lam", "sigma2", "signal", "n", "seeds"},
     ("viana_bray", "cavity"): {"graph", "k", "c", "J", "beta", "ansatz", "m", "ys", "pop",
                                "inner", "sweeps", "burn_in", "runs", "seed",
                                "require_equilibrated"},
