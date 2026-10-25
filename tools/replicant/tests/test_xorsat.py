@@ -180,11 +180,15 @@ def _crossing(N, w, alpha_star, seeds):
 def test_gf2_crossing_small_n():
     """Default tier: N = 200, seeds 0-39, band +-0.05.  Measured (seeds 0-199): P(sat) = 0.93,
     0.58, 0.07 at alpha_s - 0.04, alpha_s, alpha_s + 0.04.  The shifted threshold alpha_s + 0.05
-    is excluded (its lower edge alpha_s has P ~ 0.58, whose 99% interval reaches below 1/2)."""
+    is excluded (its lower edge alpha_s has P ~ 0.58, whose 99% interval reaches below 1/2),
+    and so is alpha_s - 0.05 (its upper edge is alpha_s).  The width was chosen after measuring
+    seeds 0-199, which include the test seeds: on fixed seeds this is a regression check."""
     a_s = X.xorsat_sat_threshold(3)
     ok, info = _crossing(200, mp.mpf("0.05"), a_s, range(40))
     assert ok, info
     bad, info = _crossing(200, mp.mpf("0.05"), a_s + mp.mpf("0.05"), range(40))
+    assert not bad, info
+    bad, info = _crossing(200, mp.mpf("0.05"), a_s - mp.mpf("0.05"), range(40))
     assert not bad, info
 
 
@@ -193,12 +197,14 @@ def test_gf2_crossing_near_alpha_s():
     """N = 400, 1000, 2000 (seeds 0-99): the crossing of 1/2 is inside alpha_s +- w(N) with
     w = 0.04, 0.03, 0.02 (measured, seeds 0-199: P(sat) at alpha_s = 0.52 (N = 400), 0.49
     (N = 1000); at alpha_s +- 0.02, N = 1000: 0.97 / 0.02).  The shifted thresholds alpha_s +
-    0.05 and alpha_s + 0.02 both fail at N = 2000: shifts of 0.02 are resolved there."""
+    0.05, alpha_s + 0.02 and the -0.02, -0.05 shifts all fail at N = 2000: shifts of 0.02 are
+    resolved there.  The widths were chosen after measuring seeds 0-199, which include the test
+    seeds: on fixed seeds this is a regression check."""
     a_s = X.xorsat_sat_threshold(3)
     for N, w in ((400, "0.04"), (1000, "0.03"), (2000, "0.02")):
         ok, info = _crossing(N, mp.mpf(w), a_s, range(100))
         assert ok, (N, info)
-    for shift in ("0.05", "0.02"):
+    for shift in ("0.05", "0.02", "-0.02", "-0.05"):
         bad, info = _crossing(2000, mp.mpf("0.02"), a_s + mp.mpf(shift), range(100))
         assert not bad, (shift, info)
 
@@ -283,6 +289,41 @@ def test_refusals_are_named():
     _refuses(lambda: X.xorsat_bp_threshold(3, law="regular"), "unsupported:degree-law")
 
 
+def test_malformed_seeds_are_refused_by_name():
+    """Fix round 1 (Important 1): seeds must be non-negative integers, named in the detail."""
+    for bad in (["x"], (-1,), "x", 3, (True,), (0, 1.5)):
+        r = _refuses(lambda: XF.xorsat_sat_probability(3, 200, "0.9", bad), "precondition:named-seeds")
+        assert "non-negative integers" in r.detail, r.detail
+    r = _refuses(lambda: XF.xorsat_gf2_satisfiable(3, 200, "0.9", -2), "precondition:named-seeds")
+    assert "-2" in r.detail
+    _refuses(lambda: XF.xorsat_sampled_core(3, 200, "0.9", seed="a"), "precondition:named-seeds")
+    e = catalog()["xorsat"]
+    r = _refuses(lambda: compose(e.spec, "cavity").run(alpha="0.9", N=200, seeds="x"),
+                 "precondition:named-seeds")
+    assert "'x'" in r.detail, r.detail
+    import io
+    from replicant.cli import main
+    err = io.StringIO()
+    code = main(["run", "xorsat", "--route", "cavity", "--param", "alpha=0.9", "--param", "N=200",
+                 "--param", "seeds=x"], io.StringIO(), err)
+    assert code == 2 and "REFUSED: precondition:named-seeds" in err.getvalue(), err.getvalue()
+    err = io.StringIO()
+    code = main(["run", "xorsat", "--route", "cavity", "--param", "alpha=0.9", "--param", "N=200",
+                 "--param", "seeds=-1,"], io.StringIO(), err)
+    assert code == 2 and "REFUSED: precondition:named-seeds" in err.getvalue(), err.getvalue()
+
+
+def test_sat_fraction_uncertainty_is_the_clopper_pearson_halfwidth():
+    """Fix round 1 (Minor 1): when every seed agrees the binomial stderr is 0; the reported
+    uncertainty is the larger distance from the fraction to its 99% Clopper-Pearson bounds."""
+    r = XF.xorsat_sat_probability(3, 200, "0.5", range(10))
+    assert r.stderr == 0 and r.halfwidth99 == max(r.fraction - r.lo, r.hi - r.fraction) > 0.3
+    e = catalog()["xorsat"]
+    res = compose(e.spec, "cavity").run(alpha="0.5", N=200, seeds=tuple(range(10)))
+    assert res.errors["sat_fraction"] == r.halfwidth99
+    assert any("Clopper-Pearson" in n for n in res.notes), res.notes
+
+
 # ---- catalog entry ---------------------------------------------------------------------------
 def test_catalog_entry_xorsat():
     e = catalog()["xorsat"]
@@ -301,6 +342,8 @@ def test_catalog_entry_xorsat():
     assert pt.finality["core_variables"].state == "exact-by-literature"
     pt = compose(e.spec, "cavity").run(alpha="0.9")
     assert pt.finality["complexity"].state == "exact-by-literature"
+    note = pt.finality["complexity"].note
+    assert "core solutions per variable" in note and "Ibrahimi" in note and "abstract only" in note
     fin = compose(e.spec, "cavity").run(alpha="0.9", N=200, seeds=(0, 1, 2))
     assert "sat_fraction" in fin.statistical and not fin.final
     assert fin.finality["sat_fraction"].state == "not-computed"

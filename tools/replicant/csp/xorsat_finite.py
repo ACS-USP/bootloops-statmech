@@ -13,14 +13,17 @@ default_rng(seed) per instance, so a seed names an instance.
       integers keyed by the leading bit), for tests
   xorsat_gf2_satisfiable(K, N, alpha, seed) -> bool
   xorsat_sat_probability(K, N, alpha, seeds) -> SatProbability: the satisfiable fraction over
-      the named seeds, its binomial stderr and the exact 99% Clopper-Pearson interval
+      the named seeds, its binomial stderr and the exact 99% Clopper-Pearson interval (its
+      larger half-width `halfwidth99` is the reported uncertainty: the stderr is 0 when every
+      seed agrees)
   leaf_removal_core(idx, N) -> (core variables, core checks)   repeatedly delete a variable of
       degree 1 with its check (degree-0 variables are not in the core); what is left is the
       2-core, independent of the deletion order
   xorsat_sampled_core(K, N, alpha, seed) -> (V, C) the core fractions of one instance
 Statistical: a fraction over seeds is a binomial estimate, never certified.
 Refusals: precondition:integer-k-at-least-3, :positive-alpha, :enough-variables (N >= max(12,
-4K): smaller systems are not a finite-size check of anything), :named-seeds.
+4K): smaller systems are not a finite-size check of anything), :named-seeds (seeds must be non-negative
+integers: numpy's default_rng refuses negative ones).
 """
 import math
 from dataclasses import dataclass
@@ -40,7 +43,29 @@ def _n(N, K):
     return int(N)
 
 
+def _seed(seed):
+    if isinstance(seed, bool) or not isinstance(seed, (int, np.integer)) or seed < 0:
+        raise Refusal("precondition:named-seeds",
+                      f"seed {seed!r}: seeds must be non-negative integers")
+    return int(seed)
+
+
+def _seeds(seeds):
+    if isinstance(seeds, (str, bytes)):
+        raise Refusal("precondition:named-seeds",
+                      f"seeds {seeds!r}: seeds must be non-negative integers (a list)")
+    try:
+        out = tuple(seeds)
+    except TypeError:
+        raise Refusal("precondition:named-seeds",
+                      f"seeds {seeds!r}: seeds must be non-negative integers (a list)") from None
+    if not out:
+        raise Refusal("precondition:named-seeds", "give at least one named seed (non-negative integers)")
+    return tuple(_seed(x) for x in out)
+
+
 def xorsat_instance(K, N, alpha, seed):
+    seed = _seed(seed)
     K = _k(K)
     N, a = _n(N, K), float(_alpha(alpha))
     M = int(round(a * N))
@@ -120,9 +145,10 @@ class SatProbability:
     n: int
     n_sat: int
     fraction: float
-    stderr: float         # binomial sqrt(p (1 - p) / n)
+    stderr: float         # binomial sqrt(p (1 - p) / n) (0 when every seed agrees)
     lo: float             # exact 99% Clopper-Pearson interval
     hi: float
+    halfwidth99: float    # max(fraction - lo, hi - fraction): the reported uncertainty
 
 
 def clopper_pearson(k, n, conf=CONF):
@@ -135,16 +161,15 @@ def clopper_pearson(k, n, conf=CONF):
 
 
 def xorsat_sat_probability(K, N, alpha, seeds):
-    seeds = tuple(int(s) for s in seeds)
-    if not seeds:
-        raise Refusal("precondition:named-seeds", "give at least one named seed")
+    seeds = _seeds(seeds)
     K = _k(K)
     N, a = _n(N, K), float(_alpha(alpha))
     k = sum(xorsat_gf2_satisfiable(K, N, alpha, s) for s in seeds)
     n = len(seeds)
     p = k / n
     lo, hi = clopper_pearson(k, n)
-    return SatProbability(K, N, a, seeds, n, k, p, math.sqrt(p * (1 - p) / n), lo, hi)
+    return SatProbability(K, N, a, seeds, n, k, p, math.sqrt(p * (1 - p) / n), lo, hi,
+                          max(p - lo, hi - p))
 
 
 def leaf_removal_core(idx, N):

@@ -73,7 +73,7 @@ CLI (from `tools/`):
   `core_d` 0.357666, all `exact-by-literature` and final; `--param K=4` for K = 4.
   `... --route cavity --param alpha=0.9` adds the 2-core (`core_variables` 0.607076, `core_checks`
   0.594959) and `complexity` 0.008399; with `--param N=1000` (seeds 0-19) also `sat_fraction` 0.95
-  (99% Clopper-Pearson [0.683, 1.000]) from exact GF(2) elimination and the sampled core
+  (99% Clopper-Pearson [0.683, 1.000]; `errors` gives 0.267, that interval's larger half-width) from exact GF(2) elimination and the sampled core
   (`core_variables_sampled` 0.6134 +- 0.0052): statistical, `not-computed`, so `final` is false.
 - Worked example, amp route (`sk`, `teacher_student`; under 1 s each, measured):
   `python3 -m replicant run sk --route amp --param beta=1.5` -> `q_se` 0.352602 (the SE fixed point,
@@ -219,7 +219,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `no-solution:not-a-local-maximum` | `branch="max-f"`: the largest-f 1RSB root is not a local maximum of f (Schur complement over the conjugates) |
 | `missing-step:derivation:<name>` | a requested document needs a derivation the entry does not provide |
 | `precondition:<name>` | an input or state precondition fails (state point incomplete: `state-point`; out-of-range or non-numeric input; `known-parameter`, `rs-reducible`, `rs-site-trace-form`, `supported-disorder-law`, `nonnegative-alpha`, `finite-kappa`, `known-ansatz`, `known-graph`, `tex-engine`, `latex-path`, `known-target`, `complete-spec`, `known-variables`, `m-range`, `alpha-range`, `replicon-block`, `p-at-least-3`, ... and the step preconditions of the derivation) |
-| `precondition:integer-k-at-least-3`, `:positive-alpha`, `:enough-variables`, `:named-seeds` | XORSAT (`csp/`): K not an integer >= 3 (K = 2 is not implemented), alpha <= 0 or non-numeric, N < max(12, 4K) (a finite-N check that small tests nothing), an empty seed list |
+| `precondition:integer-k-at-least-3`, `:positive-alpha`, `:enough-variables`, `:named-seeds` | XORSAT (`csp/`): K not an integer >= 3 (K = 2 is not implemented), alpha <= 0 or non-numeric, N < max(12, 4K) (a finite-N check that small tests nothing), an empty or malformed seed list (seeds must be non-negative integers; the detail names the offending value) |
 | `unstable:<ansatz>` | `require_final` or `require_stable`: a computed stability is negative (RS replicon or cavity lambda < 0); `unstable:1rsb` also from `pspin_gardner_temperature` when the spherical scan is negative everywhere |
 | `unknown-stability:rs` | `require_final`: an RS value whose stability is not computed |
 | `not-final:<ansatz>` | `require_final`: a non-RS value that is not final |
@@ -275,7 +275,7 @@ banked in `reference/perceptron.json` as independent targets. Honest limits:
   is a theorem for Gaussian J only, so for +-J this is sampled numerical evidence, not a theorem, and
   the band (+-0.019) excludes errors of the size of the planted one (0.053), not small ones (slow).
 
-ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 318 tests, about 21 s on a
+ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 320 tests, about 21 s on a
 laptop; also `python3 run_selftests.py replicant`) covers the core and refusal paths, the symbolic
 derivation against independent expressions, level agreement (a)=(b) for every family where both exist,
 every catalog entry against its banked non-slow values, the cavity routes, the composer and the held-out
@@ -475,7 +475,10 @@ KNOWN HAZARDS:
   threshold and size (Molloy 2005, read through Pittel-Sorkin Sec. 7; not fetched) and alpha_s
   (Dubois-Mandler 2002 for K = 3, from the C. R. note; Pittel-Sorkin 2016, Thm 16, for K >= 3);
   that alpha_d is also the clustering threshold is the cavity picture (MRZ; rigorous clustering
-  results of Achlioptas-Molloy 2015 were read from the abstract only). Finite N: the GF(2)
+  results of Ibrahimi-Kanoria-Kraning-Montanari 2015 and Achlioptas-Molloy 2015 were read from the
+  abstracts only; `complexity` is labelled as the count of core solutions). The `sat_fraction` error is
+  the larger half-width of its 99% Clopper-Pearson interval (the binomial stderr is 0 when every seed
+  agrees); the crossing widths were chosen after measuring seeds 0-199, which include the test seeds. Finite N: the GF(2)
   eliminator is checked against brute-force enumeration (N = 12) and an independent XOR-basis rank;
   measured P(sat) at alpha_s is 0.58 / 0.52 / 0.49 at N = 200 / 400 / 1000 (seeds 0-199), and
   the crossing band (99% Clopper-Pearson both sides of 1/2) is +-0.05 at N = 200 (default tier,
@@ -506,7 +509,7 @@ RSB analysis of [SK94]; the Viana-Bray model [VB85], the sparse cavity and popul
 [MP01] [MP03] and the transition conditions [MK04] [GT03]; the dense cavity method [MPV87] with
 [TAP77]; AMP, state evolution and the TAP free energy (`amp/`) follow [Bol14] [BM11] [FMM18] with
 [Ple82], universality [BLM15] [CL20] and TAP complexity [BM80]; GAMP and its state evolution follow
-[Ran11] [BKMMZ19] with [JM13], the binary teacher-student thresholds [Gyo90] [BKMMZ19] [LHZH22]. Random K-XORSAT (`csp/`): the cavity / leaf-removal solution [MRZ03] [CDMM03], the proofs of the threshold [DM02] [PS16] and of the 2-core [Mol05], the textbook treatment [MM09] and the solution geometry [AM15]. The universality of the SK free energy used in the held-out test is [CH04]. Reference digits are read
+[Ran11] [BKMMZ19] with [JM13], the binary teacher-student thresholds [Gyo90] [BKMMZ19] [LHZH22]. Random K-XORSAT (`csp/`): the cavity / leaf-removal solution [MRZ03] [CDMM03], the proofs of the threshold [DM02] [PS16] and of the 2-core [Mol05], the textbook treatment [MM09] and the solution geometry [IKKM15] [AM15]. The universality of the SK free energy used in the held-out test is [CH04]. Reference digits are read
 from [Sto25] [OSS07] [CRT03] [SY17] [DM15] [FP16] [Gyo01] [PRGE20] [Cov65] [Bar97] as stated in the bank
 cites. The typed-step architecture, the symbolic level (a), the composer, the refusal and
 finality discipline and the LaTeX writer are ours. Each bank entry names the source its digits were

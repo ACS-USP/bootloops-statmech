@@ -66,11 +66,11 @@ def _core(p):
 
 def _finite(p):
     K, N, a = _K(p), p["N"], p["alpha"]
-    seeds = tuple(p.get("seeds", _DEFAULT_SEEDS))
+    seeds = XF._seeds(p.get("seeds", _DEFAULT_SEEDS))
     r = XF.xorsat_sat_probability(K, N, a, seeds)
     cores = [XF.xorsat_sampled_core(K, N, a, s) for s in seeds]
     vals = {}
-    errs = {"sat_fraction": r.stderr}
+    errs = {"sat_fraction": r.halfwidth99}
     for key, xs in (("core_variables_sampled", [v for v, _ in cores]),
                     ("core_checks_sampled", [c for _, c in cores])):
         m = math.fsum(xs) / len(xs)
@@ -83,7 +83,9 @@ def _finite(p):
                f" {r.n_sat} satisfiable, 99% Clopper-Pearson [{r.lo:.3f}, {r.hi:.3f}]; leaf removal"
                " on the same instances", errors=errs, statistical=stat,
                notes=("statistical: sat_fraction (binomial over named seeds) and the sampled core "
-                      "(mean +- stderr) are finite-N estimates, not certified",))
+                      "(mean +- stderr) are finite-N estimates, not certified; the error given for "
+                      "sat_fraction is the larger half-width of its 99% Clopper-Pearson interval "
+                      "(the binomial stderr is 0 when every seed agrees)",))
 
 
 def _check_params(p):
@@ -112,8 +114,12 @@ def _alpha_s_label(v):
 def _sigma_label(v):
     if v["complexity"] > 0 or v.get("core_trivial"):
         return Stability("exact-by-literature", "1rsb", MM_SIGMA,
-                         "ln of the number of clusters (= core solutions) per variable, for "
-                         "alpha < alpha_s")
+                         "ln of the number of core solutions per variable, for alpha < alpha_s; "
+                         "reading it as the number of solution clusters is the cavity picture, "
+                         "made rigorous by Ibrahimi, Kanoria, Kraning & Montanari, Ann. Appl. "
+                         "Probab. 25, 2743 (2015), arXiv:1107.5377, and Achlioptas & Molloy, "
+                         "RSA 46, 197 (2015) (both abstract only); Mezard & Montanari's ch. 18 "
+                         "Notes say that clusters being well connected remained to be proved")
     return Stability("not-computed", "1rsb", MM_SIGMA,
                      "Sigma <= 0: at or above alpha_s there are no solutions w.h.p. "
                      f"({PS}); the MAX-XORSAT ground energy is not computed: NOT final")
