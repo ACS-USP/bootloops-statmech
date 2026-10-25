@@ -21,7 +21,7 @@ python3 -m replicant run perceptron --param alpha=1.5 --out /tmp/result.json --l
 `run` also takes a spec file for a model near a catalogued one
 (`python3 -m replicant run spec.json --param beta=1.5 --param h=0`; schema in the GUIDE),
 `--route amp` for `sk` and `teacher_student` (state evolution, and finite-N AMP / GAMP with
-`--param N=...`), `--route cavity` for the entries that have a cavity route (required for `viana_bray`, `xorsat` and `ksat`, which are
+`--param N=...`), `--route cavity` for the entries that have a cavity route (required for `viana_bray`, `xorsat`, `ksat` and `ldpc_bec`, which are
 cavity-only: `python3 -m replicant run viana_bray --route cavity`, `python3 -m replicant run xorsat --route cavity`), and `--pdf` (with `--latex`) to
 compile the derivation.
 
@@ -48,8 +48,12 @@ compile the derivation.
   `latex_csp.py`). Random K-SAT (E5b): `csp/ksat.py` (instances, exhaustive counts, the first-moment
   bound, BP) and `csp/sp.py` (survey propagation on instances, the SP population dynamics and the
   root of its complexity); catalog entry `ksat`.
+- `inference/`: regular (l, r) LDPC codes on the binary erasure channel (E6a): density evolution,
+  the BP threshold, the MAP threshold (Maxwell construction: trial-entropy root and area theorem)
+  through a degree-polynomial hook, and independent finite-N checks (configuration-model graphs, the
+  peeling decoder); catalog entry `ldpc_bec` (`catalog_inference.py`, `latex_inference.py`).
 - `catalog*.py`, `compose.py` (+ `compose_result.py`: `Result` and the finality rule), `cli.py`,
-  `__main__.py`: the 10-entry catalog (`catalog_ts.py` holds the teacher-student entry,
+  `__main__.py`: the 11-entry catalog (`catalog_ts.py` holds the teacher-student entry,
   `catalog_pspin.py` the two p-spin entries; LaTeX in `latex_pspin.py`), the composer,
   the command line.
 - `latex*.py`, `tex*.py`, `derive_tex.py`: the LaTeX derivation writer.

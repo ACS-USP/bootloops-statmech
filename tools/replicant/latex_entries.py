@@ -361,6 +361,9 @@ def derivation(name, route):
     if name in ("xorsat", "ksat"):
         from . import latex_csp
         return getattr(latex_csp, name)(route)
+    if name == "ldpc_bec":
+        from .latex_inference import ldpc_bec
+        return ldpc_bec(route)
     if name not in _ENTRIES:
         raise Refusal(f"missing-step:derivation:{name}", "no displayed derivation for "
                       f"catalog entry {name!r} (latex_entries.py)")

@@ -25,7 +25,7 @@ Each entry also exposes derivation(route): the equations a LaTeX document displa
 
 Matching to model specifications (which entry a spec is, which is nearest) lives in
 compose.py; the entries themselves in catalog_entries.py, catalog_sparse.py and
-catalog_csp.py (constraint satisfaction).
+catalog_csp.py (constraint satisfaction) and catalog_inference.py (codes, inference).
 """
 import math
 from dataclasses import dataclass, field
@@ -321,8 +321,9 @@ def catalog() -> dict:
     if not _CATALOG:
         from .catalog_csp import csp_entries
         from .catalog_entries import dense_entries
+        from .catalog_inference import inference_entries
         from .catalog_sparse import sparse_entries
-        for e in dense_entries() + sparse_entries() + csp_entries():
+        for e in dense_entries() + sparse_entries() + csp_entries() + inference_entries():
             _CATALOG[e.name] = e
     return dict(_CATALOG)
 

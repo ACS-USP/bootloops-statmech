@@ -279,6 +279,7 @@ _DOCUMENTED = {
     ("hopfield", "cavity"): {"alpha", "beta", "branch"},
     ("xorsat", "cavity"): {"K", "alpha", "N", "seeds"},
     ("ksat", "cavity"): {"K", "alpha", "N", "seeds", "pop", "sweeps", "crossing"},
+    ("ldpc_bec", "cavity"): {"l", "r", "eps", "N", "seeds"},
     ("viana_bray", "cavity"): {"graph", "k", "c", "J", "beta", "ansatz", "m", "ys", "pop",
                                "inner", "sweeps", "burn_in", "runs", "seed",
                                "require_equilibrated"},

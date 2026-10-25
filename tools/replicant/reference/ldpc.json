@@ -1,0 +1,110 @@
+{
+  "eps_bp_l3_r6": {
+    "value": "0.42944",
+    "tol": "5e-6",
+    "cite": "BP (peeling) threshold of the (3, 6)-regular LDPC ensemble on the BEC, edge-perspective lambda(x) = x^2, rho(x) = x^5: Kudekar, Richardson & Urbanke, 'Threshold saturation via spatial coupling: why convolutional LDPC ensembles perform so well over the BEC', arXiv:1001.1826v2 (2010; journal version not checked) (PDF read), Lemma 4 (eps_BP = eps(x_BP), x_BP the positive root of p_BP) and Example 5: 'eps_BP(l = 3, r = 6) ~ 0.42944'. Consistent (rounded): Measson, Montanari & Urbanke, IEEE Trans. Inform. Theory 54, 5277 (2008), arXiv:cs/0506083 (PDF read), Example 9 'eps_BP ~ 0.4294'; Mezard & Montanari, Information, Physics, and Computation (OUP 2009), ch. 15 (draft Part D PDF from the authors' web page read), Eq. (15.34) and Fig. 15.4 'eps_d = 0.4294'; Pfister, 'A brief introduction to spatially-coupled codes and threshold saturation' (slides, CUHK, 22 June 2015; secondary), table p. 17: 0.4294. Richardson & Urbanke, Modern Coding Theory (2008) not fetched. tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own tangency of eps(x) = x / lambda(1 - rho(1 - x)) through the DEGREE_PAIRS hook (inference/ldpc.py, 30 digits): 0.42943981441 (build); tests also take the root in (0, 1) of the KRU polynomial p_BP(x) = ((l-1)(r-1) - 1)(1-x)^(r-2) - sum_{i=0}^{r-3} (1-x)^i without the hook, and the finite-N peeling crossing (slow) brackets it"
+  },
+  "eps_map_l3_r6": {
+    "value": "0.4881508841915644",
+    "tol": "5e-15",
+    "cite": "MAP threshold of the (3, 6)-regular LDPC ensemble on the BEC: Measson, Montanari & Urbanke, 'Maxwell construction: the hidden bridge between iterative and maximum a posteriori decoding', IEEE Trans. Inform. Theory 54, 5277 (2008), arXiv:cs/0506083v1 (PDF read): Example 4 gives the closed-form root of the trial-entropy polynomial P(x) (Lemma 3, an upper bound by Lemma 2) and 'Numerically, eps_MAP ~ 0.4881508841915644'; Example 6 (Theorem 10 and Corollary 2) shows the bound is the MAP threshold for this ensemble: 'eps_MAP = eps_C ~ 0.48815'. Consistent (rounded): Kudekar, Richardson & Urbanke, arXiv:1001.1826v2 (2010; journal version not checked) (read), Example 5 '0.488151'; Kudekar, Richardson & Urbanke, arXiv:1201.2999v1 (2012; journal version not checked) (read), Table II area threshold h^A_BEC(3, 6) = 0.4881; Pfister slides (2015, secondary) 0.4882. tol 5e-15: the source prints 16 digits of what appears to be a double-precision evaluation of its closed form; replicant's 30- and 60-digit roots agree with each other and sit 1.8e-15 from the printed value",
+    "independent_route": "replicant's own root of the trial entropy P(x) = Lambda'(1) x rho(1-x) - (Lambda'(1)/Gamma'(1))(1 - Gamma(1-x)) + eps(x) Lambda(1 - rho(1-x)) on (x_BP, 1) through the DEGREE_PAIRS hook: 0.48815088419156617 (build); the area route (quadrature of the BP EXIT curve from eps to 1 equal to the design rate, inference/ldpc.py bec_map_threshold_area) agrees to 1e-12; tests also take the root of the KRU polynomial p_MAP(x) = x + (1/r)(1-x)^(r-1)(l + l(r-1)x - r x) - l/r without the hook"
+  },
+  "eps_bp_l4_r8": {
+    "value": "0.3834",
+    "tol": "5e-5",
+    "cite": "BP threshold of the (4, 8)-regular LDPC ensemble on the BEC: Pfister, 'A brief introduction to spatially-coupled codes and threshold saturation' (slides, CUHK, 22 June 2015; SECONDARY source, PDF read), table 'Properties of threshold saturation', p. 17: l = 4, r = 8, eps_BP 0.3834. No primary tabulation fetched (Richardson & Urbanke 2008 not accessible). tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own tangency of eps(x) at (4, 8) (inference/ldpc.py): 0.38344657232 (build); tests also root the hook-free KRU polynomial p_BP"
+  },
+  "eps_map_l4_r8": {
+    "value": "0.49774",
+    "tol": "5e-6",
+    "cite": "MAP threshold of the (4, 8)-regular LDPC ensemble on the BEC: Kudekar, Richardson & Urbanke, arXiv:1001.1826v2 (2010; journal version not checked) (PDF read), Sec. IV (discussion item (iv) after Theorem 10): 'eps_MAP(l = 4, r = 8) = 0.49774'; consistent (rounded): Pfister slides (2015, secondary) 0.4977. tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own root of the trial entropy at (4, 8) (inference/ldpc.py): 0.49774086293 (build); area route and the hook-free KRU p_MAP agree (tests)"
+  },
+  "eps_bp_l5_r10": {
+    "value": "0.3416",
+    "tol": "5e-5",
+    "cite": "BP threshold of the (5, 10)-regular ensemble on the BEC: Pfister slides (CUHK 2015; SECONDARY source, read), table p. 17: 0.3416. tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own tangency at (5, 10): 0.34155002304 (build; 5.0e-5 below the printed digits, inside the inclusive half-unit tolerance)"
+  },
+  "eps_map_l5_r10": {
+    "value": "0.499486",
+    "tol": "5e-7",
+    "cite": "MAP threshold of the (5, 10)-regular ensemble on the BEC: Kudekar, Richardson & Urbanke (2010), arXiv:1001.1826v2 (read), Sec. IV item (iv): 'eps_MAP(l = 5, r = 10) = 0.499486'; Pfister slides (secondary) 0.4995. tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own trial-entropy root at (5, 10): 0.49948579624 (build)"
+  },
+  "eps_bp_l6_r12": {
+    "value": "0.3075",
+    "tol": "5e-5",
+    "cite": "BP threshold of the (6, 12)-regular ensemble on the BEC: Pfister slides (CUHK 2015; SECONDARY source, read), table p. 17: 0.3075. tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own tangency at (6, 12): 0.30746226148 (build)"
+  },
+  "eps_map_l6_r12": {
+    "value": "0.499876",
+    "tol": "5e-7",
+    "cite": "MAP threshold of the (6, 12)-regular ensemble on the BEC: Kudekar, Richardson & Urbanke (2010), arXiv:1001.1826v2 (read), Sec. IV item (iv): 'eps_MAP(l = 6, r = 12) = 0.499876'; Pfister slides (secondary) 0.4999. tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own trial-entropy root at (6, 12): 0.49987571871 (build)"
+  },
+  "eps_bp_l7_r14": {
+    "value": "0.2798",
+    "tol": "5e-5",
+    "cite": "BP threshold of the (7, 14)-regular ensemble on the BEC: Pfister slides (CUHK 2015; SECONDARY source, read), table p. 17: 0.2798. tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own tangency at (7, 14): 0.27975124870 (build)"
+  },
+  "eps_map_l7_r14": {
+    "value": "0.499969",
+    "tol": "5e-7",
+    "cite": "MAP threshold of the (7, 14)-regular ensemble on the BEC: Kudekar, Richardson & Urbanke (2010), arXiv:1001.1826v2 (read), Sec. IV item (iv): 'eps_MAP(l = 7, r = 14) = 0.499969'; Pfister slides (secondary) 0.5000. tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own trial-entropy root at (7, 14): 0.49996929800 (build)"
+  },
+  "eps_map_l3_r4": {
+    "value": "0.7460",
+    "tol": "5e-5",
+    "cite": "MAP (area) threshold of the (3, 4)-regular ensemble on the BEC: Kudekar, Richardson & Urbanke, 'Spatially coupled ensembles universally achieve capacity under belief propagation', arXiv:1201.2999v1 (2012; journal version not checked) (PDF read), Table II, column h^A_BEC: (3, 4) 0.7460 (for the BEC the channel entropy is eps). NOT banked from Measson, Montanari & Urbanke (2008), Example 3, which prints (102 - 7 sqrt 21)/108 ~ 0.647426 as the MAP upper bound for (x^2, x^3): that number is the BP threshold of this ensemble (replicant: 0.6474256494), an apparent slip in the source. tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own trial-entropy root at (3, 4): 0.74600970247 (build); the area route agrees (tests)"
+  },
+  "eps_map_l3_r5": {
+    "value": "0.5910",
+    "tol": "5e-5",
+    "cite": "MAP (area) threshold of the (3, 5)-regular ensemble on the BEC: Kudekar, Richardson & Urbanke (2012), arXiv:1201.2999v1 (read), Table II, h^A_BEC(3, 5) = 0.5910. tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own trial-entropy root at (3, 5): 0.59098938773 (build)"
+  },
+  "eps_map_l4_r6": {
+    "value": "0.6657",
+    "tol": "5e-5",
+    "cite": "MAP (area) threshold of the (4, 6)-regular ensemble on the BEC: Kudekar, Richardson & Urbanke (2012), arXiv:1201.2999v1 (read), Table II, h^A_BEC(4, 6) = 0.6657. tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own trial-entropy root at (4, 6): 0.66565559543 (build)"
+  },
+  "eps_map_l3_r7": {
+    "value": "0.4154",
+    "tol": "5e-5",
+    "cite": "MAP (area) threshold of the (3, 7)-regular ensemble on the BEC: Kudekar, Richardson & Urbanke (2012), arXiv:1201.2999v1 (read), Table II, h^A_BEC(3, 7) = 0.4154. tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own trial-entropy root at (3, 7): 0.41539194521 (build)"
+  },
+  "x_bp_l3_r6": {
+    "value": "0.2606",
+    "tol": "5e-5",
+    "cite": "Location of the BP threshold on the EBP curve of the (3, 6)-regular ensemble (the minimiser of eps(x)): Measson, Montanari & Urbanke, IEEE Trans. Inform. Theory 54, 5277 (2008), arXiv:cs/0506083v1 (PDF read), Example 9 ((3, 6) ensemble, Maxwell decoder on BEC(eps = 0.46)): 'the BP threshold (x_BP ~ 0.2606, y_BP ~ 0.7790)'. tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own root of W(x) = lambda(y) - x lambda'(y) rho'(1-x) (inference/ldpc.py): 0.26057107291 (build); tests root the hook-free KRU p_BP and compare"
+  },
+  "de_x_l3_r6_eps046": {
+    "value": "0.3789",
+    "tol": "5e-5",
+    "cite": "DE fixed point of the (3, 6)-regular ensemble at eps = 0.46 (where BP gets stuck): Measson, Montanari & Urbanke, IEEE Trans. Inform. Theory 54, 5277 (2008), arXiv:cs/0506083v1 (PDF read), Example 9 ((3, 6) ensemble, Maxwell decoder on BEC(eps = 0.46)): 'the fixed point (x_eps ~ 0.3789, y_eps ~ 0.9076) of DE'. tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own density-evolution iteration from x_0 = eps (inference/ldpc.py, binary64): 0.37888749225 (build); tests compare with a bisection root of x = eps (1 - (1-x)^5)^2 and with the finite-N peeling residual"
+  },
+  "de_y_l3_r6_eps046": {
+    "value": "0.9076",
+    "tol": "5e-5",
+    "cite": "Check-to-variable erasure probability y = 1 - rho(1 - x) at the same fixed point: Measson, Montanari & Urbanke, IEEE Trans. Inform. Theory 54, 5277 (2008), arXiv:cs/0506083v1 (PDF read), Example 9 ((3, 6) ensemble, Maxwell decoder on BEC(eps = 0.46)): 'y_eps ~ 0.9076'. tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own DE: 0.90756182236 (build)"
+  },
+  "de_determined_l3_r6_eps046": {
+    "value": "0.6561",
+    "tol": "5e-5",
+    "cite": "Fraction of bits determined by BP at that fixed point, 1 - eps Lambda(y): Measson, Montanari & Urbanke, IEEE Trans. Inform. Theory 54, 5277 (2008), arXiv:cs/0506083v1 (PDF read), Example 9 ((3, 6) ensemble, Maxwell decoder on BEC(eps = 0.46)): 'a fraction 1 - eps Lambda(y_eps) ~ 0.6561 of bits has been determined'. tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own 1 - de_bit_erasure: 0.65613617706 (build); the finite-N peeling residual at N = 20000 (mean 0.3427 +- 0.0027 over seeds 0-19) is consistent"
+  }
+}
