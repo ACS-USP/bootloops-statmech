@@ -65,7 +65,7 @@ def spiked_wigner(route):
               _MV),
         cited("Threshold for nontrivial estimation (both priors)",
               r"\lambda_c = 1:\quad q^* = 0 \text{ for } \lambda \le 1,\quad q^* > 0 \text{ for } \lambda > 1",
-              f"{_LM}, Sec. 2.3, Prop. 4; {_DAM}, Thm 1.4"),
+              f"{_LM}, Sec. 2.3, Prop. 4; {_DAM}, Thm 4.3 and Lemma 3.3"),
         text("Finite-N checks", "Bayes AMP on sampled matrices over named seeds: |<xhat, x>|/N, the "
              "cosine, the sign-resolved and the matrix MSE with 99% Student-t bands (statistical)"),
     ]

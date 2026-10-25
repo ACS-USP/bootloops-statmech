@@ -12,12 +12,16 @@ lambda_LM = lambda^2.  Barbier et al. (arXiv:1606.04142) write w = s s^T / sqrt(
 Delta = 1 / lambda^2.
 
 Scalar channel y = gamma X + sqrt(gamma) G (MV Eq. (2.26)), denoiser F(y; gamma) = E[X | y]
-(the PRIORS hook: gaussian y / (1 + gamma), rademacher tanh(y)); mmse(gamma) = E (X - F)^2 by
-Gauss-Hermite quadrature over G (and over X for the gaussian prior).  State evolution (MV (2.24)):
+(the PRIORS hook: gaussian y / (1 + gamma), rademacher tanh(y)); mmse(gamma) = E (X - F)^2 by a
+trapezoid rule over G (and Gauss-Hermite over X for the gaussian prior); the SE uses
+1 - mmse = 2 E[X F] - E[F^2] (scalar_overlap: unit variance, no cancellation against E X^2 = 1, so
+it keeps ~1e-15 relative accuracy as gamma -> 0).  State evolution (MV (2.24)):
     gamma_{t+1} = lambda^2 (1 - mmse(gamma_t)),
 whose fixed points are found here by bracketing the roots of lambda^2 (1 - mmse(gamma)) - gamma on
-(0, lambda^2] (gamma = 0 is always one).  At the largest fixed point gamma* (the limit from the
-spectral start gamma_0 = lambda^2 - 1 and from the informative start lambda^2):
+[1e-9 lambda^2, lambda^2] (gamma = 0 is always one; roots below the floor are not searched, the
+quadrature cannot resolve them: |lambda^2 - 1| below about 1e-9 reports gamma = 0).  At the largest fixed point gamma* (the limit from the spectral
+start gamma_0 = lambda^2 - 1 and from the informative start lambda^2; MV Thm 2 states gamma_ALG,
+the smallest positive root: they coincide because several nontrivial roots are refused):
     q = gamma*/lambda^2   (LM's q*: the overlap x.X of a posterior sample, Nishimori),
     overlap = sqrt(q)     (cosine |<xhat, x>| / (|xhat| |x|), MV Eq. (2.28)),
     mmse = 1 - q          (vector MSE up to the global sign, MV Eq. (2.29)),
@@ -54,6 +58,12 @@ from ..csp import _checks
 # Gauss-Hermite rule with 101 nodes was off by 3e-7 at gamma = 3.7, by 2.7e-6 at gamma = 9)
 _Z = np.linspace(-10.0, 10.0, 2001)
 _WZ = np.exp(-_Z**2 / 2) / math.sqrt(2 * math.pi) * (_Z[1] - _Z[0])
+_WZ = _WZ / _WZ.sum()     # weights summing to 1 to rounding (the raw sum is 1 + O(1e-12))
+# lower edge of the root bracketing, in units of lambda^2: at lambda = 1 the true g = -gamma^2
+# (gaussian) must dominate the quadrature noise, about 1e-17 sqrt(gamma) from odd moments that do not
+# cancel exactly in floating point; at 1e-9 the margin is about 3000.  A root below it (|lambda^2 - 1|
+# below about 1e-9) is not searched and the SE reports gamma = 0.
+_FLOOR = 1e-9
 _onsager_scale = 1.0    # private: tests plant 0.5 to show the band resolves the Onsager term
 _SPECTRAL = ("AMP needs lambda > 1: the spectral start of MV Theorem 2 exists only above the "
              "spectral threshold (below it the Bayes estimate is trivial, q = 0)")
@@ -73,7 +83,7 @@ class Prior:
 
 def _gauss_prior():
     x, w = hermegauss(21)
-    return Prior("gaussian", x, w / math.sqrt(2 * math.pi), lambda y, g: y / (1 + g),
+    return Prior("gaussian", x, w / w.sum(), lambda y, g: y / (1 + g),
                  lambda y, g: np.full_like(y, 1 / (1 + g)), lambda rng, n: rng.normal(size=n))
 
 
@@ -114,6 +124,15 @@ def scalar_mmse(prior, gamma):
     return float(P.weights @ err @ _WZ)
 
 
+def scalar_overlap(prior, gamma):
+    """1 - mmse(gamma) for a unit-variance prior, as 2 E[X F] - E[F^2] (no cancellation)."""
+    P = _prior(prior)
+    g = float(gamma)
+    y = g * P.nodes[:, None] + math.sqrt(g) * _Z[None, :]
+    F = P.F(y, g)
+    return float(P.weights @ (2 * P.nodes[:, None] * F - F * F) @ _WZ)
+
+
 def _mutual_info(prior, g):
     if prior == "gaussian":
         return 0.5 * math.log1p(g)
@@ -135,6 +154,8 @@ def spiked_potential(snr, gamma, prior="gaussian"):
     g = float(gamma)
     if lam == 0:
         raise Refusal("precondition:snr", "the potential needs lambda > 0")
+    if not math.isfinite(g) or g < 0:
+        raise Refusal("precondition:gamma", f"gamma = {gamma!r}: the scalar SNR must be >= 0")
     return mp.mpf(lam**2 / 4 + g**2 / (4 * lam**2) - g / 2 + _mutual_info(prior, g))
 
 
@@ -154,8 +175,8 @@ class SEResult:
 
 
 def _roots(lam2, prior):
-    g = lambda x: lam2 * (1 - scalar_mmse(prior, x)) - x
-    grid = np.concatenate([lam2 * np.geomspace(1e-9, 1e-2, 15), lam2 * np.linspace(1e-2, 1, 40)[1:]])
+    g = lambda x: lam2 * scalar_overlap(prior, x) - x
+    grid = np.concatenate([lam2 * np.geomspace(_FLOOR, 1e-2, 25), lam2 * np.linspace(1e-2, 1, 40)[1:]])
     vals = [g(x) for x in grid]
     out = [0.0]
     for (x0, v0), (x1, v1) in zip(zip(grid, vals), zip(grid[1:], vals[1:])):
@@ -180,7 +201,7 @@ def spiked_state_evolution(snr, prior="gaussian") -> SEResult:
                       f"{[f'{r:.10g}' for r in roots[1:]]}; this module reports only the unique one")
     gs = roots[-1]
     psi = {r: float(spiked_potential(lam, r, prior)) for r in roots}
-    h = 1e-5 * max(gs, 1e-3)
+    h = min(1e-5 * max(gs, 1e-3), gs / 2)       # central difference inside gamma >= 0
     stationary = gs == 0 or abs(float(spiked_potential(lam, gs + h, prior)) -
                                 float(spiked_potential(lam, gs - h, prior))) / (2 * h) < 1e-6
     bayes = bool(stationary and psi[gs] <= min(psi.values()) + 1e-13)
@@ -193,10 +214,10 @@ def spiked_state_evolution(snr, prior="gaussian") -> SEResult:
 
 def spiked_threshold(prior="gaussian"):
     """lambda_c = (-mmse'(0))^(-1/2): where gamma = 0 stops being a stable SE fixed point
-    (slope lambda^2 (-mmse'(0)) = 1), by Richardson extrapolation of (mmse(0) - mmse(h))/h."""
+    (slope lambda^2 (-mmse'(0)) = 1), by Richardson extrapolation of (1 - mmse(h))/h = scalar_overlap(h)/h (for a prior of variance v the
+    same expression is 2 E[XF] - E[F^2] = v - mmse, so a planted variance shows up)."""
     _prior(prior)
-    m0 = scalar_mmse(prior, 0.0)
-    D = lambda h: (m0 - scalar_mmse(prior, h)) / h
+    D = lambda h: scalar_overlap(prior, h) / h
     hs = (1e-4, 5e-5, 2.5e-5)
     r1 = [2 * D(hs[i + 1]) - D(hs[i]) for i in range(2)]
     slope = (4 * r1[1] - r1[0]) / 3
@@ -331,5 +352,5 @@ def spiked_amp_ensemble(N, snr, prior, *, seeds, iters, reaction=True) -> AMPEns
 
 
 __all__ = ["AMPEnsemble", "AMPResult", "Band", "PRIORS", "Prior", "SEResult", "amp_metrics",
-           "scalar_mmse", "spiked_amp", "spiked_amp_ensemble", "spiked_matrix", "spiked_potential",
+           "scalar_mmse", "scalar_overlap", "spiked_amp", "spiked_amp_ensemble", "spiked_matrix", "spiked_potential",
            "spiked_state_evolution", "spiked_threshold"]

@@ -26,7 +26,7 @@ from .spec import ModelSpec
 LM = ("Lelarge & Miolane, Probab. Theory Relat. Fields 173, 859 (2019), arXiv:1611.03888, "
       "Thm 1, Prop. 4, Sec. 2.3")
 DAM = ("Deshpande, Abbe & Montanari, arXiv:1507.08685 (2015; Information and Inference 2017), "
-       "Thm 1.4, Thm 4.3, Lemma 3.3")
+       "Thm 4.3, Lemma 3.3 (Thm 1.4 is their SBM statement)")
 MV = ("Montanari & Venkataramanan, Ann. Statist. 49, 321 (2021), arXiv:1711.01682, Thm 2, "
       "Eqs. (2.24), (2.28)-(2.29), Prop. 2.2, Cor. 2.3")
 DKMZ = ("Decelle, Krzakala, Moore & Zdeborova, Phys. Rev. E 84, 066106 (2011), arXiv:1109.3041, "
@@ -136,7 +136,7 @@ def spiked_wigner():
                           params={"snr": lam}, route="amp")]
     lc = Stability("exact-by-literature", "rs", f"{LM}; {DAM}",
                    "threshold for nontrivial estimation (LM Eq. (12)) at lambda = 1 for both priors "
-                   "(LM Sec. 2.3; DAM Thm 1.4 for rademacher); for these priors it equals the "
+                   "(LM Sec. 2.3; for rademacher also DAM Thm 4.3 with Lemma 3.3); for these priors it equals the "
                    "spectral threshold (LM Sec. 2.3, citing Feral-Peche 2007 and Benaych-Georges-"
                    "Nadakuditi 2011, not fetched) and the SE instability of gamma = 0 computed here")
     stat = _stat(MV)
@@ -170,7 +170,7 @@ def _sbm_ks(p):
     if p.get("a") is None:
         return Out({}, "no a, b given")
     ks = B.sbm_kesten_stigum(p["a"], p["b"])
-    return Out({"ks_margin": ks.margin, "ks_detectable": ks.detectable,
+    return Out({"a": ks.a, "b": ks.b, "ks_margin": ks.margin, "ks_detectable": ks.detectable,
                 "mean_degree": ks.mean_degree, "ks_impossibility_proved": ks.impossibility_proved},
                f"tau = (a - b)^2 / (2 (a + b)) = {float(ks.margin):.6g}: "
                f"{'above' if ks.detectable else 'not above'} the Kesten-Stigum line")
@@ -195,6 +195,11 @@ def _sbm_finite(p):
 
 
 def _ks_label(v):
+    if v.get("ks_detectable") and v.get("a") is not None and v["a"] < v["b"]:
+        return Stability("not-computed", "rs", f"{MAS}; {MNS18}",
+                         "tau > 1 with a < b (disassortative): the cited possibility theorems are "
+                         "stated for a > b (Massoulie beta = (a - b)/2 > 0, MNS 2018 s = (a - b)/2 > 0); "
+                         "no theorem fetched here covers it: NOT final")
     if v.get("ks_detectable"):
         return Stability("exact-by-literature", "rs", f"{MAS}; {MNS18}",
                          "tau > 1: an efficient estimator correlated with the partition exists "
@@ -224,7 +229,7 @@ def sbm():
                      "KS line (MNS 2018 Sec. 2.1): NOT final")
     fin = {"ks_margin": _ks_label, "a_ks": line, "b_ks": line, "inverse_eps_ks": line,
            "bp_overlap": stat}
-    meta = ("ks_detectable", "mean_degree", "ks_impossibility_proved", "c", "N", "seeds", "iters",
+    meta = ("a", "b", "ks_detectable", "mean_degree", "ks_impossibility_proved", "c", "N", "seeds", "iters",
             "bp_overlap_halfwidth99", "bp_converged_fraction", "bp_factorized_fraction")
     spec = ModelSpec("sbm", "ising", "none", constraint="two planted groups, sparse random graph")
     return entry("sbm", spec, DKMZ, {"cavity": steps}, refs, {"cavity": SBM_CAVEAT},

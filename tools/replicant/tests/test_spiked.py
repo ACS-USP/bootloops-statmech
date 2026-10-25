@@ -74,8 +74,8 @@ _GAUSS_KEYS = (("1p5", "1.5"), ("2", "2"), ("3", "3"))
 # ---- the Gaussian closed form (bank) ---------------------------------------------------------
 def test_spiked_se_mmse_matches_bank_formula():
     """TARGET: LM Eq. (10) / Sec. 2.3 (q* = 1 - 1/lambda_LM, lambda_LM = lambda^2).  Route: the
-    code's SE fixed point, from the posterior-mean denoiser of the PRIORS hook and Gauss-Hermite
-    quadrature (no closed form typed in).  Finite-N AMP: the slow test below."""
+    code's SE fixed point, from the posterior-mean denoiser of the PRIORS hook, a trapezoid rule over
+    G and Gauss-Hermite over X (no closed form typed in).  Finite-N AMP: the slow test below."""
     dps = mp.mp.dps
     for tag, lam in _GAUSS_KEYS:
         se = S.spiked_state_evolution(lam, "gaussian")
@@ -159,6 +159,33 @@ def test_spiked_threshold_is_one_for_both_priors():
         assert not _ok("lambda_c_gaussian", S.spiked_threshold("gaussian"))
 
 
+def test_spiked_se_near_the_threshold():
+    """Fix round 1 (Important 1): at lambda = 1 -+ 1e-5 and at 1 the SE neither crashes nor reports
+    a root made of quadrature noise.  1 - mmse is computed as 2 E[X F] - E[F^2] (no cancellation
+    against E X^2 = 1), so g(gamma) = lambda^2 (1 - mmse) - gamma has relative accuracy ~1e-15
+    down to the bracketing floor 1e-9 lambda^2 (roots below it are not searched)."""
+    for prior in ("gaussian", "rademacher"):
+        for lam in ("0.99999", "1"):
+            se = S.spiked_state_evolution(lam, prior)
+            assert se.q == 0 and se.fixed_points == (0,) and se.bayes, (prior, lam, se)
+        se = S.spiked_state_evolution("1.00001", prior)
+        assert len(se.fixed_points) == 2 and se.bayes, se
+        if prior == "gaussian":
+            want = 1 - 1 / mp.mpf("1.00001")**2
+            # the root's condition number is 1/(lambda^2 - 1) = 5e4: 1e-9 relative (measured 1.2e-10)
+            assert abs(se.q - want) < 1e-9 * float(want), (se.q, want)
+        else:                                   # rademacher q = lambda^2 - 1 + O((lambda^2 - 1)^2)
+            assert abs(se.q - 2.00001e-5) < 1e-9, se.q
+        assert abs(S.scalar_mmse(prior, 1e-9) - (1 - S.scalar_overlap(prior, 1e-9))) < 1e-14
+    _refuses(lambda: S.spiked_potential("2", -1e-9, "rademacher"), "precondition:gamma")
+    from replicant.cli import main
+    import io
+    for lam in ("0.99999", "1", "1.00001"):
+        out, err = io.StringIO(), io.StringIO()
+        assert main(["run", "spiked_wigner", "--route", "amp", "--param", f"snr={lam}",
+                     "--param", "prior=rademacher"], out, err) == 0, err.getvalue()
+
+
 # ---- finite N ----------------------------------------------------------------------------------
 def test_spiked_matrix_normalisation():
     Y, x = S.spiked_matrix(400, "2", "rademacher", 0)
@@ -187,7 +214,10 @@ def test_spiked_amp_n2000_band_contains_bank_formula():
     term removed (power iteration: same direction, wrong normalisation; N -> oo q =
     sqrt((lam^2 - 1)/(lam^2 + 1)) = 0.620 at 1.5, 0.775 at 2) and scaled by 0.5: their bands
     exclude the banked value.  Per-matrix spread of q_hat at N = 2000 is about 0.03 (build), so
-    the bands (about +-0.013) resolve the 0.065 (lambda = 1.5) and 0.025 (lambda = 2) shifts."""
+    the bands (about +-0.013) resolve the 0.065 (lambda = 1.5) and 0.025 (lambda = 2) shifts.  The
+    lambda = 1.5 controls are the robust ones; the lambda = 2 no-Onsager control is weaker (its band
+    0.7763 +- 0.0117 misses the bank by 0.0146, its gap to the Bayes-AMP mean 0.0249 is about 2.1
+    half-widths; fixed seeds)."""
     seeds = tuple(range(32))
     for tag, lam in (("1p5", "1.5"), ("2", "2")):
         want = float(BANK[f"q_gauss_snr{tag}"].value)

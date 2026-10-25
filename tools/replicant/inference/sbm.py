@@ -5,8 +5,11 @@ propagation with the external field (Decelle, Krzakala, Moore & Zdeborova, Phys.
 Convention (Mossel, Neeman & Sly 2015, arXiv:1202.1499, Def. 1.1 with p = a/n, q = b/n; Massoulie
 2014, arXiv:1311.3085, Sec. 1.2): labels sigma_i in {+1, -1} i.i.d. uniform; each pair {i, j} is
 an edge independently with probability a/N if sigma_i = sigma_j, b/N otherwise.  In DKMZ's
-notation q = 2, n_a = 1/2, c_in = a, c_out = b, mean degree c = (a + b)/2.  Any a, b >= 0 with
-a + b > 0 is accepted (a < b is the disassortative case; the threshold condition is symmetric).
+notation q = 2, n_a = 1/2, c_in = a, c_out = b, mean degree c = (a + b)/2.  sbm_kesten_stigum and
+the sampler accept any a, b >= 0 with a + b > 0; sbm_bp refuses a < b (disassortative,
+unsupported:disassortative: the field equation below is then not monotone and BP was not seen to
+converge).  The impossibility theorem is symmetric in a - b; the possibility theorems are stated
+for a > b (Massoulie: beta = (a - b)/2 > 0; MNS 2018: s = (a - b)/2 > 0).
 Kesten-Stigum: tau = (a - b)^2 / (2 (a + b)) > 1 (DKMZ Eq. (44), |c_in - c_out| > q sqrt(c)).
 What is proved: for a + b > 2 and tau <= 1 no estimator is correlated with the partition (MNS 2015,
 Theorem 2.1, which includes tau = 1); for tau > 1 an efficient estimator is (Massoulie 2014,
@@ -181,9 +184,11 @@ def _sigmoid(L):
 
 def _field(S, a, b, N):
     """dh solving dh = s (a - b)/N sum_i (2 sigmoid(S_i - dh) - 1) (s = _field_scale): the field
-    (27) consistent with the marginals (28) of the current messages.  The right side decreases
-    in dh, so the root is unique; bisection (a field lagging one synchronous sweep behind the
-    marginals oscillates with period 2 when (a - b)/2 > 1)."""
+    (27) consistent with the marginals (28) of the current messages.  For a >= b (the only case
+    sbm_bp accepts) the right side is non-increasing in dh while the left side increases, so the
+    root is unique; bisection (a field lagging one synchronous sweep behind the marginals
+    oscillates with period 2 when (a - b)/2 > 1).  For a < b the right side increases and the
+    equation can have several roots: not supported."""
     k = _field_scale * (a - b) / N
     lo, hi = -abs(k) * N - 1.0, abs(k) * N + 1.0
     for _ in range(60):
@@ -199,6 +204,10 @@ def sbm_bp(graph, a, b, *, iters, seed, tol=1e-7, damping=0.0) -> BPResult:
     if not isinstance(graph, SBMGraph):
         raise Refusal("precondition:sbm-graph", "sbm_bp needs an SBMGraph from sbm_sample")
     a, b = (float(v) for v in _deg(a, b))
+    if a < b:
+        raise Refusal("unsupported:disassortative",
+                      f"a = {a} < b = {b}: BP here needs a >= b (for a < b the field equation is "
+                      "not monotone; at N = 2000, a = 0.5, b = 5.5 BP did not converge on seeds 0-2)")
     seed = _checks.seed(seed)
     if isinstance(iters, bool) or not isinstance(iters, int) or iters < 1:
         raise Refusal("precondition:positive-iters", f"iters={iters!r} is not a positive int")

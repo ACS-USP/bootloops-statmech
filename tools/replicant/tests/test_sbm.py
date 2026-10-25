@@ -49,7 +49,7 @@ def test_kesten_stigum_rule_and_bank():
     assert not B.sbm_kesten_stigum(4, 2).detectable
     assert not B.sbm_kesten_stigum(6, 2).detectable                  # tau = 1 exactly: impossible (MNS)
     assert B.sbm_kesten_stigum(6, 2).impossibility_proved and not B.sbm_kesten_stigum(1, 0.5).impossibility_proved
-    assert B.sbm_kesten_stigum(0.5, 5.5).detectable                  # disassortative: same rule
+    assert B.sbm_kesten_stigum(0.5, 5.5).detectable     # disassortative: same margin (not claimed: catalog)
     line = B.sbm_ks_line(3)
     assert check(BANK["inverse_eps_c_q2_c3"], line.ratio, label="inv").ok, line
     with mp.workdps(30):
@@ -117,9 +117,12 @@ def test_bp_small_graphs_far_from_the_line():
 
 @slow
 def test_sbm_kesten_stigum_threshold():
-    """N = 5000, mean degree 3, seeds 0-9.  Below the line (tau = 0.33, 0.75) BP converges to
-    the factorized fixed point and the overlap is that of a random guess, E|Q| = sqrt(2/(pi N))
-    = 0.0113 (its band contains it); above (tau = 1.5, 2.08) the band's lower edge is > 0.1.
+    """N = 5000, mean degree 3, seeds 0-9.  Below the line (tau = 0.33, 0.75) the test asserts only
+    that the band of the mean overlap contains that of a random guess, E|Q| = sqrt(2/(pi N)) =
+    0.0113: at tau = 0.75 the band 0.0198 +- 0.0256 excludes mean overlaps above about 0.045 and
+    cannot exclude weakly correlated non-factorized fixed points (BP reached the factorized fixed
+    point on 10/10 graphs at 0.33 and 9/10 at 0.75, build).  Above (tau = 1.5, 2.08) the band's
+    lower edge is > 0.1 and no run is factorized.
     Shifted-threshold controls: the rule tau' = 2 tau (line (a - b)^2 = a + b) predicts
     detection at tau = 0.75, and tau' = tau / 2 (line (a - b)^2 = 4 (a + b)) predicts none at
     tau = 1.5; BP contradicts both, and agrees with sbm_kesten_stigum at all four points."""
@@ -141,6 +144,24 @@ def test_sbm_kesten_stigum_threshold():
         seen[tau] = {k: f(a, b) == detected for k, f in rules.items()}
     assert all(v["code"] for v in seen.values()), seen
     assert not seen[0.75]["x2"] and not seen[1.5]["half"], seen
+
+
+def test_disassortative_points_are_not_claimed():
+    """Fix round 1 (Important 2, 3): above the line with a < b the cited possibility theorems
+    (Massoulie: beta = (a - b)/2 > 0; MNS 2018: s = (a - b)/2 > 0) do not apply, so the KS label is
+    not-computed; BP refuses a < b (the field equation is not monotone there and BP did not
+    converge at N = 2000, a = 0.5, b = 5.5, seeds 0-2)."""
+    e = catalog()["sbm"]
+    dis = compose(e.spec, "cavity").run(a="0.5", b="5.5")
+    assert dis.values["ks_detectable"] and dis.finality["ks_margin"].state == "not-computed"
+    assert not dis.final and "a < b" in dis.finality["ks_margin"].note
+    below = compose(e.spec, "cavity").run(a="2", b="4")          # impossibility side: symmetric
+    assert below.finality["ks_margin"].state == "exact-by-literature"
+    g = B.sbm_sample(500, 0.5, 5.5, 0)
+    r = _refuses(lambda: B.sbm_bp(g, 0.5, 5.5, iters=10, seed=0), "unsupported:disassortative")
+    assert "a < b" in r.detail
+    _refuses(lambda: compose(e.spec, "cavity").run(a="0.5", b="5.5", N=500),
+             "unsupported:disassortative")
 
 
 # ---- refusals -----------------------------------------------------------------------------------
