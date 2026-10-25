@@ -1,0 +1,62 @@
+{
+  "q_gauss_snr1p5": {
+    "value": "0.55555555555555555556",
+    "tol": "1e-10",
+    "cite": "Gaussian prior P0 = N(0, 1), overlap q* of a posterior sample with the signal at lambda = 1.5 (lambda_LM = 2.25): Lelarge & Miolane, 'Fundamental limits of symmetric low-rank matrix estimation', Probab. Theory Relat. Fields 173, 859 (2019), arXiv:1611.03888v3 (PDF read; journal version not checked), Sec. 2.3: 'q*(lambda) = max(0, 1 - 1/lambda)' (and Theorem 2: (x.X)^2 -> q*^2). The source value is exact (a rational function of lambda_LM); tol 1e-10 is the accuracy claimed for replicant's binary64 route. Convention: LM write Y = sqrt(lambda_LM/n) X X^T + Z with unit-variance Z (Eq. (2)); replicant writes Y = (lambda/N) x x^T + W, W ~ GOE(N) with off-diagonal variance 1/N (Montanari & Venkataramanan, Ann. Statist. 49, 321 (2021), arXiv:1711.01682v4, Eq. (2.1), PDF read), so lambda_LM = lambda^2",
+    "independent_route": "replicant's own SE fixed point gamma*/lambda^2 (inference/spiked.py): roots of lambda^2 (1 - mmse(gamma)) - gamma with mmse from the posterior-mean denoiser of the PRIORS hook by Gauss-Hermite quadrature (no closed form for q typed in); checked to be the minimiser of the RS potential (DAM Eq. (9), QUADPACK route); finite-N Bayes AMP at N = 2000 over seeds 0-7 (slow test, 99% Student-t band)"
+  },
+  "matrix_mmse_gauss_snr1p5": {
+    "value": "0.69135802469135802469",
+    "tol": "1e-10",
+    "cite": "Gaussian prior, limit of the matrix MMSE at lambda = 1.5 (lambda_LM = 2.25): Lelarge & Miolane, 'Fundamental limits of symmetric low-rank matrix estimation', Probab. Theory Relat. Fields 173, 859 (2019), arXiv:1611.03888v3 (PDF read; journal version not checked), Eq. (10): MMSE_n -> (1/lambda_LM)(2 - 1/lambda_LM) for lambda_LM > 1, 1 otherwise (Theorem 1: lim MMSE_n = E[X^2]^2 - q*^2). Exact; tol 1e-10 is replicant's numerical accuracy. Convention: LM write Y = sqrt(lambda_LM/n) X X^T + Z with unit-variance Z (Eq. (2)); replicant writes Y = (lambda/N) x x^T + W, W ~ GOE(N) with off-diagonal variance 1/N (Montanari & Venkataramanan, Ann. Statist. 49, 321 (2021), arXiv:1711.01682v4, Eq. (2.1), PDF read), so lambda_LM = lambda^2",
+    "independent_route": "replicant's 1 - q^2 from its own SE fixed point (as for q); finite-N matrix MSE |x x^T - xhat xhat^T|_F^2 / N^2 of Bayes AMP at N = 2000 (slow test)"
+  },
+  "q_gauss_snr2": {
+    "value": "0.75",
+    "tol": "1e-10",
+    "cite": "Gaussian prior P0 = N(0, 1), overlap q* of a posterior sample with the signal at lambda = 2 (lambda_LM = 4): Lelarge & Miolane, 'Fundamental limits of symmetric low-rank matrix estimation', Probab. Theory Relat. Fields 173, 859 (2019), arXiv:1611.03888v3 (PDF read; journal version not checked), Sec. 2.3: 'q*(lambda) = max(0, 1 - 1/lambda)' (and Theorem 2: (x.X)^2 -> q*^2). The source value is exact (a rational function of lambda_LM); tol 1e-10 is the accuracy claimed for replicant's binary64 route. Convention: LM write Y = sqrt(lambda_LM/n) X X^T + Z with unit-variance Z (Eq. (2)); replicant writes Y = (lambda/N) x x^T + W, W ~ GOE(N) with off-diagonal variance 1/N (Montanari & Venkataramanan, Ann. Statist. 49, 321 (2021), arXiv:1711.01682v4, Eq. (2.1), PDF read), so lambda_LM = lambda^2",
+    "independent_route": "replicant's own SE fixed point gamma*/lambda^2 (inference/spiked.py): roots of lambda^2 (1 - mmse(gamma)) - gamma with mmse from the posterior-mean denoiser of the PRIORS hook by Gauss-Hermite quadrature (no closed form for q typed in); checked to be the minimiser of the RS potential (DAM Eq. (9), QUADPACK route); finite-N Bayes AMP at N = 2000 over seeds 0-7 (slow test, 99% Student-t band)"
+  },
+  "matrix_mmse_gauss_snr2": {
+    "value": "0.4375",
+    "tol": "1e-10",
+    "cite": "Gaussian prior, limit of the matrix MMSE at lambda = 2 (lambda_LM = 4): Lelarge & Miolane, 'Fundamental limits of symmetric low-rank matrix estimation', Probab. Theory Relat. Fields 173, 859 (2019), arXiv:1611.03888v3 (PDF read; journal version not checked), Eq. (10): MMSE_n -> (1/lambda_LM)(2 - 1/lambda_LM) for lambda_LM > 1, 1 otherwise (Theorem 1: lim MMSE_n = E[X^2]^2 - q*^2). Exact; tol 1e-10 is replicant's numerical accuracy. Convention: LM write Y = sqrt(lambda_LM/n) X X^T + Z with unit-variance Z (Eq. (2)); replicant writes Y = (lambda/N) x x^T + W, W ~ GOE(N) with off-diagonal variance 1/N (Montanari & Venkataramanan, Ann. Statist. 49, 321 (2021), arXiv:1711.01682v4, Eq. (2.1), PDF read), so lambda_LM = lambda^2",
+    "independent_route": "replicant's 1 - q^2 from its own SE fixed point (as for q); finite-N matrix MSE |x x^T - xhat xhat^T|_F^2 / N^2 of Bayes AMP at N = 2000 (slow test)"
+  },
+  "q_gauss_snr3": {
+    "value": "0.88888888888888888889",
+    "tol": "1e-10",
+    "cite": "Gaussian prior P0 = N(0, 1), overlap q* of a posterior sample with the signal at lambda = 3 (lambda_LM = 9): Lelarge & Miolane, 'Fundamental limits of symmetric low-rank matrix estimation', Probab. Theory Relat. Fields 173, 859 (2019), arXiv:1611.03888v3 (PDF read; journal version not checked), Sec. 2.3: 'q*(lambda) = max(0, 1 - 1/lambda)' (and Theorem 2: (x.X)^2 -> q*^2). The source value is exact (a rational function of lambda_LM); tol 1e-10 is the accuracy claimed for replicant's binary64 route. Convention: LM write Y = sqrt(lambda_LM/n) X X^T + Z with unit-variance Z (Eq. (2)); replicant writes Y = (lambda/N) x x^T + W, W ~ GOE(N) with off-diagonal variance 1/N (Montanari & Venkataramanan, Ann. Statist. 49, 321 (2021), arXiv:1711.01682v4, Eq. (2.1), PDF read), so lambda_LM = lambda^2",
+    "independent_route": "replicant's own SE fixed point gamma*/lambda^2 (inference/spiked.py): roots of lambda^2 (1 - mmse(gamma)) - gamma with mmse from the posterior-mean denoiser of the PRIORS hook by Gauss-Hermite quadrature (no closed form for q typed in); checked to be the minimiser of the RS potential (DAM Eq. (9), QUADPACK route); finite-N Bayes AMP at N = 2000 over seeds 0-7 (slow test, 99% Student-t band)"
+  },
+  "matrix_mmse_gauss_snr3": {
+    "value": "0.20987654320987654321",
+    "tol": "1e-10",
+    "cite": "Gaussian prior, limit of the matrix MMSE at lambda = 3 (lambda_LM = 9): Lelarge & Miolane, 'Fundamental limits of symmetric low-rank matrix estimation', Probab. Theory Relat. Fields 173, 859 (2019), arXiv:1611.03888v3 (PDF read; journal version not checked), Eq. (10): MMSE_n -> (1/lambda_LM)(2 - 1/lambda_LM) for lambda_LM > 1, 1 otherwise (Theorem 1: lim MMSE_n = E[X^2]^2 - q*^2). Exact; tol 1e-10 is replicant's numerical accuracy. Convention: LM write Y = sqrt(lambda_LM/n) X X^T + Z with unit-variance Z (Eq. (2)); replicant writes Y = (lambda/N) x x^T + W, W ~ GOE(N) with off-diagonal variance 1/N (Montanari & Venkataramanan, Ann. Statist. 49, 321 (2021), arXiv:1711.01682v4, Eq. (2.1), PDF read), so lambda_LM = lambda^2",
+    "independent_route": "replicant's 1 - q^2 from its own SE fixed point (as for q); finite-N matrix MSE |x x^T - xhat xhat^T|_F^2 / N^2 of Bayes AMP at N = 2000 (slow test)"
+  },
+  "matrix_mmse_gauss_snr0p8": {
+    "value": "1",
+    "tol": "1e-10",
+    "cite": "Gaussian prior, limit of the matrix MMSE at lambda = 0.8 (lambda_LM = 0.64): Lelarge & Miolane, 'Fundamental limits of symmetric low-rank matrix estimation', Probab. Theory Relat. Fields 173, 859 (2019), arXiv:1611.03888v3 (PDF read; journal version not checked), Eq. (10): MMSE_n -> (1/lambda_LM)(2 - 1/lambda_LM) for lambda_LM > 1, 1 otherwise (Theorem 1: lim MMSE_n = E[X^2]^2 - q*^2). Exact; tol 1e-10 is replicant's numerical accuracy. Convention: LM write Y = sqrt(lambda_LM/n) X X^T + Z with unit-variance Z (Eq. (2)); replicant writes Y = (lambda/N) x x^T + W, W ~ GOE(N) with off-diagonal variance 1/N (Montanari & Venkataramanan, Ann. Statist. 49, 321 (2021), arXiv:1711.01682v4, Eq. (2.1), PDF read), so lambda_LM = lambda^2",
+    "independent_route": "replicant's 1 - q^2 from its own SE fixed point (as for q); finite-N matrix MSE |x x^T - xhat xhat^T|_F^2 / N^2 of Bayes AMP at N = 2000 (slow test)"
+  },
+  "q_gauss_snr0p8": {
+    "value": "0",
+    "tol": "1e-10",
+    "cite": "Gaussian prior P0 = N(0, 1), overlap q* of a posterior sample with the signal at lambda = 0.8 (lambda_LM = 0.64): Lelarge & Miolane, 'Fundamental limits of symmetric low-rank matrix estimation', Probab. Theory Relat. Fields 173, 859 (2019), arXiv:1611.03888v3 (PDF read; journal version not checked), Sec. 2.3: 'q*(lambda) = max(0, 1 - 1/lambda)' (and Theorem 2: (x.X)^2 -> q*^2). The source value is exact (a rational function of lambda_LM); tol 1e-10 is the accuracy claimed for replicant's binary64 route. Convention: LM write Y = sqrt(lambda_LM/n) X X^T + Z with unit-variance Z (Eq. (2)); replicant writes Y = (lambda/N) x x^T + W, W ~ GOE(N) with off-diagonal variance 1/N (Montanari & Venkataramanan, Ann. Statist. 49, 321 (2021), arXiv:1711.01682v4, Eq. (2.1), PDF read), so lambda_LM = lambda^2",
+    "independent_route": "replicant's own SE fixed point gamma*/lambda^2 (inference/spiked.py): roots of lambda^2 (1 - mmse(gamma)) - gamma with mmse from the posterior-mean denoiser of the PRIORS hook by Gauss-Hermite quadrature (no closed form for q typed in); checked to be the minimiser of the RS potential (DAM Eq. (9), QUADPACK route); finite-N Bayes AMP at N = 2000 over seeds 0-7 (slow test, 99% Student-t band)"
+  },
+  "lambda_c_gaussian": {
+    "value": "1",
+    "tol": "1e-9",
+    "cite": "Threshold for nontrivial estimation (LM Eq. (12): lambda_c = sup{lambda : q*(lambda) = 0}) of the Gaussian prior: Lelarge & Miolane, 'Fundamental limits of symmetric low-rank matrix estimation', Probab. Theory Relat. Fields 173, 859 (2019), arXiv:1611.03888v3 (PDF read; journal version not checked), Sec. 2.3: q*(lambda) = max(0, 1 - 1/lambda), so lambda_c = 1 (= the spectral threshold: LM Sec. 2.3, 'PCA is optimal' for P0 = N(0, 1), citing Feral-Peche 2007 and Benaych-Georges-Nadakuditi 2011, not fetched). lambda_LM = 1 is lambda = 1 in replicant's convention. Exact; tol 1e-9 is the accuracy of replicant's numerical-derivative route",
+    "independent_route": "replicant's spiked_threshold: (-mmse'(0))^(-1/2) by Richardson extrapolation of (1 - mmse(h))/h on the hook's quadrature (inference/spiked.py), 0.99999999999 (build); SE q = 0 at lambda = 0.99 and > 0 at 1.01 (tests)"
+  },
+  "lambda_c_rademacher": {
+    "value": "1",
+    "tol": "1e-9",
+    "cite": "Threshold for nontrivial estimation of the Rademacher prior (Z/2 synchronization): Lelarge & Miolane, 'Fundamental limits of symmetric low-rank matrix estimation', Probab. Theory Relat. Fields 173, 859 (2019), arXiv:1611.03888v3 (PDF read; journal version not checked), Sec. 2.3: the fixed-point equation q* = E tanh(lambda q* + sqrt(lambda q*) Z0) 'has one solution for lambda <= 1 equals to zero and an additional solution q*(lambda) > 0 for lambda > 1 which is the one achieving the supremum', so lambda_c = 1 (Eq. (12)); also Deshpande, Abbe & Montanari, arXiv:1507.08685v1 (2015; published as 'Asymptotic mutual information for the balanced binary stochastic block model', Information and Inference (2017), journal version not checked) (PDF read), Theorem 1.4: lim MMSE_n = 1 for lambda <= 1 and < 1 for lambda > 1 (stated for the SBM with diverging degree; Theorem 4.3 for the Gaussian model Y = sqrt(lambda/n) X X^T + Z). Exact; tol 1e-9 is replicant's numerical accuracy",
+    "independent_route": "replicant's spiked_threshold('rademacher') (Richardson extrapolation of the hook's mmse slope at 0): 1.0000000000069 (build); SE q = 0 at 0.99, > 0 at 1.01"
+  }
+}

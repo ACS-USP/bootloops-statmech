@@ -160,7 +160,8 @@ def ldpc_bec():
 
 
 def inference_entries():
-    return [ldpc_bec()]
+    from .catalog_spiked_sbm import sbm, spiked_wigner
+    return [ldpc_bec(), spiked_wigner(), sbm()]
 
 
 __all__ = ["inference_entries", "ldpc_bec"]

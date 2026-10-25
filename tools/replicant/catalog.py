@@ -25,7 +25,8 @@ Each entry also exposes derivation(route): the equations a LaTeX document displa
 
 Matching to model specifications (which entry a spec is, which is nearest) lives in
 compose.py; the entries themselves in catalog_entries.py, catalog_sparse.py and
-catalog_csp.py (constraint satisfaction) and catalog_inference.py (codes, inference).
+catalog_csp.py (constraint satisfaction) and catalog_inference.py (codes, inference; the
+spiked Wigner and block-model entries in catalog_spiked_sbm.py).
 """
 import math
 from dataclasses import dataclass, field
@@ -266,6 +267,9 @@ UNCLAIMED[("ksat", "alpha_d_k3")] = (
 UNCLAIMED[("ksat", "alpha_sp_onset_k3")] = (
     "bracketed in tests/test_ksat.py (SP population trivial at 3.6, non-trivial at 4.2), not "
     "located: near the onset the population relaxes slowly (labelled undetermined)")
+UNCLAIMED[("sbm", "inverse_eps_c_q4_c16")] = (
+    "DKMZ's q = 4, c = 16 ratio: inference/sbm.py implements q = 2 only (q = 4 is refused "
+    "unsupported:q), so no pipeline outputs it")
 UNCLAIMED[("ksat", "alpha_1rsb_stability_k3")] = (
     "MMZ's 1RSB stability window edge, cited in the finality note of alpha_s_sp; replicant "
     "computes no SP stability")

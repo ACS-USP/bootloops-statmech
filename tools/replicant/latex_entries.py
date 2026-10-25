@@ -364,6 +364,9 @@ def derivation(name, route):
     if name == "ldpc_bec":
         from .latex_inference import ldpc_bec
         return ldpc_bec(route)
+    if name in ("spiked_wigner", "sbm"):
+        from . import latex_spiked_sbm
+        return getattr(latex_spiked_sbm, name)(route)
     if name not in _ENTRIES:
         raise Refusal(f"missing-step:derivation:{name}", "no displayed derivation for "
                       f"catalog entry {name!r} (latex_entries.py)")

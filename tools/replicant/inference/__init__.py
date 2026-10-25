@@ -6,6 +6,11 @@
                    quadrature), through the degree-polynomial hook DEGREE_PAIRS
   ldpc_finite.py   finite N, independent of ldpc.py: configuration-model graphs, the peeling
                    decoder, success fractions over named seeds (99% Clopper-Pearson)
+  spiked.py        rank-one spiked Wigner Y = (lambda/N) x x^T + W: Bayes-optimal state evolution
+                   through the PRIORS denoiser hook (gaussian | rademacher), the RS potential, the
+                   threshold lambda_c, and finite-N Bayes AMP with spectral start (Student-t bands)
+  sbm.py           two-group stochastic block model: the Kesten-Stigum line, an exact sampler, BP
+                   with the external field (DKMZ), the BP overlap over named seeds
 """
 from .ldpc import (DEGREE_PAIRS, BecThresholds, DEResult, RegularPair, bec_bp_threshold,
                    bec_density_evolution, bec_map_threshold, bec_map_threshold_area,

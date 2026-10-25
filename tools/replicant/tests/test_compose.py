@@ -280,6 +280,8 @@ _DOCUMENTED = {
     ("xorsat", "cavity"): {"K", "alpha", "N", "seeds"},
     ("ksat", "cavity"): {"K", "alpha", "N", "seeds", "pop", "sweeps", "crossing"},
     ("ldpc_bec", "cavity"): {"l", "r", "eps", "N", "seeds"},
+    ("spiked_wigner", "amp"): {"snr", "prior", "N", "seeds", "iters"},
+    ("sbm", "cavity"): {"a", "b", "c", "N", "seeds", "iters"},
     ("viana_bray", "cavity"): {"graph", "k", "c", "J", "beta", "ansatz", "m", "ys", "pop",
                                "inner", "sweeps", "burn_in", "runs", "seed",
                                "require_equilibrated"},
