@@ -21,7 +21,7 @@ python3 -m replicant run perceptron --param alpha=1.5 --out /tmp/result.json --l
 `run` also takes a spec file for a model near a catalogued one
 (`python3 -m replicant run spec.json --param beta=1.5 --param h=0`; schema in the GUIDE),
 `--route amp` for `sk` and `teacher_student` (state evolution, and finite-N AMP / GAMP with
-`--param N=...`), `--route cavity` for the entries that have a cavity route (required for `viana_bray` and `xorsat`, which are
+`--param N=...`), `--route cavity` for the entries that have a cavity route (required for `viana_bray`, `xorsat` and `ksat`, which are
 cavity-only: `python3 -m replicant run viana_bray --route cavity`, `python3 -m replicant run xorsat --route cavity`), and `--pdf` (with `--latex`) to
 compile the derivation.
 
@@ -45,9 +45,11 @@ compile the derivation.
 - `csp/`: random K-XORSAT (E5a): leaf-removal / zero-temperature cavity closed forms (`alpha_d`,
   `alpha_s`, 2-core, complexity) through a degree-law hook, and independent finite-N checks (exact GF(2)
   elimination, leaf removal on sampled hypergraphs); catalog entry `xorsat` (`catalog_csp.py`,
-  `latex_csp.py`).
+  `latex_csp.py`). Random K-SAT (E5b): `csp/ksat.py` (instances, exhaustive counts, the first-moment
+  bound, BP) and `csp/sp.py` (survey propagation on instances, the SP population dynamics and the
+  root of its complexity); catalog entry `ksat`.
 - `catalog*.py`, `compose.py` (+ `compose_result.py`: `Result` and the finality rule), `cli.py`,
-  `__main__.py`: the 9-entry catalog (`catalog_ts.py` holds the teacher-student entry,
+  `__main__.py`: the 10-entry catalog (`catalog_ts.py` holds the teacher-student entry,
   `catalog_pspin.py` the two p-spin entries; LaTeX in `latex_pspin.py`), the composer,
   the command line.
 - `latex*.py`, `tex*.py`, `derive_tex.py`: the LaTeX derivation writer.
@@ -55,9 +57,9 @@ compile the derivation.
 
 ## Test tiers
 
-- Default: `python3 tools/replicant/selftest.py` (320 tests, about 21 s). Also
+- Default: `python3 tools/replicant/selftest.py` (334 tests, about 22 s). Also
   `python3 run_selftests.py replicant` from the repository root.
-- Full: `python3 tools/replicant/selftest.py --full` adds the 105 `@slow` tests (full RSB,
-  population dynamics at reference sizes, solver-based checks); about 9-10 minutes on a laptop (measured 9 min 28 s).
+- Full: `python3 tools/replicant/selftest.py --full` adds the 111 `@slow` tests (full RSB,
+  population dynamics at reference sizes, solver-based checks); about 12 minutes on a laptop (measured 12 min 7 s).
 - `@slow` is a plain function attribute honoured by `selftest.py` only. pytest ignores the
   marker and would run every test, slow ones included.

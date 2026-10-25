@@ -7,6 +7,12 @@
                     elimination over GF(2) (numpy bit-packed), leaf removal on the sampled
                     hypergraph, the satisfiable fraction over named seeds with a 99%
                     Clopper-Pearson band
+  ksat.py           random K-SAT: instances, exhaustive counts (N <= 22), the annealed
+                    (first-moment) bound, belief propagation on an instance
+  sp.py             survey propagation: the update hook SP_UPDATES and its enumeration audit,
+                    SP and its complexity on an instance, the SP population dynamics (1RSB,
+                    y -> oo) and the root of its complexity Sigma(alpha)
+  _checks.py        shared input checks (named seeds)
 """
 from .xorsat import (DEGREE_LAWS, PoissonLaw, XorsatCore, XorsatThresholds, xorsat_bp_threshold,
                      xorsat_complexity, xorsat_core_size, xorsat_sat_threshold, xorsat_thresholds)

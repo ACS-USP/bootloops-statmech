@@ -77,6 +77,10 @@ MODELS = {
     "xorsat": (r"x_{i_1^a} \oplus \dots \oplus x_{i_K^a} = y_a,\quad a = 1, \dots, M = \alpha N,"
                r"\quad \{i^a\} \text{ uniform K-subsets},\ y_a \text{ uniform},\ K = 3",
                "Mezard, Ricci-Tersenghi & Zecchina, J. Stat. Phys. 111, 505 (2003), Eq. (1)"),
+    "ksat": (r"\bigwedge_{a=1}^{M} \big(\ell_{a,1}\vee\dots\vee\ell_{a,K}\big),\quad M = "
+             r"\alpha N,\ \ell = x_i \text{ or } \bar x_i \text{ (prob. 1/2), K distinct "
+             r"uniform variables},\ K = 3", "Mertens, Mezard & Zecchina, Random Struct. "
+             "Algorithms 28, 340 (2006), Sec. 2.1"),
 }
 
 
@@ -354,9 +358,9 @@ def derivation(name, route):
     if name == "viana_bray":
         from .latex_cavity import viana_bray
         return viana_bray()
-    if name == "xorsat":
-        from .latex_csp import xorsat
-        return xorsat(route)
+    if name in ("xorsat", "ksat"):
+        from . import latex_csp
+        return getattr(latex_csp, name)(route)
     if name not in _ENTRIES:
         raise Refusal(f"missing-step:derivation:{name}", "no displayed derivation for "
                       f"catalog entry {name!r} (latex_entries.py)")

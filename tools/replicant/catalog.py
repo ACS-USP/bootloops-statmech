@@ -254,6 +254,22 @@ UNCLAIMED = {
         "tests/test_hopfield.py (slow): not a pipeline output",
 }
 
+_KSAT = ("random K-SAT thresholds banked from the literature (MMZ 2006 / KMRSZ 2007 tables): "
+         "replicant locates the SP-population root for K = 3 only (catalog_csp.ksat, "
+         "crossing=true), and implements no reconstruction / condensation recursion")
+UNCLAIMED.update({("ksat", k): _KSAT for k in (
+    "alpha_s_k4", "alpha_s_k5", "alpha_s_k6", "alpha_s_k7", "alpha_c_k3", "alpha_d_k4",
+    "alpha_c_k4", "alpha_d_k5", "alpha_c_k5", "alpha_d_k6", "alpha_c_k6")})
+UNCLAIMED[("ksat", "alpha_d_k3")] = (
+    "the reference point of tests/test_ksat.py::test_bp_converges_below_alpha_d_and_not_above "
+    "(BP converges at 3.5, not at 4.0): bracketed, not computed (no reconstruction recursion)")
+UNCLAIMED[("ksat", "alpha_sp_onset_k3")] = (
+    "bracketed in tests/test_ksat.py (SP population trivial at 3.6, non-trivial at 4.2), not "
+    "located: near the onset the population relaxes slowly (labelled undetermined)")
+UNCLAIMED[("ksat", "alpha_1rsb_stability_k3")] = (
+    "MMZ's 1RSB stability window edge, cited in the finality note of alpha_s_sp; replicant "
+    "computes no SP stability")
+
 
 # ---- reference checks --------------------------------------------------------------------
 _RUNS = {}

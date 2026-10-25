@@ -1,4 +1,4 @@
-"""Displayed equations of the `xorsat` catalog entry (cavity route): the leaf-removal /
+"""Displayed equations of the `xorsat` and `ksat` catalog entries (cavity route).  xorsat: the leaf-removal /
 warning-propagation recursion, the 2-core, the complexity and the two thresholds.  Same rule
 as latex_entries.py: each sympy block carries a tex.Check against csp/xorsat.py at three
 points (tests/test_latex.py); the threshold conditions are cited strings.
@@ -61,4 +61,54 @@ def xorsat(route):
     ]
 
 
-__all__ = ["xorsat"]
+_BMZ = "Braunstein, Mezard & Zecchina, Random Struct. Algorithms 27, 201 (2005)"
+_MMZ = "Mertens, Mezard & Zecchina, Random Struct. Algorithms 28, 340 (2006)"
+_DSS = "Ding, Sly & Sun, Ann. of Math. 196, 1 (2022)"
+
+
+def ksat(route):
+    """BP and SP update rules as sympy (checked against the code's functions, the SP factor
+    through the live SP_UPDATES hook); the complexity formulas and the threshold cited."""
+    from .csp import ksat as S
+    from .csp import sp as SP
+    PS, PU = sp.symbols("p_s p_u", positive=True)
+    pts = (("0.3", "0.6"), ("0.9", "0.05"), ("0.5", "0.5"))
+    return [
+        text("Cavity route", "survey propagation is the zero-energy (y -> oo) limit of the 1RSB "
+             "cavity equations on the factor graph: a survey is the probability, over clusters "
+             "of SAT assignments, that clause a sends variable i a warning (all its other "
+             "variables are forced to violate it).  The SP factor is the SP_UPDATES hook "
+             "(csp/sp.py), audited by enumerating warning configurations", source=_MMZ),
+        sym("Annealed (first-moment) entropy, (1/N) ln E Z (DSS Eq. (2.3))",
+            sp.Eq(sp.Symbol("s_ann"), sp.log(2) + A * sp.log(1 - 2**(-K))), source=_DSS,
+            check=Check((K, A), lambda k, a: S.ksat_annealed_bound(int(k), a),
+                        ((3, "2.0"), (3, "4.2"), (4, "9.0")), "rhs")),
+        sym("BP cavity probability that j violates a (BMZ Eq. (11)); P^u, P^s products of "
+            "(1 - delta) over the same-sign and opposite-sign clauses",
+            sp.Eq(sp.Symbol("gamma"), PU / (PU + PS)), source=f"{_BMZ}, Eqs. (10)-(12)",
+            check=Check((PU, PS), lambda pu, ps: S.bp_rule(float(pu), float(ps)), pts, "rhs")),
+        sym("SP factor of input j: Pi^u / (Pi^u + Pi^s + Pi^0), p_s (p_u) = product of "
+            "(1 - eta) over the same-sign (opposite-sign) clauses; eta_(a->i) = product over "
+            "j != i (BMZ Eqs. (26)-(27), MMZ Eq. (2))",
+            sp.Eq(sp.Symbol("f_SP"), PS * (1 - PU) / (PS + PU - PS * PU)),
+            source=f"{_BMZ}; {_MMZ}",
+            check=Check((PS, PU), lambda ps, pu: SP.SP_UPDATES["bmz"](float(ps), float(pu)),
+                        pts, "rhs")),
+        cited("Complexity of an instance (BMZ Eqs. (39)-(41))",
+              r"N\Sigma = \sum_a \ln\Big[\prod_{j\in a}(\Pi^u+\Pi^s+\Pi^0)_{j\to a}"
+              r" - \prod_{j\in a}\Pi^u_{j\to a}\Big] - \sum_i (n_i - 1)\ln\big[P^+_i + P^-_i"
+              r" - P^+_i P^-_i\big]", f"{_BMZ}; {_MMZ}, Eqs. (3)-(5)"),
+        cited("Complexity of the SP population (MMZ Eq. (18), with the fixed-point identity (17))",
+              r"\Sigma = \Sigma_0 + \alpha\left[K I_{K-1} - (K-1) I_K\right] = "
+              r"\mathbb{E}\ln(\pi + \pi' - \pi\pi') - \alpha (K-1)\,\mathbb{E}\ln\Big(1 - "
+              r"\prod_{i=1}^{K}\rho_i\Big)", f"{_MMZ}, Eqs. (13), (15), (17), (18)"),
+        cited("SAT/UNSAT threshold (cavity conjecture): the root of the complexity",
+              r"\Sigma(\alpha_s) = 0,\qquad \alpha_s(3) = 4.26675 \pm 0.00015",
+              f"{_MMZ}, Sec. 2.3 and Eq. (43); proved for K >= k0 only: {_DSS}, Theorem 1"),
+        text("Finite-N checks", "independent of BP and SP: exhaustive counts of all 2^N "
+             "assignments (N <= 22) on named seeds, Jensen's inequality and the exact first "
+             "moment; BP exact on tree formulas (BMZ Theorem 2)"),
+    ]
+
+
+__all__ = ["ksat", "xorsat"]

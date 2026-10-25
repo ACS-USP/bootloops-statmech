@@ -31,6 +31,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from ..core import Refusal
+from . import _checks
 from .xorsat import _alpha, _k
 
 CONF = 0.99
@@ -43,25 +44,7 @@ def _n(N, K):
     return int(N)
 
 
-def _seed(seed):
-    if isinstance(seed, bool) or not isinstance(seed, (int, np.integer)) or seed < 0:
-        raise Refusal("precondition:named-seeds",
-                      f"seed {seed!r}: seeds must be non-negative integers")
-    return int(seed)
-
-
-def _seeds(seeds):
-    if isinstance(seeds, (str, bytes)):
-        raise Refusal("precondition:named-seeds",
-                      f"seeds {seeds!r}: seeds must be non-negative integers (a list)")
-    try:
-        out = tuple(seeds)
-    except TypeError:
-        raise Refusal("precondition:named-seeds",
-                      f"seeds {seeds!r}: seeds must be non-negative integers (a list)") from None
-    if not out:
-        raise Refusal("precondition:named-seeds", "give at least one named seed (non-negative integers)")
-    return tuple(_seed(x) for x in out)
+_seed, _seeds = _checks.seed, _checks.seeds      # shared with csp/ksat.py
 
 
 def xorsat_instance(K, N, alpha, seed):

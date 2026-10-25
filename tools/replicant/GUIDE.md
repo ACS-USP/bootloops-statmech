@@ -13,7 +13,7 @@ reader can follow to the paper, a per-value finality label, and a comparison wit
 values. Two levels: (a) a symbolic derivation (replicate, average the disorder, introduce order
 parameters, RS ansatz, n -> 0, stationarity, solve) that works for models you describe, and (b) the
 published pipelines of a catalog of 9 entries, each with a replica route and/or a cavity route (and an
-`amp` route for `sk` and `teacher_student`; the constraint-satisfaction entry `xorsat` is cavity-only). A composer
+`amp` route for `sk` and `teacher_student`; the constraint-satisfaction entries `xorsat` and `ksat` are cavity-only). A composer
 matches a model description against the catalog, reuses what applies, adapts what it can through
 registered hooks, and says what it reused, adapted, or could not do. A LaTeX writer turns any run into a
 derivation document. For theoretical physicists and agents who need a published statistical-mechanics
@@ -75,6 +75,18 @@ CLI (from `tools/`):
   0.594959) and `complexity` 0.008399; with `--param N=1000` (seeds 0-19) also `sat_fraction` 0.95
   (99% Clopper-Pearson [0.683, 1.000]; `errors` gives 0.267, that interval's larger half-width) from exact GF(2) elimination and the sampled core
   (`core_variables_sampled` 0.6134 +- 0.0052): statistical, `not-computed`, so `final` is false.
+- Worked example, random K-SAT (`ksat`, cavity-only; measured times): `python3 -m replicant run ksat
+  --route cavity` (0.5 s) -> `alpha_1` 5.190893 (first-moment root, `exact-by-literature`: an upper
+  bound on the threshold, not the threshold) and `alpha_t` 1.636938 (tangency of the zero-survey
+  equation, `not-computed`), so `final` is false. `... --param alpha=3.0 --param N=16` (0.6 s):
+  exhaustive counts of seeds 0-19, `sat_fraction` 1.0, `entropy_exact_mean` 0.2913 +- 0.0121,
+  `ln_mean_z` 0.3125, `annealed_entropy` 0.292553. `... --param alpha=4.2 --param N=1000 --param
+  seeds=0,1,2,3` (2.2 s): BP converged on 0/4 (`bp_converged_fraction` 0, 99% Clopper-Pearson upper
+  edge 0.734), SP on 4/4 with `sp_complexity_instances` 0.0071 +- 0.0016. `... --param alpha=4.2
+  --param pop=20000` (5 s): SP population `complexity` 0.0051 +- 0.0013, `mean_survey` 0.1779,
+  `zero_survey_fraction` 0.00371 (Eq. (39) gives 0.003757), `sp_phase` nontrivial.
+  `--param crossing=true` (about 40 s) adds `alpha_s_sp`, the root of the SP-population complexity
+  (K = 3 only). Every value but `alpha_1` and `annealed_entropy` is statistical and `not-computed`.
 - Worked example, amp route (`sk`, `teacher_student`; under 1 s each, measured):
   `python3 -m replicant run sk --route amp --param beta=1.5` -> `q_se` 0.352602 (the SE fixed point,
   `exact-by-literature`: Bayati-Montanari Thm 4 proves SE for AMP on Gaussian J; it is the AMP limit,
@@ -169,6 +181,21 @@ core_d, q_s, lambda_s)`; `xorsat_bp_threshold(K)`, `xorsat_sat_threshold(K)` (mp
 `xorsat_gf2_satisfiable(K, N, alpha, seed)`, `xorsat_sat_probability(K, N, alpha, seeds)` ->
 `SatProbability(fraction, n_sat, n, stderr, lo, hi)` (99% Clopper-Pearson), `leaf_removal_core(idx,
 N)`, `xorsat_sampled_core(K, N, alpha, seed)`. Example: `xorsat_sat_threshold(3)` -> 0.917935276658.
+`from replicant.csp import ksat, sp` (E5b, random K-SAT; the module docstrings state the
+conventions): `ksat.random_ksat(K, N, alpha, seed)` -> `KSatFormula(K, N, alpha, seed, var, sign)`
+(`sign` +1 unnegated, -1 negated); `ksat_annealed_bound(K, alpha)`, `ksat_first_moment_threshold(K)`,
+`ksat_sp_support_threshold(K)`, `ksat_sp_support(K, alpha)` -> (t, tau) (mpf);
+`ksat_exact_count(f)`, `ksat_exact_marginals(f)` -> (Z, ones) (N <= 22), `ksat_count_reference(f)`;
+`ksat_bp(f, *, iters, damping, seed, tol)` -> `BPSATResult(converged, iterations, residual, marginals,
+entropy, messages, note)`; `ksat_bp_converged_fraction(K, N, alpha, seeds, *, iters, damping)` (99%
+Clopper-Pearson); `sp.ksat_sp(f, *, iters, seed, tol, damping, rule)` -> `SPResult(converged,
+iterations, residual, trivial, complexity, surveys, note)`; `sp.ksat_population_dynamics_sp(K, alpha,
+*, pop, sweeps, seed, burn_in, runs, rule)` -> `PDResult` (values `complexity`, `complexity_mmz18`,
+`mean_survey`, `zero_survey_fraction`, with stderr; `phase` trivial / nontrivial / undetermined);
+`sp.ksat_sp_crossing(K, alphas, *, pop, sweeps, seed, burn_in, runs, rule, warm_burn_in)` ->
+`SPCrossing(alpha_s, stderr, halfwidth99, roots, sigma, ...)`; `sp.SP_UPDATES` (the SP-factor hook),
+`sp.audit_sp_rule()` (max deviation from the warning enumeration). Example:
+`ksat_first_moment_threshold(3)` -> 5.19089306968.
 `from replicant.latex import render_latex, write_latex` (`write_latex(result, path, pdf=False)`; a
 `Refusal` is also accepted and writes its partial derivation).
 
@@ -189,7 +216,10 @@ cavity: `alpha`, `kappa`, `variables` (`spherical`; `ising` is refused `not-impl
 `burn_in`, `runs`, `seed`, `require_equilibrated`, `field`, `init_field`, `init_spread`, `init`,
 `bary_samples`; `xorsat` (cavity): `K` (integer >= 3, default 3), `alpha`, and for the finite-N
 GF(2) check `N` (needs `alpha`; refused `precondition:state-point` without it) and `seeds` (default
-0-19; without `N` refused `precondition:known-parameter`, "need N"). Without `beta` an entry returns its T = 0 / critical headline values. A composed spec
+0-19; without `N` refused `precondition:known-parameter`, "need N"); `ksat` (cavity): `K` (integer >= 2,
+default 3), `alpha`, `N` (needs `alpha`; N <= 22 exhaustive counts, larger N BP and SP on instances),
+`seeds` (default 0-19 for counts, 0-9 for BP / SP; needs `N`), `pop` (the SP population; needs
+`alpha`), `sweeps` (default 30; needs `pop`), `crossing` (`true`: the SP-population root, K = 3). Without `beta` an entry returns its T = 0 / critical headline values. A composed spec
 (not a catalog entry) does not refuse an unknown name: its notes list "unused parameters [...]".
 
 OUTPUTS: the `Result` object (`values`, `errors`, `rigor`, `route`, `stable`, `final`, `finality`,
@@ -220,6 +250,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `missing-step:derivation:<name>` | a requested document needs a derivation the entry does not provide |
 | `precondition:<name>` | an input or state precondition fails (state point incomplete: `state-point`; out-of-range or non-numeric input; `known-parameter`, `rs-reducible`, `rs-site-trace-form`, `supported-disorder-law`, `nonnegative-alpha`, `finite-kappa`, `known-ansatz`, `known-graph`, `tex-engine`, `latex-path`, `known-target`, `complete-spec`, `known-variables`, `m-range`, `alpha-range`, `replicon-block`, `p-at-least-3`, ... and the step preconditions of the derivation) |
 | `precondition:integer-k-at-least-3`, `:positive-alpha`, `:enough-variables`, `:named-seeds` | XORSAT (`csp/`): K not an integer >= 3 (K = 2 is not implemented), alpha <= 0 or non-numeric, N < max(12, 4K) (a finite-N check that small tests nothing), an empty or malformed seed list (seeds must be non-negative integers; the detail names the offending value) |
+| `precondition:integer-k-at-least-2`, `:exhaustive-size`, `:damping`, `:iterations`, `:population-size`, `:runs`, `:sweeps`, `:burn-in`, `:crossing-grid`, `unsupported:sp-rule` | K-SAT (`csp/ksat.py`, `csp/sp.py`): K not an integer >= 2 (the zero-survey tangency `ksat_sp_support_threshold` needs K >= 3: `precondition:integer-k-at-least-3`), N > 22 for exhaustive counts, damping outside [0, 1), iters < 1, pop < 100, runs < 2, sweeps < 4, burn_in < max(2, sweeps // 2), fewer than three crossing densities (or `crossing` for K != 3), an SP rule name not in `sp.SP_UPDATES`; also `:positive-alpha`, `:enough-variables` (N < K) and `:named-seeds` as for XORSAT. `no-solution:bracket` / `no-convergence:equilibration` from `ksat_sp_crossing`: the mean Sigma does not change sign on the grid, a run's line is not decreasing, the population is trivial, or still drifting at a grid point |
 | `unstable:<ansatz>` | `require_final` or `require_stable`: a computed stability is negative (RS replicon or cavity lambda < 0); `unstable:1rsb` also from `pspin_gardner_temperature` when the spherical scan is negative everywhere |
 | `unknown-stability:rs` | `require_final`: an RS value whose stability is not computed |
 | `not-final:<ansatz>` | `require_final`: a non-RS value that is not final |
@@ -245,6 +276,7 @@ CATALOG (v1; `list` shows the live table; values at the default / banked state p
 | `teacher_student` | replica, amp | Gibbs 0.624658 / Bayes 0.441700 asymptotic constants (`eps ~ c/alpha`); amp: GAMP SE `q_se`, `mse_se`, `eps_se`, with `N` finite-N `q_gamp`, `eps_gamp` | both constants (bank tol is a 3-digit rounding) | exact-by-literature; amp values not-computed (GAMP SE is a claim) |
 | `hopfield` (AGS) | replica, cavity | `alpha_c(T=0)` 0.137906, `m` 0.967417, `E` -0.501445, `alpha_global` 0.051854 | all four (Steffan-Kuehn; AGS 0.051 for the global one) | T = 0 values not-computed; state-point values carry their replicon |
 | `xorsat` random K-XORSAT | cavity | K = 3: `alpha_d` 0.818469, `alpha_s` 0.917935, `lambda_d` 1.256431, `lambda_s` 2.149126; at `alpha`: 2-core `core_variables`, `core_checks`, `complexity`; with `N`: `sat_fraction` (exact GF(2)) and the sampled core | `alpha_d`, `alpha_s`, `lambda_d`, `lambda_s` (K = 3; MRZ 2003), `alpha_d` K = 4, 5, `alpha_s` K = 4, 5, 6 | thresholds and core exact-by-literature (Molloy 2005 core; Dubois-Mandler 2002 for K = 3, Pittel-Sorkin 2016 for K >= 3); `complexity` exact-by-literature below `alpha_s`, not-computed above; finite-N values not-computed (statistical) |
+| `ksat` random K-SAT | cavity | K = 3: `alpha_1` 5.190893 (first-moment root), `alpha_t` 1.636938 (zero-survey tangency); at `alpha`: `annealed_entropy`; with `N`: exhaustive counts (N <= 22) or BP / SP on instances; with `pop`: SP-population `complexity`; `crossing=true`: `alpha_s_sp` (root of the SP complexity) | `alpha_t` K = 3 (MZ 2002 / MMZ 2006); slow, statistical: `alpha_s` K = 3 4.26675 (MMZ 2006 Eq. (43)); the other thresholds (MMZ, KMRSZ tables) banked but UNCLAIMED | `alpha_1`, `annealed_entropy` exact-by-literature (DSS Eq. (2.3)); everything else not-computed (the K = 3 threshold is a cavity conjecture) |
 | `viana_bray` sparse +-J | cavity | `beta_c` (3-regular) 0.881374; T = 0 RS `p0` 1/3, `e0` -23/18; factorized 1RSB -1.27231, mu* 0.4174 | those, plus slow/statistical population-dynamics RS and 1RSB at k = 5, T = 0.8 | `beta_c` stable; the rest not-computed |
 
 HELD-OUT EVIDENCE (the test of REUSE; `tests/test_heldout.py`). Two models that are not catalog entries
@@ -275,14 +307,14 @@ banked in `reference/perceptron.json` as independent targets. Honest limits:
   is a theorem for Gaussian J only, so for +-J this is sampled numerical evidence, not a theorem, and
   the band (+-0.019) excludes errors of the size of the planted one (0.053), not small ones (slow).
 
-ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 320 tests, about 21 s on a
+ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 334 tests, about 22 s on a
 laptop; also `python3 run_selftests.py replicant`) covers the core and refusal paths, the symbolic
 derivation against independent expressions, level agreement (a)=(b) for every family where both exist,
 every catalog entry against its banked non-slow values, the cavity routes, the composer and the held-out
 models, the CLI and the LaTeX writer (displayed equations re-checked numerically), the 1RSB replicon
-the Gardner transition and random K-XORSAT (closed forms, small-N GF(2) elimination and leaf removal). `--full` adds 105 `@slow` tests (full-RSB Parisi up to K = 9, population dynamics at reference sizes, the XORSAT GF(2) crossing at N = 400-2000 and leaf removal at N = 100000, the Hopfield replicon
+the Gardner transition, random K-XORSAT (closed forms, small-N GF(2) elimination and leaf removal) and random K-SAT (exhaustive small-N counts, BP on trees, the SP-rule audit, small SP populations). `--full` adds 111 `@slow` tests (full-RSB Parisi up to K = 9, population dynamics at reference sizes, the XORSAT GF(2) crossing at N = 400-2000 and leaf removal at N = 100000, the K-SAT SP-population crossing (about 75 s with its planted control) and the BP window, the Hopfield replicon
 scans, the p-spin T -> 0 energy, solver-based composed and LaTeX checks, a PDF compile when a TeX engine
-is present) and takes about 9-10 minutes on a laptop (measured 9 min 28 s); run it before merging a
+is present) and takes about 12 minutes on a laptop (measured 12 min 7 s); run it before merging a
 change to a family. The `@slow` marker is honoured by
 `selftest.py` only: pytest ignores it and would run everything. Level agreement between the derivation
 and the pipelines is a consistency check, not new evidence for the ansatz; the cavity route reproducing
@@ -489,6 +521,38 @@ KNOWN HAZARDS:
   N^(-1/2) (Mezard-Montanari Sec. 18.4.1, Dembo-Montanari 2008, not fetched), so the
   sampled checks sit 0.02-0.05 away from alpha_d. Not implemented: K = 2, the UNSAT
   (MAX-XORSAT) ground energy, non-Poisson degree laws.
+- Random K-SAT (E5b, `csp/ksat.py`, `csp/sp.py`, entry `ksat`). The SP threshold is the cavity
+  CONJECTURE alpha_s = root of the SP complexity (MMZ Sec. 2.3); Ding-Sly-Sun prove the 1RSB
+  formula only for K >= k0, an unspecified constant, so no K of this package is covered and every
+  threshold here is `not-computed`. The crossing (`ksat_sp_crossing`, settings `sp.CROSSING`: alpha =
+  4.18, 4.22, 4.26, 4.30, 4.34, pop 30000, 30 measured sweeps, burn-in 100 then 33 per warm-started
+  density, 6 runs, seed 0; about 40 s) fits a line to Sigma per run and averages the roots: measured
+  4.2623 +- 0.0108 (99% Student-t half-width over runs), which contains MMZ's 4.26675 +- 0.00015
+  and Lundow-Markstrom's bound 4.262 alike: the band cannot separate them. A planted 1.005 power on
+  the SP factor moves the root to 4.3402 +- 0.0207 (excluded); the band excludes shifts of about
+  0.03 and larger, not small ones. The population uses MMZ Eq. (18) rewritten with the fixed-point
+  identity (17) (variance about 2.3x smaller; the unrewritten form `complexity_mmz18` is reported
+  too and agrees within its band on an equilibrated population, slow test), keeps zero surveys
+  (no Sec. 5.1 regularisation) and caps phi = -ln(1 - eta) at 50. The SP factor is a hook
+  (`sp.SP_UPDATES`) audited against an enumeration of warning configurations (max deviation
+  4e-16); a planted rule is caught there and changes the instance complexity. Near the SP onset
+  (MMZ 3.927) the population relaxes slowly and is labelled `undetermined` (pop 2000: 3.85 and 3.9
+  undetermined, 4.0 non-trivial); the onset is bracketed (3.6 trivial, 4.2 non-trivial), not
+  located. BP on instances: the measured convergence edge (synchronous BP, damping 0.5, 1000
+  sweeps, seeds 0-19) is 3.5 -> 20/20, 3.8 -> 8, 3.9 -> 2, 4.0 -> 0 at N = 2000 and 3.7 -> 18, 3.8 ->
+  3, 3.9 -> 0 at N = 6000 (damping 0.8 gives the same counts at N = 2000; undamped synchronous BP
+  fails from 3.5 on, a schedule effect). The edge brackets alpha_d = 3.86 (KMRSZ 2007, where for
+  K = 3 alpha_d is a local, Kesten-Stigum instability) but is NOT a measurement of it. SP on
+  instances: synchronous sweeps, tol 1e-6; at N = 1000, 3 of seeds 0-3 converge at alpha = 4.2 (BMZ
+  report non-convergence at small N too). MMZ find the 1RSB solution stable only for 4.15 < alpha <=
+  alpha_s (K = 3); replicant computes no SP stability. Small N: exhaustive counts (N <= 22) agree
+  with an independent backtracking counter; on named seeds Jensen (mean ln Z <= ln mean Z) holds
+  exactly and the sample mean of Z / E Z contains 1 (a (1 - 2^-(K-1))^M law is excluded); at N =
+  12 the quenched-annealed entropy gap is NOT resolved (alpha = 2: 0.4177 +- 0.0042 against
+  0.4261). `alpha_t` = 2 alpha_d^XOR(K) exactly (the zero-survey equation is the XORSAT leaf-removal
+  recursion at density alpha / 2); it is not a phase transition. Not implemented: SP stability,
+  reconstruction / condensation thresholds (banked from KMRSZ, UNCLAIMED), SP decimation, the 3-
+  coloring stretch.
 - Banked values often come from secondary open sources where the original is paywalled; each bank
   entry names the source its digits were read from (`reference/*.json`, field `cite`), and where the
   cite says the original was not fetched the digits come from the secondary source named there. Check
@@ -509,7 +573,9 @@ RSB analysis of [SK94]; the Viana-Bray model [VB85], the sparse cavity and popul
 [MP01] [MP03] and the transition conditions [MK04] [GT03]; the dense cavity method [MPV87] with
 [TAP77]; AMP, state evolution and the TAP free energy (`amp/`) follow [Bol14] [BM11] [FMM18] with
 [Ple82], universality [BLM15] [CL20] and TAP complexity [BM80]; GAMP and its state evolution follow
-[Ran11] [BKMMZ19] with [JM13], the binary teacher-student thresholds [Gyo90] [BKMMZ19] [LHZH22]. Random K-XORSAT (`csp/`): the cavity / leaf-removal solution [MRZ03] [CDMM03], the proofs of the threshold [DM02] [PS16] and of the 2-core [Mol05], the textbook treatment [MM09] and the solution geometry [IKKM15] [AM15]. The universality of the SK free energy used in the held-out test is [CH04]. Reference digits are read
+[Ran11] [BKMMZ19] with [JM13], the binary teacher-student thresholds [Gyo90] [BKMMZ19] [LHZH22]. Random K-XORSAT (`csp/`): the cavity / leaf-removal solution [MRZ03] [CDMM03], the proofs of the threshold [DM02] [PS16] and of the 2-core [Mol05], the textbook treatment [MM09] and the solution geometry [IKKM15] [AM15]. Random K-SAT: BP and survey propagation [BMZ05] [MPZ02] [MZ02],
+the SP population dynamics and thresholds [MMZ06] [LM19], the clustering / condensation thresholds
+[KMRSZ07], the first-moment bound [FP83] and the proof for large K [DSS22]. The universality of the SK free energy used in the held-out test is [CH04]. Reference digits are read
 from [Sto25] [OSS07] [CRT03] [SY17] [DM15] [FP16] [Gyo01] [PRGE20] [Cov65] [Bar97] as stated in the bank
 cites. The typed-step architecture, the symbolic level (a), the composer, the refusal and
 finality discipline and the LaTeX writer are ours. Each bank entry names the source its digits were
