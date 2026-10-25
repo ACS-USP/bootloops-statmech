@@ -40,7 +40,6 @@ the full replica Hessian, and, for the Ising p-spin, the Hessian in (q, m).  So 
 means "replicon positive", local stability in the replicon sector only.  Physics-level.
 """
 from dataclasses import dataclass
-from functools import lru_cache
 import itertools
 
 import mpmath as mp
@@ -184,8 +183,16 @@ def _static_replicon(p, T, seed=None):
     return float(replicon_formula("ising", p, b, pt[0], pt[1])), pt
 
 
-@lru_cache(maxsize=None)
+_TG_CACHE = {}       # (p, rule object) -> T_G; the key keeps the rule alive (no id reuse)
+
+
 def _ising_tg(p, rule):
+    if (p, rule) not in _TG_CACHE:
+        _TG_CACHE[(p, rule)] = _ising_tg_search(p)
+    return _TG_CACHE[(p, rule)]
+
+
+def _ising_tg_search(p):
     ts = float(I.ising_pspin_critical_temperature(p))
     grid = np.linspace(0.98 * ts, 0.15 * ts, 18)
     prev, seed = None, None
@@ -208,25 +215,47 @@ def _ising_tg(p, rule):
                   f"change sign on the scan T in [{grid[-1]:.4g}, {grid[0]:.4g}] (18 points)")
 
 
+_MARGIN = mp.mpf("1e-6")
+_SPH_SCAN = ("0.02", "0.25", "0.5", "0.75", "0.99")     # fractions of T_s
+
+
 def pspin_gardner_temperature(p, variables="spherical"):
-    """T_G: zero of the static-line 1RSB replicon (Ising); the pure spherical p-spin has
-    none and is refused with the computed scan as the reason."""
+    """T_G: the first zero below T_s of the static-line 1RSB replicon.  Ising: always
+    searched.  Spherical: the answer follows its own scan (fractions 0.02..0.99 of T_s):
+    every value > 1e-6 -> refused no-transition:gardner (the pure model's case); a sign
+    change -> T_G by root-finding, audited by the signs at T_G +- 1e-6 T_s; otherwise
+    (negative or marginal everywhere) refused unstable:1rsb."""
     if variables == "ising":
-        return mp.mpf(_ising_tg(p, id(CHI_R["ising"])))
+        return mp.mpf(_ising_tg(p, CHI_R["ising"]))
     if variables != "spherical":
         raise Refusal("precondition:known-variables",
                       f"variables = {variables!r}: 'spherical' or 'ising'")
-    ts = P.pspin_critical_temperature(p)
-    scan = [(f, onersb_replicon("pspin", p=p, beta=1 / (f * ts))) for f in
-            (mp.mpf("0.02"), mp.mpf("0.25"), mp.mpf("0.5"), mp.mpf("0.75"), mp.mpf("0.99"))]
-    raise Refusal("no-transition:gardner",
-                  f"no Gardner transition for the pure spherical p-spin (p = {p}); 1RSB "
-                  f"replicon positive for all T < T_s = {mp.nstr(ts, 8)}: computed scan "
-                  + ", ".join(f"T = {mp.nstr(f * ts, 4)}: {mp.nstr(v, 8)}" for f, v in scan)
-                  + f" (on the static line it equals 1 - (p-1) y = "
-                  f"{mp.nstr(1 - (p - 1) * P._y(p), 8)} for every T; Crisanti & Leuzzi 2006, "
-                  "App. C; Montanari & Ricci-Tersenghi 2003, Sec. 1: the spherical model is an "
-                  "exception)")
+    with mp.workdps(_DPS):
+        ts = P.pspin_critical_temperature(p)
+        lam = lambda T: onersb_replicon("pspin", p=p, beta=1 / T)
+        scan = [(mp.mpf(f) * ts, lam(mp.mpf(f) * ts)) for f in _SPH_SCAN]
+        shown = ", ".join(f"T = {mp.nstr(T, 4)}: {mp.nstr(v, 8)}" for T, v in scan)
+        if all(v > _MARGIN for _, v in scan):
+            raise Refusal("no-transition:gardner",
+                          f"no Gardner transition for the pure spherical p-spin (p = {p}); 1RSB "
+                          f"replicon positive (> {mp.nstr(_MARGIN, 2)}) at every scanned T < T_s "
+                          f"= {mp.nstr(ts, 8)}: computed scan {shown} (on the static line the "
+                          "formula gives 1 - (p-1) y, the same for every T; Montanari & "
+                          "Ricci-Tersenghi 2003, Sec. 1, state it for this model; Crisanti & "
+                          "Leuzzi 2006, App. C, for the s+p model with s > 2, of which the pure "
+                          "model is the mu_s -> 0 edge)")
+        hot_first = scan[::-1]
+        for (t_hi, v_hi), (t_lo, v_lo) in zip(hot_first, hot_first[1:]):
+            if (v_hi > 0) != (v_lo > 0):
+                tg = mp.findroot(lam, (t_lo, t_hi), solver="anderson")
+                d = _MARGIN * ts
+                if not (lam(tg + d) > 0) != (lam(tg - d) > 0) or not t_lo <= tg <= t_hi:
+                    raise Refusal("no-solution:audit", f"spherical T_G candidate {tg}: the "
+                                  "replicon does not change sign across it")
+                return tg
+        raise Refusal("unstable:1rsb", f"spherical p-spin (p = {p}): the 1RSB replicon is "
+                      f"negative or marginal (<= {mp.nstr(_MARGIN, 2)}) at every scanned T < T_s "
+                      f"without a sign change: {shown}")
 
 
 def ising_perceptron_1rsb_replicon(alpha):

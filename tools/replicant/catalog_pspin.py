@@ -118,8 +118,8 @@ def ising_pspin():
            "T_G": lambda v: Stability(
                "stable", "1rsb", REPLICON,
                "the static-line 1RSB replicon is computed positive for T_G < T < T_s (it is "
-               f"{mp.nstr(v['replicon_1rsb_Ts'], 6)} at T_s) and T_G is its zero, approached "
-               "from the stable side; below T_G the 1RSB is unstable (FRSB, not computed)"),
+               f"{mp.nstr(v['replicon_1rsb_Ts'], 6)} at T_s) and T_G is its zero: the value itself is "
+               "marginal (replicon = 0), approached from the stable side; below T_G the 1RSB is unstable (FRSB, not computed)"),
            "T_d": Stability("not-computed", "1rsb", ISING_CITE.split("; ")[2],
                             "dynamic transition of the 1RSB scheme: the m = 1 states are "
                             "marginal there (replicon zero), and threshold states lie in the "

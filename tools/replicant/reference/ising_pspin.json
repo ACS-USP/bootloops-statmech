@@ -8,7 +8,7 @@
   "ts_p3": {
     "value": "0.651385",
     "tol": "5e-7",
-    "cite": "Static (1RSB, m_s = 1) transition of the same model, p = 3: Rizzo, PRE 88, 032135 (2013), arXiv:1305.2070, Fig. 1 caption and Sec. V text 'Ts = .651385'; also Nishimori, arXiv:2608.23904 (2026, preprint, not peer reviewed; PDF read), Table I, 'Tc 0.651385' for p = 3; Yeo & Moore (2020), arXiv:1911.02719, Sec. II A: 'T_1RSB^c ~ 0.651 for p = 3' (rounded). tol = half a unit in the last stated digit",
+    "cite": "Static (1RSB, m_s = 1) transition of the same model, p = 3: Rizzo, PRE 88, 032135 (2013), arXiv:1305.2070, Fig. 1 caption and Sec. V text 'Ts = .651385'; also Nishimori, Phys. Rev. E 114, 044127 (2026), doi:10.1103/1xrx-rsxn, arXiv:2608.23904 (PDF of v2, 6 Oct 2026, read), Table I, 'Tc 0.651385' for p = 3; Yeo & Moore (2020), arXiv:1911.02719, Sec. II A: 'T_1RSB^c ~ 0.651 for p = 3' (rounded). tol = half a unit in the last stated digit",
     "independent_route": "replicant's own m = 1 condition on the larger-q branch (brentq in T of the m equation at m = 1): 0.65138523 (build); does not use the banked digits"
   },
   "td_p3": {
@@ -20,13 +20,13 @@
   "qs_p3": {
     "value": "0.813518",
     "tol": "5e-7",
-    "cite": "Innermost 1RSB overlap q1 at T_s (m = 1) of the same model (couplings of variance J^2 p!/(2 N^(p-1)), J = 1, their Eq. (4)), p = 3: Nishimori, 'Reentrance and temperature chaos in the p-spin Ising spin glass', arXiv:2608.23904 (2026, preprint dated 7 Oct 2026, not peer reviewed; PDF read), Table I, column mu (= q1c, 'the innermost 1RSB overlap q1 of the SG solution evaluated at Tc', Tc = 0.651385). tol = half a unit in the last stated digit",
+    "cite": "Innermost 1RSB overlap q1 at T_s (m = 1) of the same model (couplings of variance J^2 p!/(2 N^(p-1)), J = 1, their Eq. (4)), p = 3: Nishimori, 'Reentrance and temperature chaos in the p-spin Ising spin glass', Phys. Rev. E 114, 044127 (2026), doi:10.1103/1xrx-rsxn, arXiv:2608.23904 (PDF of v2, dated 6 Oct 2026, read), Table I, column mu (= q1c, 'the innermost 1RSB overlap q1 of the SG solution evaluated at Tc', Tc = 0.651385). tol = half a unit in the last stated digit",
     "independent_route": "replicant's own larger nonzero root of the m = 1 q equation at its own T_s (families/ising_pspin.py): 0.8135176 (build)"
   },
   "replicon_ts_p3": {
     "value": "0.3305",
     "tol": "5e-5",
-    "cite": "Innermost-block 1RSB replicon at T_s (m = 1), normalised as 1 - p(p-1)/2 beta^2 q1^(p-2) E_x[sech^4] (their Eq. (22b), the form of MRT Eq. (2.6)), p = 3: Nishimori, arXiv:2608.23904 (2026, preprint, not peer reviewed; PDF read), Table I, column lambda(M) '+0.3305' (Eq. (23)). tol = half a unit in the last stated digit",
+    "cite": "Innermost-block 1RSB replicon at T_s (m = 1), normalised as 1 - p(p-1)/2 beta^2 q1^(p-2) E_x[sech^4] (their Eq. (22b), the form of MRT Eq. (2.6)), p = 3: Nishimori, Phys. Rev. E 114, 044127 (2026), doi:10.1103/1xrx-rsxn, arXiv:2608.23904 (PDF of v2, 6 Oct 2026, read), Table I, column lambda(M) '+0.3305' (Eq. (23)). tol = half a unit in the last stated digit",
     "independent_route": "replicant's replicon rule (families/gardner.py, checked against the explicit integer-n functional) at its own (T_s, q_s, m = 1): 0.3304579 (build); the formula is MRT's, so this checks the evaluation, not the formula's derivation"
   }
 }

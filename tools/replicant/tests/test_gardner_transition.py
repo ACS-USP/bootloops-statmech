@@ -77,8 +77,8 @@ def test_replicon_sign_scan():
 
 
 def test_spherical_replicon_is_the_closed_form_on_the_static_line():
-    """On the static line beta^2 q^(p-2)(1-q)^2 = 2y/p, so Lambda_R = 1 - (p-1) y for all
-    T < T_s (y depends on p only): a closed form the scan must reproduce."""
+    """CONSISTENCY check, not independent evidence (it uses _y from the same pspin.py): on the
+    static line beta^2 q^(p-2)(1-q)^2 = 2y/p, so Lambda_R = 1 - (p-1) y for all T < T_s."""
     from replicant.families.pspin import _y
     for p in (3, 4):
         want = 1 - (p - 1) * _y(p)
@@ -128,6 +128,37 @@ def test_planted_error_in_replicon_formula_is_caught():
     assert all(G.CHI_R[k] is orig[k] for k in orig) and set(G.CHI_R) == set(orig)
     tg = G.pspin_gardner_temperature(3, variables="ising")
     assert check(BANK["tg_p3"], mp.nstr(tg, 12), label="tg").ok
+
+
+def test_spherical_gardner_answer_follows_its_own_scan():
+    """Fix round 1 (Important 1): the spherical no-transition reason is given only when every
+    scanned replicon is positive.  Planted rules (registry restored, identity checked):
+    5 (1 - q)^2 makes the replicon negative everywhere (refused unstable:1rsb, not the
+    no-transition reason); (1 - q)^2 beta/2 makes it 1 - (p-1) y beta/2, which crosses zero at
+    T = (p-1) y / 2 inside (0, T_s): the root must be found and returned."""
+    from replicant.families.pspin import _y
+    orig = dict(G.CHI_R)
+    sph = orig["spherical"]
+    try:
+        G.CHI_R["spherical"] = lambda p, beta, q, m: 5 * sph(p, beta, q, m)
+        r = _refuses(lambda: G.pspin_gardner_temperature(3), "unstable:1rsb")
+        assert "positive for all" not in r.detail and "negative" in r.detail, r.detail
+        G.CHI_R["spherical"] = lambda p, beta, q, m: sph(p, beta, q, m) * mp.mpf(beta) / 2
+        tg = G.pspin_gardner_temperature(3)
+        assert abs(tg - 2 * _y(3) / 2) < mp.mpf("1e-9"), tg
+    finally:
+        G.CHI_R.clear()
+        G.CHI_R.update(orig)
+    assert all(G.CHI_R[k] is orig[k] for k in orig) and set(G.CHI_R) == set(orig)
+    _refuses(lambda: G.pspin_gardner_temperature(3), "no-transition:gardner")
+
+
+def test_ising_tg_cache_holds_the_rule_object():
+    """Fix round 1 (minor 2): the T_G cache is keyed on the rule object itself (kept alive by
+    the key), never on id(rule), which CPython may reuse after a planted lambda is freed."""
+    G.pspin_gardner_temperature(3, variables="ising")
+    assert any(k[1] is G.CHI_R["ising"] for k in G._TG_CACHE), list(G._TG_CACHE)
+    assert all(callable(k[1]) for k in G._TG_CACHE)
 
 
 # ---- the Ising p-spin 1RSB solver --------------------------------------------------------
@@ -204,12 +235,18 @@ def test_pspin_finality_is_conditional():
     assert hd.finality["T_G"].state == "stable" and hd.finality["T_d"].state == "not-computed"
     for ref in ising.refs:
         assert check_ref(ising, ref).ok, ref.key
+
+
+@slow
+def test_pspin_finality_documents_are_updated():
+    """GUIDE and LaTeX carry the computed finality (string checks; slow tier for budget)."""
+    cat = catalog()
     guide = open(os.path.join(os.path.dirname(os.path.dirname(__file__)), "GUIDE.md")).read()
     assert "no Gardner transition" in guide and "`ising_pspin`" in guide
     assert "| exact-by-literature (1RSB) |\n| `perceptron`" not in guide
     titles = [b.title for b in cat["pspin"].derivation()]
     assert any("replicon" in t.lower() for t in titles), titles
-    assert any("replicon" in b.title.lower() for b in ising.derivation()), ising.derivation()
+    assert any("replicon" in b.title.lower() for b in cat["ising_pspin"].derivation())
 
 
 # ---- the Ising perceptron ---------------------------------------------------------------
