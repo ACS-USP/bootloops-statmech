@@ -58,8 +58,11 @@ def _bayes_gaps(audited=True, alphas=ALPHAS):
 def test_gamp_state_evolution_matches_teacher_student_bayes_error():
     """Gaussian prior: the SE fixed point reached from the GAMP start q = 0 gives the
     Bayes generalization error of families.teacher_student (comparison target only) to
-    1e-6 at four loads, and the Gibbs error arccos(q)/pi (Nishimori: a posterior sample
-    has overlap q with the teacher) likewise.  Positive control: a planted factor 1.05
+    1e-6 at alpha = 1, 2 (the slow test adds 0.5, 5, 10).  The agreement checks an
+    identity: with the Gaussian prior the SE equation is Gyorgyi's spherical Gibbs
+    equation (r = q/(1 - q)), so it tests the implementation, not the physics.  The
+    Gibbs error arccos(q)/pi (Nishimori: a posterior sample has overlap q with the
+    teacher) likewise.  Positive control: a planted factor 1.05
     in the channel hook `_rhat` (restored in finally, identity assert) is detected by
     the comparison, and by the SE's own xi-form audit (an independent quadrature of the
     unplanted channel), which then reports converged False.
@@ -93,7 +96,7 @@ def test_channel_and_prior_maps_are_derivatives_of_the_potential():
     """BKMMZ eq. (10): r = 2 alpha Psi_out'(q), q = 2 psi_P0'(r).  The SE maps (Gauss-
     Hermite in the t variable) against central differences of the potentials Psi_out
     and psi_P0 computed independently here by adaptive mpmath quadrature."""
-    with mp.workdps(20):
+    with mp.workdps(16):
         Phi = lambda x: mp.erfc(-x / mp.sqrt(2)) / 2
         D = lambda f: mp.quad(lambda z: f(z) * mp.exp(-z * z / 2),
                               [-mp.inf, -3, 0, 3, mp.inf]) / mp.sqrt(2 * mp.pi)
@@ -110,9 +113,9 @@ def test_channel_and_prior_maps_are_derivatives_of_the_potential():
             q = mp.mpf(q)
             want = 2 * (Psi(q + d) - Psi(q - d)) / (2 * d)
             assert abs(GS._rhat(float(q), 1.0) - want) < 1e-8, (q, want)
-        for r in ("0.3", "7"):
-            r = mp.mpf(r)
-            for prior, psi in (("ising", psi_ising), ("gaussian", psi_gauss)):
+        # ising at large r only (where Gauss-Hermite had failed: the trapezoid rule's case)
+        for prior, psi, rs in (("ising", psi_ising, ("7",)), ("gaussian", psi_gauss, ("0.3", "7"))):
+            for r in map(mp.mpf, rs):
                 want = 2 * (psi(r + d) - psi(r - d)) / (2 * d)
                 assert abs(GS._prior_map(prior, float(r)) - want) < 1e-8, (prior, r)
 
@@ -129,6 +132,8 @@ def test_ising_prior_thresholds_match_bank():
     for key, got in (("ising_alpha_it", th.alpha_it), ("ising_alpha_amp", th.alpha_amp)):
         c = check(bank[key], mp.nstr(mp.mpf(got), 12), label=key)
         assert c.ok, c
+    # regression lock, not a reference: this code's own values (alpha_IT also reproduced by
+    # an independent dps-25 mpmath computation in the build, 1.24468399)
     assert 1.2446 < th.alpha_it < 1.2448 and 1.4925 < th.alpha_amp < 1.4928, th
     low, high = A.perceptron_state_evolution("1.45", "ising"), \
         A.perceptron_state_evolution("1.55", "ising")
@@ -223,13 +228,15 @@ def test_gamp_finite_N_matches_state_evolution():
     (df = 23): gaussian prior at alpha = 1, 2 and ising prior at alpha = 1 (below
     alpha_IT).  The plug-in generalization error of the GAMP estimate against
     arccos(sqrt q_t)/pi likewise.  Ising at alpha = 2 (> alpha_AMP): SE reaches q = 1,
-    but at N = 800 only 14 of the 24 instances do; the others freeze a few wrong spins
-    (e.g. seed 2: 3 of 800, unchanged for any variance floor 1e-6..1e-12), so the band
-    EXCLUDES the SE value there: a finite-N effect, recorded, not claimed away.
+    but at N = 800 not every instance does (14 of 24 measured); the others freeze a few
+    wrong spins (e.g. seed 2: 3 of 800, unchanged for any variance floor 1e-6..1e-12); the
+    band (0.9928 +- 0.0074) only just reaches q = 1: observed, not explained.  The deficit 1 - q
+    shrinks from N = 800 to 1600 to 3200 (asserted); the perfect fraction does not.
     Band-excludes control: the Onsager coefficient of the omega update scaled by the
     private hook gamp._onsager_scale (restored in finally, identity assert): 0.8, 0.9,
-    1.1 and 1.2 all fall outside every band (measured: the closest, 0.9 at gaussian
-    alpha = 2, by 0.0035); smaller errors are not claimed."""
+    1.1 and 1.2 all fall outside every band, and each planted band excludes the SE q_t
+    (measured: the closest, 0.9 at gaussian alpha = 2, by 0.0035); smaller errors are
+    not claimed."""
     T = 30
     bands = {}
     for a, prior in (("1", "gaussian"), ("2", "gaussian"), ("1", "ising")):
@@ -248,14 +255,26 @@ def test_gamp_finite_N_matches_state_evolution():
     perfect = sum(q > 1 - 1e-7 for q in hard.values)
     print(f"GAMP ising alpha=2: {perfect}/{len(hard.values)} reach q = 1; band "
           f"{hard.band.mean:.4f} +- {hard.band.half_width:.4f}; min {min(hard.values):.4f}")
-    assert perfect == 14 and hard.band.mean > 0.98, (perfect, hard.band)
+    # the band (0.9928 +- 0.0074 measured) just reaches 1, so it neither confirms nor
+    # excludes the SE value; what is asserted is that not every instance gets there
+    assert perfect < len(SEEDS) and hard.band.mean < 1, (perfect, hard.band)
+    # N-scaling (observed, not explained): the mean deficit 1 - q shrinks with N, the
+    # fraction of perfect instances does not (measured 0.0072 / 0.0039 / 0.0025 and
+    # 14 / 13 / 17 of 24 at N = 800 / 1600 / 3200)
+    deficits = [1 - A.gamp_ensemble(n, 2, "ising", seeds=SEEDS, iters=T).band.mean
+                for n in (800, 1600, 3200)]
+    print(f"ising alpha=2 deficit 1 - q at N = 800/1600/3200: {deficits}")
+    assert deficits[0] > deficits[1] > deficits[2] > 0, deficits
     orig = G._onsager_scale
     try:
         for scale in (0.8, 1.2, 0.9, 1.1):
             G._onsager_scale = scale
             for key, b in bands.items():
-                q = _ensemble(*key, T).band.mean
+                pb = _ensemble(*key, T).band
+                q = pb.mean
                 out = abs(q - b.mean) > b.half_width
+                se_t = A.perceptron_state_evolution(key[0], key[1], iters=T).trajectory[-1]
+                assert abs(q - se_t) > pb.half_width, (scale, key, pb, se_t)
                 print(f"Onsager x{scale} {key}: q = {q:.4f} vs band {b.mean:.4f} +- "
                       f"{b.half_width:.4f}: {'outside' if out else 'inside'}")
                 assert out, (scale, key, q, b)

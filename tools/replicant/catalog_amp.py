@@ -51,9 +51,17 @@ class AmpRoute:
     meta: tuple
 
 
-def _need(p, key, model):
+def _need(p, key, model, finite):
+    """The state point is required; the finite-N knobs (`finite`) are read only with N, so
+    one given without N is refused rather than echoed and ignored."""
     if p.get(key) is None:
         raise Refusal("precondition:state-point", f"the {model} amp route needs {key}")
+    stray = [k for k in finite if k in p] if p.get("N") is None else []
+    if stray:
+        raise Refusal("precondition:known-parameter",
+                      f"{', '.join(stray)}: finite-N parameters need N (the {model} amp route "
+                      "without N runs state evolution only, which reads "
+                      f"{key}{', h' if model == 'sk' else ', learning'})")
 
 
 def _stat(key, note):
@@ -69,9 +77,13 @@ def _band_values(key, band):
 # ---- SK ------------------------------------------------------------------------------
 def _sk_se(p):
     from .amp import sk_state_evolution
-    _need(p, "beta", "sk")
+    from .amp.sk import LAWS
+    _need(p, "beta", "sk", ("seeds", "iters", "law"))
+    law = p.get("law", "gaussian")
+    if law not in LAWS:
+        raise Refusal("precondition:known-law", f"law={law!r}; known: {', '.join(LAWS)}")
     se = sk_state_evolution(p["beta"], p.get("h", 0))
-    return Out({"q_se": se.q, "se_converged": se.converged,
+    return Out({"q_se": se.q, "law": law, "se_converged": se.converged,
                 "se_fixed_points": [mp.nstr(f.q, 12) for f in se.fixed_points],
                 "se_amp_converges": se.amp_converges}, "SE fixed point from Q_0 = 1: " + se.note)
 
@@ -85,7 +97,7 @@ def _sk_finite(p):
                           iters=iters, law=law)
     se_t = sk_state_evolution(beta, h, q0=random_init_q(beta, h), iters=iters).trajectory[-1]
     vals = {**_band_values("q_amp", ens.band), "N": p["N"], "seeds": list(seeds),
-            "iters": iters, "law": law, "q_se_t": se_t, "q_amp_runs": ens.values,
+            "iters": iters, "q_se_t": se_t, "q_amp_runs": ens.values,
             "amp_converged": ens.converged}
     return Out(vals, f"AMP over seeds {list(seeds)}: q = {ens.band.mean:.6g} +- "
                f"{ens.band.half_width:.3g} (99% Student-t, df = {ens.band.df}); SE at t = "
@@ -93,9 +105,16 @@ def _sk_finite(p):
                errors={"q_amp": ens.band.stderr}, statistical=("q_amp",), notes=(ens.note,))
 
 
+_PM_ONE = ("+-J matrix: SE is not proved for it here (Bayati-Lelarge-Montanari 2015 cover "
+           "polynomial nonlinearities); the value is the Gaussian-J SE, numerical evidence only "
+           "for this law")
+
+
 def _sk_q_se(v):
     if not v.get("se_converged"):
         return Stability("not-computed", "amp-se", BM11, "the SE trajectory did not converge")
+    if v.get("law") != "gaussian":
+        return Stability("not-computed", "amp-se", BM11, _PM_ONE)
     return Stability("exact-by-literature", "amp-se", BM11,
                      "what is proved: for Gaussian (GOE-type) J and the Lipschitz tanh, lim_N of "
                      "AMP's Q_t = <m^t, m^t> equals the SE Q_t at each fixed t (Thm 4 is stated "
@@ -108,9 +127,7 @@ def _sk_q_se(v):
 
 def _sk_q_se_t(v):
     if v.get("law") != "gaussian":
-        return Stability("not-computed", "amp-se", BM11,
-                         "+-J matrix: SE is not proved for it here (Bayati-Lelarge-Montanari "
-                         "2015 cover polynomial nonlinearities); numerical evidence only")
+        return Stability("not-computed", "amp-se", BM11, _PM_ONE)
     return Stability("exact-by-literature", "amp-se", BM11,
                      "SE Q_t at the finite t of the AMP runs, from the same initial law (proved "
                      "for each fixed t as N -> oo, Gaussian J)")
@@ -139,7 +156,7 @@ def _learning(p):
 
 def _ts_se(p):
     from .amp import perceptron_state_evolution
-    _need(p, "alpha", "teacher_student")
+    _need(p, "alpha", "teacher_student", ("seeds", "iters"))
     learning = _learning(p)
     se = perceptron_state_evolution(p["alpha"], "gaussian")
     eps = se.eps_bayes if learning == "bayes" else se.eps_gibbs
@@ -170,8 +187,10 @@ def ts_amp_route():
                       "GAMP state evolution for GLMs is stated as Claim 1 by Barbier et al. "
                       "(from Rangan 2011, steps of the proof missing; Javanmard-Montanari 2013 "
                       "state SE for general AMP covering GAMP, not counted as a proof there): "
-                      "no theorem is applied by this route.  The replica route's eps is exact-by-literature "
-                      "(Barbier et al. Thm 2) and agrees with eps_se (tests/test_gamp.py)")
+                      "no theorem is applied by this route.  The replica route's eps is "
+                      "exact-by-literature (Barbier et al. Thm 2) and agrees with eps_se "
+                      "(tests/test_gamp.py); the agreement checks an identity: with the "
+                      "Gaussian prior the SE equation is Gyorgyi's spherical Gibbs equation")
     steps = [fstep("gamp-state-evolution", BKMMZ, _ts_se),
              fstep("gamp-finite-n", BKMMZ + " (finite-N iterates: statistical)", _ts_finite,
                    when=has("N"), skip="no N given (finite-N GAMP runs only with N)")]

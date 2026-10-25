@@ -151,10 +151,12 @@ route reads, `CatalogEntry.parameters[route]`; any other name, e.g. a typo `kapa
 `rem`: `beta`, `N_scale` (default 1/2, Derrida's normalization); `sk` replica: `beta`, `h`, `ansatz`
 (`rs`|`1rsb`, at a `beta`), `fullrsb` (flag, slow tier); `sk` cavity: `beta`, `h`, `require_stable`;
 `sk` amp: `beta`, `h`, and for finite-N AMP `N`, `seeds` (default 0-5), `iters` (default 100), `law`
-(`gaussian`|`pm_one`); `pspin`: `p` (default 3), `beta`; `perceptron` replica: `alpha`, `kappa` (default 0); `perceptron`
+(`gaussian`|`pm_one`; with `pm_one` every SE value is `not-computed`: SE is proved for Gaussian J only);
+a finite-N parameter without `N` is refused `precondition:known-parameter` ("need N"); `pspin`: `p` (default 3), `beta`; `perceptron` replica: `alpha`, `kappa` (default 0); `perceptron`
 cavity: `alpha`, `kappa`, `variables` (`spherical`; `ising` is refused `not-implemented:cavity-ising`);
 `teacher_student`: `alpha`, `learning` (`gibbs`|`bayes`); `teacher_student` amp: `alpha`, `learning`
-(default `bayes`), and for finite-N GAMP `N`, `seeds` (default 0-5), `iters` (default 30); `hopfield` (both routes): `alpha`, `beta`,
+(default `bayes`), and for finite-N GAMP `N`, `seeds` (default 0-5), `iters` (default 30; `seeds` and
+`iters` without `N` are refused likewise); `hopfield` (both routes): `alpha`, `beta`,
 `branch`; `viana_bray`: `graph` (`regular` with excess degree `k`, or `poisson` with mean degree `c`),
 `J`, `beta`, `ansatz` (`rs`|`1rsb`), `m`, `ys`, and the sampling knobs `pop`, `inner`, `sweeps`,
 `burn_in`, `runs`, `seed`, `require_equilibrated`, `field`, `init_field`, `init_spread`, `init`,
@@ -240,7 +242,7 @@ banked in `reference/perceptron.json` as independent targets. Honest limits:
   is a theorem for Gaussian J only, so for +-J this is sampled numerical evidence, not a theorem, and
   the band (+-0.019) excludes errors of the size of the planted one (0.053), not small ones (slow).
 
-ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 289 tests, about 20 s on a
+ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 291 tests, about 20 s on a
 laptop; also `python3 run_selftests.py replicant`) covers the core and refusal paths, the symbolic
 derivation against independent expressions, level agreement (a)=(b) for every family where both exist,
 every catalog entry against its banked non-slow values, the cavity routes, the composer and the held-out
@@ -348,9 +350,11 @@ KNOWN HAZARDS:
   1.492632 (BKMMZ 1.493(1), Li et al. 1.492). In (alpha_IT, alpha_AMP) GAMP's fixed point is NOT the
   Bayes-optimal one (`gamp_is_optimal` False). Finite N (N = 800, seeds 0-23, t = 30): the 99% bands
   (about +-0.011) contain the SE trajectory for the gaussian prior at alpha = 1, 2 and the ising prior at
-  alpha = 1 and exclude Onsager-coefficient errors of 10% (closest margin 0.0035); smaller errors are not
-  claimed. Ising at alpha = 2 > alpha_AMP: SE reaches q = 1 but only 14 of 24 instances do at N = 800
-  (the rest freeze a few wrong spins, band 0.9928 +- 0.0074 excludes 1): a finite-N effect. When the
+  alpha = 1 and exclude Onsager-coefficient errors of 10% (closest margin 0.0035; each planted band
+  also excludes the SE q_t); smaller errors are not claimed. Ising at alpha = 2 > alpha_AMP: SE reaches q = 1 but not every instance does (the rest
+  freeze a few wrong spins; band 0.9928 +- 0.0074, which only just reaches 1). Observed, not explained:
+  at N = 800 / 1600 / 3200 (seeds 0-23) the mean is 0.9928 / 0.9961 / 0.9975 (the deficit shrinks,
+  asserted in the slow test) while 14 / 13 / 17 of 24 instances reach q = 1. When the
   ising variances collapse (<v> < 1e-6) the iterate is frozen (the scalar-variance update underflows
   there; the result note says so). The fixed-point list is a 240-point grid scan plus the trajectory
   limit and (ising) q = 1: roots closer than the grid spacing could be missed.

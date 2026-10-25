@@ -41,14 +41,15 @@ compile the derivation.
 - `amp/`: AMP, state evolution and the TAP free energy for SK, GAMP and its state evolution for the
   teacher-student perceptron (finite N, statistical; independent of the replica and cavity code);
   catalog route `amp` (`catalog_amp.py`, `latex_amp.py`) for `sk` and `teacher_student`.
-- `catalog*.py`, `compose.py`, `cli.py`, `__main__.py`: the 7-entry catalog, the composer,
+- `catalog*.py`, `compose.py` (+ `compose_result.py`: `Result` and the finality rule), `cli.py`,
+  `__main__.py`: the 7-entry catalog (`catalog_ts.py` holds the teacher-student entry), the composer,
   the command line.
 - `latex*.py`, `tex*.py`, `derive_tex.py`: the LaTeX derivation writer.
 - `tests/`, `selftest.py`: the battery.
 
 ## Test tiers
 
-- Default: `python3 tools/replicant/selftest.py` (289 tests, about 20 s). Also
+- Default: `python3 tools/replicant/selftest.py` (291 tests, about 20 s). Also
   `python3 run_selftests.py replicant` from the repository root.
 - Full: `python3 tools/replicant/selftest.py --full` adds the 101 `@slow` tests (full RSB,
   population dynamics at reference sizes, solver-based checks); about 9-10 minutes on a laptop (measured 9 min 28 s).

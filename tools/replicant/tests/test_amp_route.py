@@ -73,7 +73,9 @@ def test_amp_route_in_catalog_and_cli():
     assert code == 2 and "precondition:known-parameter" in err and "fullrsb" in err, err
     code, _, err = _cli("run", "sk", "--route", "amp", "--param", "beta=1.5", "--param",
                         "ansatz=1rsb")
-    assert code == 2 and "missing-step:route:amp" in err, err
+    # `ansatz` is the composer's switch (cli.build_result passes it to compose), so it is
+    # refused by the composer, naming the route, before the entry's parameter check
+    assert code == 2 and "missing-step:route:amp" in err and "no ansatz switch" in err, err
     code, _, err = _cli("run", "teacher_student", "--route", "amp", "--param", "alpha=2",
                         "--param", "prior=ising")
     assert code == 2 and "precondition:known-parameter" in err, err
@@ -118,3 +120,41 @@ def test_amp_route_finite_N_runs():
                                                           iters=20)
     assert set(res.statistical) == {"q_gamp", "eps_gamp"} and res.final is False
     assert abs(res.values["q_gamp"] - res.values["q_se_t"]) <= res.values["q_gamp_halfwidth99"]
+
+
+def test_amp_route_finite_N_parameters_need_N_and_labels_follow_the_law():
+    """Fix round 1.  (a) A finite-N knob (sk: seeds, iters, law; teacher_student: seeds,
+    iters) without N is refused precondition:known-parameter naming N, never echoed and
+    ignored.  (b) law is validated even so (precondition:known-law).  (c) With a +-J law
+    every SE label is not-computed (SE is proved for Gaussian J only), so nothing on that
+    run is final; with the Gaussian law q_se stays exact-by-literature."""
+    cat = catalog()
+    sk, ts = compose(cat["sk"].spec, "amp"), compose(cat["teacher_student"].spec, "amp")
+    for calc, p, knob in ((sk, {"beta": "1.5"}, {"law": "pm_one"}),
+                          (sk, {"beta": "1.5"}, {"seeds": (1, 2)}),
+                          (sk, {"beta": "1.5"}, {"iters": 10}),
+                          (ts, {"alpha": 2}, {"seeds": (1, 2)}),
+                          (ts, {"alpha": 2}, {"iters": 10})):
+        r = _refusal(lambda: calc.run(**p, **knob))
+        assert r.reason == "precondition:known-parameter", (knob, r)
+        assert "need N" in r.detail and next(iter(knob)) in r.detail, r.detail
+    code, _, err = _cli("run", "sk", "--route", "amp", "--param", "beta=1.5", "--param",
+                        "law=bogus")
+    assert code == 2 and "precondition:known-parameter" in err and "need N" in err, err
+    r = _refusal(lambda: sk.run(beta="1.5", N=20, law="bogus"))
+    assert r.reason == "precondition:known-law", r
+    res = sk.run(beta="1.5", h="0.8", N=60, seeds=(0, 1), iters=5, law="pm_one")
+    for k in ("q_se", "q_se_t", "q_amp"):
+        assert res.finality[k].state == "not-computed", (k, res.finality[k])
+    assert "+-J" in res.finality["q_se"].note and res.final is False
+    g = sk.run(beta="1.5", h="0.8", N=60, seeds=(0, 1), iters=5)
+    assert g.finality["q_se"].state == "exact-by-literature"
+
+
+def test_touched_modules_leave_line_headroom():
+    """Fix round 1 (file size): the three files the amp route touched stay <= 380 lines."""
+    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    for name in ("catalog_entries.py", "compose.py", "latex.py"):
+        with open(os.path.join(here, name)) as f:
+            n = sum(1 for _ in f)
+        assert n <= 380, (name, n)

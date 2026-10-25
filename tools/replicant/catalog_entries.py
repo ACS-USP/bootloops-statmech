@@ -1,5 +1,6 @@
 """Catalog entries for the fully connected families (level (b)) and their dense cavity
-routes: REM, SK, spherical p-spin, spherical perceptron, teacher-student, Hopfield.
+routes: REM, SK, spherical p-spin, spherical perceptron, Hopfield, and (catalog_ts.py)
+teacher-student.
 
 Conventions are the families' own (stated in each families/*.py docstring):
   REM       2^N i.i.d. energies of variance N_scale N; default N_scale = 1/2, Derrida's
@@ -19,7 +20,8 @@ import mpmath as mp
 
 from .agree import default_spec
 from .catalog import Out, RefCheck, Stability, entry, fstep, from_flag, has, lacks, saddle
-from .catalog_amp import sk_amp_route, ts_amp_route
+from .catalog_amp import sk_amp_route
+from .catalog_ts import teacher_student
 from .cavity import dense
 from .cavity.dense_hopfield import energy as hopfield_cavity_energy
 from .core import Refusal, Step
@@ -31,7 +33,6 @@ from .families.pspin import pspin_critical_temperature, pspin_spherical_1rsb
 from .families.rem import rem_1rsb, rem_critical_beta, rem_free_energy
 from .families.parisi import PARISI_CITE, krsb_ground_energy, parisi_ground_energy
 from .families.sk import FULLRSB_GRID, sk_1rsb, sk_ground_energy, sk_replicon, sk_rs
-from .families.teacher_student import asymptotic_constant, teacher_student_error
 from .spec import ModelSpec
 
 SK_CITE = ("Sherrington & Kirkpatrick, PRL 35, 1792 (1975); de Almeida & Thouless, "
@@ -40,8 +41,6 @@ REM_CITE = "Derrida, PRL 45, 79 (1980); Phys. Rev. B 24, 2613 (1981)"
 PSPIN_CITE = "Crisanti & Sommers, Z. Phys. B 87, 341 (1992)"
 GARDNER_CITE = "Gardner, J. Phys. A 21, 257 (1988); Gardner & Derrida, J. Phys. A 21, 271 (1988)"
 MEZARD_CITE = "Mezard, J. Phys. A 22, 2181 (1989)"
-TS_CITE = ("Gyorgyi, Phys. Rev. A 41, 7097 (1990); Seung, Sompolinsky & Tishby, Phys. Rev. A "
-           "45, 6056 (1992); Opper & Haussler, PRL 66, 2677 (1991)")
 AGS_CITE = ("Amit, Gutfreund & Sompolinsky, PRL 55, 1530 (1985); Ann. Phys. 173, 30 (1987)")
 MPV = "Mezard, Parisi & Virasoro, Spin Glass Theory and Beyond (1987), ch. V"
 AT_CITE = "de Almeida & Thouless, J. Phys. A 11, 983 (1978) (replicon)"
@@ -293,48 +292,6 @@ def perceptron():
                  meta=("capacity_replicon", "capacity_stable", "stability"),
                  parameters={"replica": ("alpha", "kappa"),
                              "cavity": ("alpha", "kappa", "variables")})
-
-
-# ---- teacher-student -------------------------------------------------------------------
-def _ts_const(p):
-    return Out({"gibbs_asymptotic_constant": asymptotic_constant("gibbs"),
-                "bayes_asymptotic_constant": asymptotic_constant("bayes")},
-               "lim alpha eps(alpha): sqrt(2)/I (Gibbs), 1/I (Bayes)")
-
-
-def _ts_curve(p):
-    learning = p.get("learning", "gibbs")
-    eps = teacher_student_error(p["alpha"], learning)
-    return Out(_saddle("rs", None, eps=eps, learning=learning),
-               "RS on the Nishimori line q = R; RS stability is argued (convex version "
-               "space) but not computed by the family")
-
-
-def teacher_student():
-    steps = [fstep("ts-asymptotic-constants", TS_CITE, _ts_const, when=lacks("alpha"),
-                   skip="alpha given (state point)"),
-             fstep("ts-learning-curve", TS_CITE, _ts_curve, when=has("alpha"),
-                   skip="no alpha given")]
-    refs = [RefCheck("perceptron", "gibbs_asymptotic_constant",
-                     lambda v: v["gibbs_asymptotic_constant"]),
-            RefCheck("perceptron", "bayes_asymptotic_constant",
-                     lambda v: v["bayes_asymptotic_constant"])]
-    spec = ModelSpec("teacher_student", "spherical", "gaussian", prior="teacher")
-    exact = Stability("exact-by-literature", "rs",
-                      "Barbier, Krzakala, Macris, Miolane & Zdeborova, PNAS 116, 5451 (2019) "
-                      "(the RS formula is proved for Bayes-optimal generalized linear models)",
-                      "Gibbs sampling of the version space is Bayes-consistent with the teacher "
-                      "prior (Nishimori line q = R), so both curves are on the proved RS branch. "
-                      "Gibbs learning on the version space with a uniform prior is posterior "
-                      "sampling, so the Nishimori identity applies (overlap concentration of "
-                      "Barbier et al.)")
-    fin = {k: exact for k in ("gibbs_asymptotic_constant", "bayes_asymptotic_constant", "eps")}
-    amp = ts_amp_route()
-    return entry("teacher_student", spec, TS_CITE, {"replica": steps, "amp": amp.steps}, refs,
-                 {"replica": CAVEAT, "amp": amp.caveat},
-                 "teacher-student perceptron: Gibbs and Bayes learning curves; GAMP / SE",
-                 finality={**fin, **amp.finality}, meta=("learning", *amp.meta),
-                 parameters={"replica": ("alpha", "learning"), "amp": amp.params})
 
 
 # ---- Hopfield -----------------------------------------------------------------------------

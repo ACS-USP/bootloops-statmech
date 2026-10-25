@@ -52,14 +52,15 @@ Result.final = all values final, and run(require_final=True) refuses if ANY valu
 final: unstable:<ansatz>, else unknown-stability:rs (RS, stability not computed), else
 not-final:<ansatz>.
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import mpmath as mp
 import sympy as sp
 
 from . import derive as D
 from . import solve_derived as SD
-from .catalog import CatalogEntry, catalog, compare, from_flag, run_cached
+from .catalog import CatalogEntry, catalog, from_flag
+from .compose_result import Result, _finalise
 from .core import Refusal, State, Step, Trace, run_pipeline
 from .solve_derived import lift_numeric_beta, solve_derived_rs
 from .spec import ModelSpec
@@ -122,42 +123,6 @@ class CompositionReport:
                 "adapted": [vars(a) for a in self.adapted], "missing": list(self.missing)}
 
 
-@dataclass
-class Result:
-    values: dict
-    trace: Trace
-    rigor: str = "physics-level"
-    errors: dict = field(default_factory=dict)
-    notes: list = field(default_factory=list)
-    route: str = "replica"
-    stable: bool | None = None      # the saddle's computed flag (values["stable"]), if any
-    final: bool | None = False      # all values final (None: no physical values)
-    finality: dict = field(default_factory=dict)    # value key -> catalog.Stability
-    statistical: tuple = ()         # value keys estimated by sampling (stderr in errors)
-    report: CompositionReport = None
-    params: dict = field(default_factory=dict)
-    entry: CatalogEntry = None
-    spec: ModelSpec = None          # the spec that was run (for writers, e.g. latex.py)
-
-    def reference_checks(self, *, slow=False):
-        """The entry's banked comparisons for this route (RefOutcome list); slow and
-        statistical ones only with slow=True.  A check whose parameters are this run's
-        reads this result's values; the others run the entry at their own parameters.
-        Composed calculations have no banked keys: []."""
-        if self.entry is None:
-            return []
-        out = []
-        for ref in self.entry.refs:
-            if ref.route != self.route or ((ref.slow or ref.statistical) and not slow):
-                continue
-            if dict(ref.params) == dict(self.params):
-                out.append(compare(self.entry, ref, self.values, self.errors))
-            else:
-                out.append(compare(self.entry, ref, *run_cached(self.entry, ref.route,
-                                                                ref.params)))
-        return out
-
-
 def _key(spec):
     return tuple(getattr(spec, f) for f in FIELDS)
 
@@ -172,30 +137,6 @@ def nearest_entry(spec: ModelSpec):
         if score is None or s > score:
             best, score = e, s
     return best
-
-
-def _finalise(res: Result, finality, require_final):
-    res.finality = finality
-    res.stable = res.values.get("stable")
-    res.final = all(st.final for st in finality.values()) if finality else None
-    bad = {k: st for k, st in finality.items() if not st.final}
-    for k, st in bad.items():
-        res.notes.append(f"{k}: {st.ansatz.upper()} value is NOT final ({st.state}"
-                         + (f"; {st.note}" if st.note else "") + ")")
-    if require_final and bad:
-        states = [(st.state, st.ansatz) for st in bad.values()]
-        unstable = [a for st, a in states if st == "unstable"]
-        if unstable:
-            reason = f"unstable:{unstable[0]}"
-        elif any(a == "rs" for _, a in states):
-            reason = "unknown-stability:rs"
-        else:
-            reason = f"not-final:{states[0][1]}"
-        raise Refusal(reason, "; ".join(f"{k}: {st.ansatz} {st.state}" + (f" ({st.note})"
-                                                                           if st.note else "")
-                                        for k, st in bad.items()),
-                      trace=res.trace, step="require-final")
-    return res
 
 
 @dataclass
@@ -343,7 +284,10 @@ def compose(spec: ModelSpec, route: str = "replica", ansatz: str = "rs") -> Comp
 def _compose_rsb(spec, route):
     from .compose_rsb import level_a_rsb_steps, rsb_report
     if route != "replica":
-        raise Refusal(f"missing-step:route:{route}", "ansatz 1rsb is a level-(a) replica route")
+        raise Refusal(f"missing-step:route:{route}",
+                      f"ansatz 1rsb is a level-(a) replica route; route {route!r} has no "
+                      "ansatz switch (the CLI passes --param ansatz to the composer, which "
+                      "refuses it here before any entry parameter check)")
     _check_hooks(spec, nearest_entry(spec))
     return ComposedCalculation(spec, route, level_a_rsb_steps(spec), rsb_report(spec),
                                ansatz="1rsb")

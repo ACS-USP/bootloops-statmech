@@ -53,7 +53,9 @@ def ts_amp():
               r"\omega^t = \frac{\Phi \hat x^{t-1}}{\sqrt N} - V^t g^{t-1},\quad "
               r"g^t = g_{\rm out}(y, \omega^t, V^t),\quad \lambda^t = \alpha\,\overline{(g^t)^2},"
               r"\quad R^t = \hat x^{t-1} + \frac{\Phi^{\top} g^t}{\sqrt N\,\lambda^t},\quad "
-              r"\hat x^t = g_{P_0}(R^t, \lambda^t)", f"{_BK}, Sec. 2.4; {_RAN}"),
+              r"\hat x^t = g_{P_0}(R^t, \lambda^t)",
+              f"{_RAN}; {_BK}, Sec. 2.4 (their displayed g_Pout is sqrt(V) times the g_out "
+              "below, so their omega and lambda lines differ by powers of sqrt(V))"),
         sym("Output function of the noiseless sign channel (d/d omega ln H(-y omega/sqrt V))",
             sp.Eq(sp.Symbol("g_out"), YY * _phi(u) / (sp.sqrt(VV) * _H(-u))),
             Check((YY, OM, VV), lambda y, w, v: G._gout(float(y), float(w), float(v))[0],
@@ -72,8 +74,10 @@ def ts_amp():
               r"\quad \epsilon_{\rm Gibbs} = \frac{\arccos q}{\pi}", f"{_BK}, Sec. 2.3"),
         text("What is (not) proved", "GAMP's state evolution for generalized linear models "
              "is stated by Barbier et al. as Claim 1 (from Rangan 2011, steps of the proof "
-             "missing), so no theorem is applied here and the SE values are not-computed. The RS formula for the Bayes-optimal errors is "
-             "their Thm 2 (the replica route). With the gaussian prior the SE fixed point "
-             "solves the spherical Gibbs equation (r = q/(1 - q)). Bayes-optimal only on the "
+             "missing), so no theorem is applied here and the SE values are not-computed. "
+             "The RS formula for the Bayes-optimal errors is their Thm 2 (the replica "
+             "route). With the gaussian prior the SE fixed point solves the spherical Gibbs "
+             "equation (r = q/(1 - q)): the agreement of the two routes checks an "
+             "identity. Bayes-optimal only on the "
              "Nishimori line.", _BK),
     ]

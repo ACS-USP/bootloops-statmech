@@ -15,8 +15,11 @@ variance form displayed in BKMMZ Sec. 2.4), x_hat^0 = E P0 = 0, v^0 = rho = 1, g
     R^t     = x_hat^{t-1} + Phi^T g^t/(sqrt N lambda^t)
     x_hat^t = mean, v^t = variance of P0(x) exp(-lambda^t (R^t - x)^2/2):
             gaussian: lambda R/(1 + lambda), 1/(1 + lambda);  ising: tanh(lambda R), 1 - x_hat^2.
-g_out is written as the omega-derivative of ln Z_out, so that V g is dimensionally the
-correction to omega (BKMMZ display the same scheme).  lambda uses <g^2> (BKMMZ); its
+g_out is the omega-derivative of ln Z_out (Rangan's form), so V g is dimensionally the
+correction to omega.  BKMMZ's displayed g_Pout is instead the mean of x under
+P_out(y | omega + sqrt(V) x) exp(-x^2/2), i.e. sqrt(V) d/d omega ln Z_out, so their
+displayed omega and lambda lines differ from these by powers of sqrt(V); the code follows
+the dimensionally consistent Rangan form.  lambda uses <g^2> (as BKMMZ); its
 Nishimori-equivalent form -alpha <d g/d omega> is not used.  Overlap q_t = x_hat^t . w*/N
 (needs the teacher), q_0 = 0; the SE of amp/gamp_se.py predicts q_t at each t.
 
