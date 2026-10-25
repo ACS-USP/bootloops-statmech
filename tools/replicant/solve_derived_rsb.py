@@ -19,7 +19,9 @@ derive_rsb.derive_1rsb(spec, frozen, zero_temperature).
     expectation is substituted into another), erfc kept as written; one round of Gaussian
     integration by parts (gauss.stein) when no expectation is nested (T = 0, frozen).
  3. Search (_rsb_num rules: "fast" Gauss-Hermite for the search, "main" composite
-    Gauss-Legendre for the polish).  Newton with a central-difference Jacobian, steps of at
+    Gauss-Legendre for the polish; re-polished with 2x and 4x the panels when an audit
+    disagrees: the base rule holds 1e-9 for SK up to about beta = 3, the refined ones were
+    measured to resolve beta = 4 and 6).  Newton with a central-difference Jacobian, steps of at
     most min(0.2, |v|/2) per coordinate, halved to stay in the domain (0 < q0 < q1 < 1,
     0 < x < 1, mu > 0, the conditions the reduction ASSUMED > 0 and qhat > 0 for the
     eliminated conjugates), from every seed: `seeds` (a list of {name: value}) or the default
@@ -39,7 +41,9 @@ derive_rsb.derive_1rsb(spec, frozen, zero_temperature).
  5. Classification.  q1 - q0 < 1e-4, or x > 1 - 1e-4 with q1 an unknown: "rs-degenerate" (RS
     collapse; counted in the note, not a 1RSB root).  "trivial": every q ~ 0 off the edge.
     The others "nontrivial" if unique, else "nontrivial-1", ... by decreasing psi; never the
-    unique name while a nontrivial candidate failed to polish.  branch=None: the unique
+    unique name while a nontrivial candidate was dropped by the polish or an audit at every
+    rule level (edge candidates included; only a pinned edge solution whose q0 equation alone
+    fails counts as "no edge root").  The x -> 0 and q1 -> 1 edges are not searched.  branch=None: the unique
     nontrivial root, several (or one plus unpolished candidates) -> ambiguous:several-saddles;
     none -> no-solution.  branch="<name>" by name.  branch="max-f": the n -> 0 rule, f =
     -psi/beta maximal: the nontrivial root of smallest psi, which must be a local maximum of f

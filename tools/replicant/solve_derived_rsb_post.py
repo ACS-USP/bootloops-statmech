@@ -41,12 +41,12 @@ def _central(f, w, idx, d=1e-4):
     return (H + H.T) / 2
 
 
-def schur_hessian(sv, v):
+def schur_hessian(sv, v, rule="main"):
     v = list(map(float, v))
-    w = np.array(v + sv.conj(v, "main"))
+    w = np.array(v + sv.conj(v, rule))
     qi = [i for i, nm in enumerate(sv.names) if nm in _ORDER]
     hi = list(range(len(sv.names), len(w)))
-    H = _central(lambda y: sv.phi_num.value(y, "main"), w, qi + hi)
+    H = _central(lambda y: sv.phi_num.value(y, rule), w, qi + hi)
     k = len(qi)
     if not hi:
         return tuple(map(float, np.linalg.eigvalsh(H))), ()
@@ -56,14 +56,14 @@ def schur_hessian(sv, v):
             tuple(map(float, np.linalg.eigvalsh(Hhh))))
 
 
-def eliminated_hessian(sv, v):
+def eliminated_hessian(sv, v, rule="main"):
     v = np.array(list(map(float, v)))
     qi = [i for i, nm in enumerate(sv.names) if nm in _ORDER]
-    return tuple(map(float, np.linalg.eigvalsh(_central(lambda y: sv.psi_value(y, "main"), v,
+    return tuple(map(float, np.linalg.eigvalsh(_central(lambda y: sv.psi_value(y, rule), v,
                                                          qi))))
 
 
-def independent_audit(sv, v):
+def independent_audit(sv, v, rule="main"):
     """(residual, psi, max |main - independent|) of root v through QuadNum."""
     v = list(map(float, v))
     s = [S.value(v) for S in sv.S_ind]
@@ -72,7 +72,7 @@ def independent_audit(sv, v):
     eqs = [a.value(w) + sum(bj * sv.C_ind[j][k].value(v) for j, bj in enumerate(B))
            for k, a in enumerate(sv.A_ind)]
     psi = sv.phi_ind.value(w)
-    main = sv.ev(v, "main") + [sv.psi_value(v, "main")]
+    main = sv.ev(v, rule) + [sv.psi_value(v, rule)]
     return max(abs(e) for e in eqs), psi, max(abs(a - b) for a, b in zip(main, eqs + [psi]))
 
 
@@ -84,9 +84,12 @@ def select(sv, roots, blocking):
     """Name the roots, pick one by `sv.branch`, check the pick (module docstring of
     solve_derived_rsb, 5)."""
     contract = sv.contract()
+    drops = ("; dropped by the polish or an audit (a root may exist there): "
+             + "; ".join(f"{[round(float(y), 6) for y in c]} ({why})" for c, why in blocking)
+             ) if blocking else ""
     if not roots:
         raise Refusal("no-solution", "no 1RSB root with q1 > q0 of the derived equations in "
-                      f"{sv.names} passes the audits (tol {sv.tol}); {contract}; "
+                      f"{sv.names} passes the audits (tol {sv.tol}){drops}; {contract}; "
                       + "; ".join(sv.notes))
     triv = [r for r in roots if all(abs(r["values"][k]) < _ZERO for k in ("q0", "q1")
                                     if k in r["values"]) and not _is_edge(r)]
@@ -99,8 +102,9 @@ def select(sv, roots, blocking):
     listing = "; ".join(f"{r['name']}" + (" (q0 = 0 edge)" if r.get("edge") else "") + ": "
                         + ", ".join(f"{k}={mp.nstr(y, 10)}" for k, y in r["values"].items())
                         + f", psi={mp.nstr(r['phi'], 12)}" for r in table)
-    pend = (f"; {len(blocking)} nontrivial candidate(s) the polish did not converge on: "
-            + "; ".join(str([round(float(y), 6) for y in c]) for c in blocking)) if blocking else ""
+    pend = (f"; {len(blocking)} nontrivial candidate(s) dropped by the polish or an audit (a "
+            "root may exist there): " + "; ".join(f"{[round(float(y), 6) for y in c]} ({why})"
+                                                 for c, why in blocking)) if blocking else ""
     if sv.branch is None:
         if len(non) > 1 or (non and blocking):
             raise Refusal("ambiguous:several-saddles",
@@ -122,12 +126,12 @@ def select(sv, roots, blocking):
         hess, conj, rule = (), (), ("not computed (" + ("a threshold: solve_for" if sv.solve_for
                                                         else "a q0 = 0 edge root") + ")")
     elif sv.t0:
-        hess, conj = eliminated_hessian(sv, pick["_v"]), ()
+        hess, conj = eliminated_hessian(sv, pick["_v"], pick["_rule"]), ()
         rule = ("Hessian of the T = 0 functional (its conjugates were eliminated by d phi/d q in "
                 "the derivation; the sign agrees with the Schur complement for SK at finite "
                 "beta, tested, not proven at T = 0)")
     else:
-        hess, conj = schur_hessian(sv, pick["_v"])
+        hess, conj = schur_hessian(sv, pick["_v"], pick["_rule"])
         rule = "Schur complement of the derived phi's Hessian over the conjugates"
     local = bool(hess) and all(e > 0 for e in hess)
     if sv.branch == "max-f" and not local:

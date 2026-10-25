@@ -5,7 +5,9 @@ solve_derived_rsb.py).
                                             deep, E_t F(t, E_u f(t, u), ...), at vals
   rules (product quadrature, the same rule in t and u, each times the Gaussian density):
     "main"   composite Gauss-Legendre, MAIN_PANELS panels of MAIN_ORDER nodes on
-             [-MAIN_CUT, MAIN_CUT]
+             [-MAIN_CUT, MAIN_CUT]; "main2", "main3" the same with 2x and 4x the panels (the
+             solver re-polishes a candidate with them when the audit disagrees: SK at beta = 4
+             needs main2, at beta = 6 main3; measured)
     "audit"  trapezoid with step AUDIT_STEP on [-AUDIT_CUT, AUDIT_CUT]: a different rule with
              different nodes (spectrally accurate for analytic integrands of Gaussian
              decay), so main - audit measures quadrature error
@@ -52,15 +54,17 @@ def _trap():
     return x, AUDIT_STEP * np.exp(-x * x / 2) / math.sqrt(2 * math.pi)
 
 
-def _gl():
+def _gl(panels=None):
     y, v = np.polynomial.legendre.leggauss(MAIN_ORDER)
-    edges = np.linspace(-MAIN_CUT, MAIN_CUT, MAIN_PANELS + 1)
+    edges = np.linspace(-MAIN_CUT, MAIN_CUT, (panels or MAIN_PANELS) + 1)
     x = np.concatenate([(lo + hi) / 2 + (hi - lo) / 2 * y for lo, hi in zip(edges, edges[1:])])
     wt = np.concatenate([(hi - lo) / 2 * v for lo, hi in zip(edges, edges[1:])])
     return x, wt * np.exp(-x * x / 2) / math.sqrt(2 * math.pi)
 
 
-RULES = {"main": _gl(), "audit": _trap(), "fast": _gh(FAST_NODES)}
+RULES = {"main": _gl(), "main2": _gl(2 * MAIN_PANELS), "main3": _gl(4 * MAIN_PANELS),
+         "audit": _trap(), "fast": _gh(FAST_NODES)}
+MAIN_LEVELS = ("main", "main2", "main3")      # the main rule, refined when an audit disagrees
 
 
 def top_atoms(expr):

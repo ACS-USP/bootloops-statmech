@@ -100,6 +100,19 @@ def test_frozen_site_reduction_matches_brute_force_at_integer_n():
     assert abs(got - float(brute)) < 1e-12, (got, float(brute))
 
 
+def test_gaussian_energy_reduction_default_point():
+    """Default-tier point of the rule below (one (q0, q1)): the 1RSB reduction of
+    E_y prod_a exp(b y_a^2/2) at n = 4, x = 2 equals -(1/2) ln det(I - b C)."""
+    bv = sp.Rational(1, 5)
+    q = D._overlap_symbols(n)[0]
+    w = D.LnGaussProd(sp.Lambda(_l, sp.exp(bv * _l**2 / 2)), q[D._a, D._b], n)
+    F, q, qh = _functional(w, energy=w)
+    e = _at(R._reduce(F, False)[0], 4, 2)
+    C = rsb_matrix([2], [sp.Rational(1, 4), sp.Rational(3, 5)], 4)
+    exact = -sp.log((sp.eye(4) - bv * C).det()) / 2
+    assert abs(_value(e, {"q0": 0.25, "q1": 0.6}) - float(exact)) < 1e-12
+
+
 @slow
 def test_gaussian_energy_reduction_matches_the_determinant_at_integer_n():
     # E_y prod_a exp(b y_a^2 / 2), y ~ N(0, C), C 1RSB: = det(I - b C)^(-1/2) exactly

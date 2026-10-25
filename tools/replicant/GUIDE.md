@@ -192,14 +192,14 @@ banked in `reference/perceptron.json` as independent targets. Honest limits:
 - The annealed bound does not detect the spherical-site swap (the other checks do).
 - Enumeration slack c/N with c = 1 is an assumption of the test.
 
-ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 272 tests, about 19 s on a
+ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 274 tests, about 19 s on a
 laptop; also `python3 run_selftests.py replicant`) covers the core and refusal paths, the symbolic
 derivation against independent expressions, level agreement (a)=(b) for every family where both exist,
 every catalog entry against its banked non-slow values, the cavity routes, the composer and the held-out
-models, the CLI and the LaTeX writer (displayed equations re-checked numerically). `--full` adds 75
+models, the CLI and the LaTeX writer (displayed equations re-checked numerically). `--full` adds 91
 `@slow` tests (full-RSB Parisi up to K = 9, population dynamics at reference sizes, the Hopfield replicon
 scans, the p-spin T -> 0 energy, solver-based composed and LaTeX checks, a PDF compile when a TeX engine
-is present) and takes about 8-9 minutes on a laptop (measured 8 min 58 s); run it before merging a
+is present) and takes about 9-10 minutes on a laptop (measured 9 min 28 s); run it before merging a
 change to a family. The `@slow` marker is honoured by
 `selftest.py` only: pytest ignores it and would run everything. Level agreement between the derivation
 and the pipelines is a consistency check, not new evidence for the ansatz; the cavity route reproducing
@@ -237,7 +237,13 @@ KNOWN HAZARDS:
   scalar math-module code, adaptive QUADPACK; `audit="quadrature"` skips it and says so). The search is
   seeded (default: a table plus seeds from the derived RS solution) and includes the q0 = 0 edge
   (q0 pinned at 1e-9, its equation audited there); every note and refusal states the seed count and
-  the edges searched; an absent root means "not found from these seeds". Roots with q1 - q0 < 1e-4 or
+  the edges searched; an absent root means "not found from these seeds". The x -> 0 and q1 -> 1 edges
+  are NOT searched. An edge candidate whose pinned q0 equation fails while the others hold is "no edge
+  root"; one dropped by the polish or an audit is listed as "a root may exist there" and, like any
+  dropped nontrivial candidate, blocks the unique label (`ambiguous:several-saddles`). Main-rule window:
+  the base rule (32 Gauss-Legendre panels) holds 1e-9 for SK up to about beta = 3; when the audit
+  disagrees the candidate is re-polished with 64 and 128 panels (measured: SK beta = 4 needs 64, beta =
+  6 needs 128); beyond that a candidate is dropped on audit (named, blocking), never silently. Roots with q1 - q0 < 1e-4 or
   x > 1 - 1e-4 are `rs-degenerate` (collapse to RS), not 1RSB roots. SK at h = 0 has two nontrivial
   1RSB saddles (q0 > 0 and the q0 = 0 edge, at T = 0 and at beta = 2): without `branch` the solver
   refuses `ambiguous:several-saddles`; `branch="max-f"` takes the root of largest f and requires a

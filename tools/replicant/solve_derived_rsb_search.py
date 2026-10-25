@@ -8,7 +8,7 @@ import numpy as np
 import sympy as sp
 
 from ._derived_num import safe
-from ._rsb_num import NestedNum, QuadNum
+from ._rsb_num import MAIN_LEVELS, NestedNum, QuadNum
 from ._rsb_num import top_atoms as _top
 from .core import Refusal
 from .derive_rsb_t0 import eliminate_conjugates
@@ -118,16 +118,15 @@ class Solver:
         """Seeds from the DERIVED RS solution(s) at the same point (full finite-T 1RSB)."""
         from .solve_derived import solve_derived_rs
         sols = []
-        for b in (None, "nontrivial-1", "nontrivial-2"):
-            try:
-                sols.append(solve_derived_rs(self.spec, branch=b, **self.params))
-                if b is None:
-                    break
-            except Refusal as r:
-                if b is None and r.reason.startswith("ambiguous"):
-                    continue
-                if b is not None:
-                    break
+        try:
+            sols.append(solve_derived_rs(self.spec, **self.params))
+        except Refusal as r:
+            if r.reason.startswith("ambiguous"):        # several RS roots: seed from each
+                for b in ("nontrivial-1", "nontrivial-2"):
+                    try:
+                        sols.append(solve_derived_rs(self.spec, branch=b, **self.params))
+                    except Refusal:
+                        break
         out = []
         for sol in sols:
             q = float(sol.values.get("q", 0))
@@ -164,7 +163,7 @@ class Solver:
                 "the q0 = 0 edge was not searched (q0 is not an unknown here)")
         return (f"roots found from {self.n_seeds} seeds ({self.seed_origin}): an absent root "
                 f"means not found from these seeds; {edge}; the q1 = q0 edge is the RS "
-                "collapse (rs-degenerate)")
+                "collapse (rs-degenerate); the x -> 0 and q1 -> 1 edges are not searched")
 
     def audit_label(self):
         return ("accepted roots audited through a separate evaluation path (QuadNum: scalar "
@@ -174,35 +173,69 @@ class Solver:
                 "audit='quadrature': the trapezoid rule only (the same compiled integrands, "
                 "other nodes): a quadrature check, NOT an independent evaluation")
 
-    def _search(self, seeds, pin=None):
-        """Newton from each seed; pin = index of an unknown held at _EDGE (its equation is
-        dropped from the search and audited afterwards)."""
-        found, unpolished = [], []
+    def _reduced(self, pin, rule):
+        """(free indices, full(y), G(y), ok(y)) of the system with unknown `pin` held at
+        _EDGE and its equation dropped (pin None: the whole system)."""
         free = [i for i in range(len(self.names)) if i != pin]
         full = (lambda y: list(y)) if pin is None else \
             (lambda y: [(_EDGE if i == pin else y[free.index(i)]) for i in range(len(self.names))])
-        G = lambda y, rule: [g for i, g in enumerate(self.ev(full(y), rule)) if i != pin]
-        ok = lambda y: self.ok(full(y))
+        G = lambda y: [g for i, g in enumerate(self.ev(full(y), rule)) if i != pin]
+        return free, full, G, lambda y: self.ok(full(y))
+
+    def _search(self, seeds, pin=None):
+        """Fast-rule Newton from each seed: the distinct converged points (full vectors)."""
+        free, full, G, ok = self._reduced(pin, "fast")
+        out = []
         for s in seeds:
             s = [s[i] for i in free]
             if not ok(s):
                 continue
-            v = _newton(lambda y: G(y, "fast"), s, ok, 1e-7)
-            if v is None:
-                continue
-            w = _newton(lambda y: G(y, "main"), v, ok, _POLISH, maxit=12)
-            if w is None:
-                unpolished.append(np.array(full(v)))
-            elif not any(np.abs(np.array(full(w)) - u).max() < _SAME for u in found):
-                found.append(np.array(full(w)))
-        return found, unpolished
+            v = _newton(G, s, ok, 1e-7)
+            if v is not None and not any(np.abs(np.array(full(v)) - u).max() < _SAME
+                                         for u in out):
+                out.append(np.array(full(v)))
+        return out
+
+    def _accept(self, v, pin):
+        """Polish candidate v with the main rule and audit it.  The candidate is re-polished
+        with a refined rule (_rsb_num.MAIN_LEVELS) only when the main rule itself disagrees
+        with the trapezoid rule there (|main - trapezoid| > tol/10 on the equations): a point
+        that fails with an accurate main rule is not a root.  Returns (kind, r): "root",
+        "degenerate", "edge-none" (pinned edge: the other equations hold, the q0 equation
+        fails: no edge root there) or "dropped" (a root may exist: r = (v, why))."""
+        free = [i for i in range(len(self.names)) if i != pin]
+        red, vf = [v[i] for i in free], v
+        for rule in MAIN_LEVELS:
+            _, full, G, ok = self._reduced(pin, rule)
+            w = _newton(G, red, ok, _POLISH, maxit=12)
+            if w is not None:
+                red, vf = w, np.array(full(w))
+            try:
+                r = self.audit(vf, pin is not None, rule)
+            except (ValueError, ZeroDivisionError, OverflowError) as e:
+                return "dropped", (vf, f"audit not evaluable ({type(e).__name__}, rule {rule})")
+            if self._degenerate(r["values"]):
+                return "degenerate", r
+            if w is not None and r["residual"] < self.tol:
+                r["_rule"] = rule
+                return "root", r
+            trap = r["_trap"]
+            if w is not None and pin is not None and abs(trap[pin]) >= self.tol and \
+                    max([abs(y) for i, y in enumerate(trap) if i != pin] or [0]) < self.tol:
+                return "edge-none", r
+            why = ((f"the polish did not converge with main rule {rule}" if w is None else
+                    f"trapezoid residual {mp.nstr(r['residual'], 3)} > tol {self.tol} with "
+                    f"main rule {rule}") + f" (|main - trapezoid| {mp.nstr(r['quad_error'], 3)})")
+            if not r["quad_error"] > self.tol / 10:     # the main rule is accurate here: stop
+                break
+        return "dropped", (vf, why)
 
     # -- 4, 5: audits and classification --
-    def audit(self, v, edge):
-        main = self.ev(v, "main") + [self.psi_value(v, "main")]
+    def audit(self, v, edge, rule="main"):
+        main = self.ev(v, rule) + [self.psi_value(v, rule)]
         trap = self.ev(v, "audit") + [self.psi_value(v, "audit")]
         vals = {nm: mp.mpf(float(y)) for nm, y in zip(self.names, v)}
-        for (x, _), y in zip(self.elim, self.conj(v, "main")):
+        for (x, _), y in zip(self.elim, self.conj(v, rule)):
             vals[x.name] = mp.mpf(float(y))
         for k, y in self.fixed.items():
             vals[k] = mp.mpf(str(y))
@@ -212,7 +245,7 @@ class Solver:
         return {"values": vals, "phi": mp.mpf(float(trap[-1])),
                 "residual": mp.mpf(float(max(abs(y) for y in trap[:-1]))),
                 "quad_error": mp.mpf(float(max(abs(a - b) for a, b in zip(main, trap)))),
-                "edge": edge, "_v": np.array(v, float)}
+                "edge": edge, "_v": np.array(v, float), "_trap": trap[:-1], "_rule": rule}
 
     def _degenerate(self, vv):
         return ("q0" in vv and "q1" in vv and abs(vv["q1"] - vv["q0"]) < _DEGENERATE) or \
@@ -222,65 +255,64 @@ class Solver:
         self.setup()
         seeds = self.seed_list()
         self.n_seeds = len(seeds)
-        found, unpolished = self._search(seeds)
-        edges, eunp = [], []
+        cands = [(v, None) for v in self._search(seeds)]
         if "q0" in self.names:
             self.edge_searched = True
-            edges, eunp = self._search(seeds, pin=self.names.index("q0"))
-        roots, dropped, degen, edge_fail = [], [], 0, 0
-        for v, edge in [(v, False) for v in found] + [(v, True) for v in edges]:
-            try:
-                r = self.audit(v, edge)
-            except (ValueError, ZeroDivisionError, OverflowError):
-                r = None
-            if r is not None and self._degenerate(r["values"]):
+            q = self.names.index("q0")
+            cands += [(v, q) for v in self._search(seeds, pin=q)]
+        roots, dropped, degen, edge_none = [], [], 0, 0
+        for v, pin in cands:
+            kind, r = self._accept(v, pin)
+            if kind == "root":
+                # several fast-rule points can polish to one root: keep it once
+                if not any(np.abs(r["_v"] - u["_v"]).max() < 1e-6 for u in roots):
+                    roots.append(r)
+            elif kind == "degenerate":
                 degen += 1
-                continue
-            if r is None or not r["residual"] < self.tol:
-                if edge:
-                    edge_fail += 1          # the pinned q0 equation fails: not an edge root
-                else:
-                    dropped.append((v, None if r is None else r["residual"]))
-                continue
-            roots.append(r)
+            elif kind == "edge-none":
+                edge_none += 1
+            else:
+                dropped.append((r[0], ("q0 = 0 edge candidate: " if pin is not None else "")
+                                + r[1]))
         if self.audit_mode == "independent" and roots:
             self.audit_setup()
             for r in list(roots):
                 try:
-                    res, psi, dev = independent_audit(self, r["_v"])
-                except (ValueError, ZeroDivisionError, OverflowError):
+                    res, psi, dev = independent_audit(self, r["_v"], r["_rule"])
+                except (ValueError, ZeroDivisionError, OverflowError) as e:
                     roots.remove(r)
-                    dropped.append((r["_v"], None))
+                    dropped.append((r["_v"], f"independent audit not evaluable "
+                                              f"({type(e).__name__})"))
                     continue
                 r["residual"], r["phi"] = mp.mpf(res), mp.mpf(psi)
                 r["quad_error"] = max(r["quad_error"], mp.mpf(dev))
                 if not res < self.tol:
                     roots.remove(r)
-                    dropped.append((r["_v"], mp.mpf(res)))
-        if dropped:
-            self.notes.append("dropped by the audits: " + "; ".join(
-                f"{[round(float(y), 8) for y in v]} (residual "
-                f"{'n/a' if res is None else mp.nstr(res, 3)})" for v, res in dropped))
-        if edge_fail:
-            self.notes.append(f"q0 = 0 edge: {edge_fail} pinned solution(s) fail the q0 "
-                              "equation (no edge root there)")
+                    dropped.append((r["_v"], f"independent (QuadNum) residual "
+                                              f"{mp.nstr(res, 3)} > tol {self.tol}"))
+        if edge_none:
+            self.notes.append(f"q0 = 0 edge: {edge_none} pinned solution(s) satisfy the other "
+                              "equations but not the q0 equation (no edge root there)")
         if degen:
             self.notes.append(f"{degen} rs-degenerate root(s) (q1 = q0 or x = 1: 1RSB "
                               "collapses to RS) not counted as 1RSB roots")
-        blocking = self._blocking(unpolished + eunp, roots)
-        return select(self, roots, blocking)
+        refined = sorted({r["_rule"] for r in roots} - {"main"})
+        if refined:
+            self.notes.append(f"main rule refined to {', '.join(refined)} for some roots (the "
+                              "audit disagreed with the base rule)")
+        return select(self, roots, self._blocking(dropped, roots))
 
-    def _blocking(self, unpolished, roots):
-        """Unpolished candidates that are neither rs-degenerate nor close to an accepted root
-        (or, near q0 = 0, to an accepted edge root)."""
+    def _blocking(self, dropped, roots):
+        """[(v, why)]: candidates dropped by the polish or an audit (a root may exist there)
+        that are neither rs-degenerate nor close to an accepted root (near q0 = 0: to an
+        accepted edge root, q0 ignored)."""
         out = []
-        for v in unpolished:
+        for v, why in dropped:
             vv = dict(zip(self.names, v))
             if self._degenerate(vv):
                 continue
-            near = any(np.abs(np.delete(v - r["_v"], [self.names.index("q0")]
-                                        if "q0" in self.names and vv.get("q0", 1) < 1e-3
-                                        else [])).max() < 1e-3 for r in roots)
-            if not near and not any(np.abs(v - u).max() < 1e-6 for u in out):
-                out.append(v)
+            skip = [self.names.index("q0")] if "q0" in self.names and vv["q0"] < 1e-3 else []
+            near = any(np.abs(np.delete(v - r["_v"], skip)).max() < 1e-3 for r in roots)
+            if not near and not any(np.abs(v - u).max() < 1e-6 for u, _ in out):
+                out.append((v, why))
         return out
