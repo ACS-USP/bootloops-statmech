@@ -24,7 +24,8 @@ Each entry also exposes derivation(route): the equations a LaTeX document displa
 (latex.py), kept next to the family code in latex_entries.py / latex_cavity.py.
 
 Matching to model specifications (which entry a spec is, which is nearest) lives in
-compose.py; the entries themselves in catalog_entries.py and catalog_sparse.py.
+compose.py; the entries themselves in catalog_entries.py, catalog_sparse.py and
+catalog_csp.py (constraint satisfaction).
 """
 import math
 from dataclasses import dataclass, field
@@ -302,9 +303,10 @@ _CATALOG = {}
 
 def catalog() -> dict:
     if not _CATALOG:
+        from .catalog_csp import csp_entries
         from .catalog_entries import dense_entries
         from .catalog_sparse import sparse_entries
-        for e in dense_entries() + sparse_entries():
+        for e in dense_entries() + sparse_entries() + csp_entries():
             _CATALOG[e.name] = e
     return dict(_CATALOG)
 

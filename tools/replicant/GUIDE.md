@@ -12,8 +12,8 @@ citation; a missing precondition is a named refusal, never a silent fallback; ev
 reader can follow to the paper, a per-value finality label, and a comparison with banked, cited reference
 values. Two levels: (a) a symbolic derivation (replicate, average the disorder, introduce order
 parameters, RS ansatz, n -> 0, stationarity, solve) that works for models you describe, and (b) the
-published pipelines of a catalog of 8 entries, each with a replica route and/or a cavity route (and an
-`amp` route for `sk` and `teacher_student`). A composer
+published pipelines of a catalog of 9 entries, each with a replica route and/or a cavity route (and an
+`amp` route for `sk` and `teacher_student`; the constraint-satisfaction entry `xorsat` is cavity-only). A composer
 matches a model description against the catalog, reuses what applies, adapts what it can through
 registered hooks, and says what it reused, adapted, or could not do. A LaTeX writer turns any run into a
 derivation document. For theoretical physicists and agents who need a published statistical-mechanics
@@ -67,6 +67,14 @@ CLI (from `tools/`):
   (RS; under 1 s measured at the default sizes) or `... --route cavity --param beta=1.25 --param k=5
   --param ansatz=1rsb --param m=0.24` (1RSB population of populations; about 13 s measured), are
   STATISTICAL (value +- stderr); reference-size runs are slower (minutes).
+- Worked example, random K-XORSAT (`xorsat`, cavity-only like `viana_bray`; under 1 s each,
+  measured): `python3 -m replicant run xorsat --route cavity` -> `alpha_d` 0.818469 (2-core / clustering
+  threshold), `alpha_s` 0.917935 (SAT/UNSAT), `lambda_d` 1.256431, `lambda_s` 2.149126, the core jump
+  `core_d` 0.357666, all `exact-by-literature` and final; `--param K=4` for K = 4.
+  `... --route cavity --param alpha=0.9` adds the 2-core (`core_variables` 0.607076, `core_checks`
+  0.594959) and `complexity` 0.008399; with `--param N=1000` (seeds 0-19) also `sat_fraction` 0.95
+  (99% Clopper-Pearson [0.683, 1.000]) from exact GF(2) elimination and the sampled core
+  (`core_variables_sampled` 0.6134 +- 0.0052): statistical, `not-computed`, so `final` is false.
 - Worked example, amp route (`sk`, `teacher_student`; under 1 s each, measured):
   `python3 -m replicant run sk --route amp --param beta=1.5` -> `q_se` 0.352602 (the SE fixed point,
   `exact-by-literature`: Bayati-Montanari Thm 4 proves SE for AMP on Gaussian J; it is the AMP limit,
@@ -152,6 +160,15 @@ free_entropy, fixed_points, optimal_overlap, gamp_is_optimal, ...)`; `amp.ising_
 `Thresholds(alpha_it, alpha_amp)` (1.244684, 1.492632). Refusals `precondition:known-prior`,
 `:nonnegative-alpha`, `:positive-alpha`, `:pattern-matrix`, `:label-count`, `:sign-labels`,
 `:teacher-length`, `:positive-iters`, `not-implemented:mismatched-teacher-student`.
+`from replicant.csp import xorsat, xorsat_finite` (E5a, random K-XORSAT; `csp/xorsat.py` states the
+conventions): `xorsat.xorsat_thresholds(K)` -> `XorsatThresholds(alpha_d, alpha_s, q_d, lambda_d,
+core_d, q_s, lambda_s)`; `xorsat_bp_threshold(K)`, `xorsat_sat_threshold(K)` (mpf);
+`xorsat_core_size(K, alpha)` -> `XorsatCore(q, q_hat, lam, variables, checks, complexity, trivial)`;
+`xorsat.DEGREE_LAWS` (the degree-law hook the recursion reads; `PoissonLaw`);
+`xorsat_finite.xorsat_instance(K, N, alpha, seed)`, `gf2_solve(idx, rhs, N)` -> (satisfiable, rank),
+`xorsat_gf2_satisfiable(K, N, alpha, seed)`, `xorsat_sat_probability(K, N, alpha, seeds)` ->
+`SatProbability(fraction, n_sat, n, stderr, lo, hi)` (99% Clopper-Pearson), `leaf_removal_core(idx,
+N)`, `xorsat_sampled_core(K, N, alpha, seed)`. Example: `xorsat_sat_threshold(3)` -> 0.917935276658.
 `from replicant.latex import render_latex, write_latex` (`write_latex(result, path, pdf=False)`; a
 `Refusal` is also accepted and writes its partial derivation).
 
@@ -170,7 +187,9 @@ cavity: `alpha`, `kappa`, `variables` (`spherical`; `ising` is refused `not-impl
 `branch`; `viana_bray`: `graph` (`regular` with excess degree `k`, or `poisson` with mean degree `c`),
 `J`, `beta`, `ansatz` (`rs`|`1rsb`), `m`, `ys`, and the sampling knobs `pop`, `inner`, `sweeps`,
 `burn_in`, `runs`, `seed`, `require_equilibrated`, `field`, `init_field`, `init_spread`, `init`,
-`bary_samples`. Without `beta` an entry returns its T = 0 / critical headline values. A composed spec
+`bary_samples`; `xorsat` (cavity): `K` (integer >= 3, default 3), `alpha`, and for the finite-N
+GF(2) check `N` (needs `alpha`; refused `precondition:state-point` without it) and `seeds` (default
+0-19; without `N` refused `precondition:known-parameter`, "need N"). Without `beta` an entry returns its T = 0 / critical headline values. A composed spec
 (not a catalog entry) does not refuse an unknown name: its notes list "unused parameters [...]".
 
 OUTPUTS: the `Result` object (`values`, `errors`, `rigor`, `route`, `stable`, `final`, `finality`,
@@ -200,6 +219,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `no-solution:not-a-local-maximum` | `branch="max-f"`: the largest-f 1RSB root is not a local maximum of f (Schur complement over the conjugates) |
 | `missing-step:derivation:<name>` | a requested document needs a derivation the entry does not provide |
 | `precondition:<name>` | an input or state precondition fails (state point incomplete: `state-point`; out-of-range or non-numeric input; `known-parameter`, `rs-reducible`, `rs-site-trace-form`, `supported-disorder-law`, `nonnegative-alpha`, `finite-kappa`, `known-ansatz`, `known-graph`, `tex-engine`, `latex-path`, `known-target`, `complete-spec`, `known-variables`, `m-range`, `alpha-range`, `replicon-block`, `p-at-least-3`, ... and the step preconditions of the derivation) |
+| `precondition:integer-k-at-least-3`, `:positive-alpha`, `:enough-variables`, `:named-seeds` | XORSAT (`csp/`): K not an integer >= 3 (K = 2 is not implemented), alpha <= 0 or non-numeric, N < max(12, 4K) (a finite-N check that small tests nothing), an empty seed list |
 | `unstable:<ansatz>` | `require_final` or `require_stable`: a computed stability is negative (RS replicon or cavity lambda < 0); `unstable:1rsb` also from `pspin_gardner_temperature` when the spherical scan is negative everywhere |
 | `unknown-stability:rs` | `require_final`: an RS value whose stability is not computed |
 | `not-final:<ansatz>` | `require_final`: a non-RS value that is not final |
@@ -208,7 +228,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `no-convergence`, `no-convergence:equilibration`, `:tap` | BP or a survey did not converge; a population-dynamics run is still drifting and `require_equilibrated` is set; `amp.tap_fixed_point`: Newton from the AMP iterate left the TAP residual above tol |
 | `no-transition` | the branching number rules out a spin-glass transition |
 | `no-transition:gardner` | `pspin_gardner_temperature`: the pure spherical p-spin (no Gardner transition; the detail carries the computed replicon scan), or no sign change of the Ising static-line replicon on the scan |
-| `unsupported:degree-law`, `unsupported:J-law` | a graph/coupling law the sparse code does not implement |
+| `unsupported:degree-law`, `unsupported:J-law` | a graph/coupling law the sparse code does not implement; for XORSAT a name not in `csp/xorsat.DEGREE_LAWS` |
 | `not-implemented:annealed`, `:cavity-ising`, `:spherical-rsb`, `:mismatched-teacher-student`, `:frozen-1rsb-replicon` | the named case is outside v1 (`:mismatched-teacher-student`: GAMP state evolution off the Nishimori line; `:frozen-1rsb-replicon`: `ising_perceptron_1rsb_replicon`, the stability of the frozen Ising-perceptron 1RSB is not computed) |
 | `unbanked:missing-entry`, `:malformed`, `:no-citation`, `:no-independent-route` | a banked reference value is absent or has no citation / no independent route (a value that fed a fit never certifies it) |
 | `tex-engine:failed`, `tex-engine:unavailable` | `--pdf`: the engine ran and failed, or could not reach its offline resources |
@@ -224,6 +244,7 @@ CATALOG (v1; `list` shows the live table; values at the default / banked state p
 | `perceptron` spherical (Gardner) | replica, cavity | `alpha_c(kappa=0)` = 2; entropy `S` and its `replicon` at `alpha` | `alpha_c`, both routes | `alpha_c` stable for kappa >= 0 (RS exact), unstable and not final for kappa < 0; `S` carries its own computed replicon label. The entry is RS only: `--param ansatz=1rsb` is refused `precondition:known-parameter`; in Python `gardner_capacity("spherical", ansatz="1rsb")` is refused `not-implemented:spherical-rsb` |
 | `teacher_student` | replica, amp | Gibbs 0.624658 / Bayes 0.441700 asymptotic constants (`eps ~ c/alpha`); amp: GAMP SE `q_se`, `mse_se`, `eps_se`, with `N` finite-N `q_gamp`, `eps_gamp` | both constants (bank tol is a 3-digit rounding) | exact-by-literature; amp values not-computed (GAMP SE is a claim) |
 | `hopfield` (AGS) | replica, cavity | `alpha_c(T=0)` 0.137906, `m` 0.967417, `E` -0.501445, `alpha_global` 0.051854 | all four (Steffan-Kuehn; AGS 0.051 for the global one) | T = 0 values not-computed; state-point values carry their replicon |
+| `xorsat` random K-XORSAT | cavity | K = 3: `alpha_d` 0.818469, `alpha_s` 0.917935, `lambda_d` 1.256431, `lambda_s` 2.149126; at `alpha`: 2-core `core_variables`, `core_checks`, `complexity`; with `N`: `sat_fraction` (exact GF(2)) and the sampled core | `alpha_d`, `alpha_s`, `lambda_d`, `lambda_s` (K = 3; MRZ 2003), `alpha_d` K = 4, 5, `alpha_s` K = 4, 5, 6 | thresholds and core exact-by-literature (Molloy 2005 core; Dubois-Mandler 2002 for K = 3, Pittel-Sorkin 2016 for K >= 3); `complexity` exact-by-literature below `alpha_s`, not-computed above; finite-N values not-computed (statistical) |
 | `viana_bray` sparse +-J | cavity | `beta_c` (3-regular) 0.881374; T = 0 RS `p0` 1/3, `e0` -23/18; factorized 1RSB -1.27231, mu* 0.4174 | those, plus slow/statistical population-dynamics RS and 1RSB at k = 5, T = 0.8 | `beta_c` stable; the rest not-computed |
 
 HELD-OUT EVIDENCE (the test of REUSE; `tests/test_heldout.py`). Two models that are not catalog entries
@@ -254,12 +275,12 @@ banked in `reference/perceptron.json` as independent targets. Honest limits:
   is a theorem for Gaussian J only, so for +-J this is sampled numerical evidence, not a theorem, and
   the band (+-0.019) excludes errors of the size of the planted one (0.053), not small ones (slow).
 
-ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 306 tests, about 21 s on a
+ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 318 tests, about 21 s on a
 laptop; also `python3 run_selftests.py replicant`) covers the core and refusal paths, the symbolic
 derivation against independent expressions, level agreement (a)=(b) for every family where both exist,
 every catalog entry against its banked non-slow values, the cavity routes, the composer and the held-out
 models, the CLI and the LaTeX writer (displayed equations re-checked numerically), the 1RSB replicon
-and the Gardner transition. `--full` adds 103 `@slow` tests (full-RSB Parisi up to K = 9, population dynamics at reference sizes, the Hopfield replicon
+the Gardner transition and random K-XORSAT (closed forms, small-N GF(2) elimination and leaf removal). `--full` adds 105 `@slow` tests (full-RSB Parisi up to K = 9, population dynamics at reference sizes, the XORSAT GF(2) crossing at N = 400-2000 and leaf removal at N = 100000, the Hopfield replicon
 scans, the p-spin T -> 0 energy, solver-based composed and LaTeX checks, a PDF compile when a TeX engine
 is present) and takes about 9-10 minutes on a laptop (measured 9 min 28 s); run it before merging a
 change to a family. The `@slow` marker is honoured by
@@ -441,6 +462,30 @@ KNOWN HAZARDS:
   in `tests/test_parisi.py`. The `exact-by-literature` label of full RSB rests on the cited published
   Parisi value (Talagrand, Panchenko), not on this package's K-level extrapolation, whose band is stated
   separately.
+- Random K-XORSAT (E5a, `csp/`, entry `xorsat`): the closed forms are computed from the leaf-removal
+  recursion q = 1 - G1(1 - q^(K-1); K alpha) through the degree-law hook `DEGREE_LAWS` (Poisson
+  only), 30 digits; the largest root is bracketed by a 64-point sign scan on [q_d, 1] (q_d the
+  tangency point), alpha_d by the tangency Phi = dPhi/dq = 0 started from a 39-point scan of
+  alpha*(q). They agree to 1e-20 with three published parametrisations written independently in
+  the tests (Pittel-Sorkin g_k / psi, Dubois-Mandler (c, u), Cocco et al. s0); a planted law of
+  mean (K + 1) alpha, or 1.01 K alpha, moves both thresholds out of the bank tolerance. The
+  sources disagree in the sixth digit of alpha_d: K = 4, MRZ's table 0.772278 vs Mezard-Montanari
+  0.772280 (computed 0.7722798; bank tol 2e-6 covers both); K = 6, MRZ's 0.637080 vs the computed
+  0.6370811 with no second source, so alpha_d at K = 6 is NOT banked. What is proved: the 2-core
+  threshold and size (Molloy 2005, read through Pittel-Sorkin Sec. 7; not fetched) and alpha_s
+  (Dubois-Mandler 2002 for K = 3, from the C. R. note; Pittel-Sorkin 2016, Thm 16, for K >= 3);
+  that alpha_d is also the clustering threshold is the cavity picture (MRZ; rigorous clustering
+  results of Achlioptas-Molloy 2015 were read from the abstract only). Finite N: the GF(2)
+  eliminator is checked against brute-force enumeration (N = 12) and an independent XOR-basis rank;
+  measured P(sat) at alpha_s is 0.58 / 0.52 / 0.49 at N = 200 / 400 / 1000 (seeds 0-199), and
+  the crossing band (99% Clopper-Pearson both sides of 1/2) is +-0.05 at N = 200 (default tier,
+  seeds 0-39; it excludes a threshold shifted by +0.05) and +-0.04 / 0.03 / 0.02 at N = 400 /
+  1000 / 2000 (slow, seeds 0-99; at N = 2000 shifts of +0.02 are excluded). The sampled core is
+  compared in a 99% Student-t band plus a stated finite-size allowance (2e-3 at N = 20000,
+  1e-3 at N = 100000); near alpha_d the finite-N core probability has a window of order
+  N^(-1/2) (Mezard-Montanari Sec. 18.4.1, Dembo-Montanari 2008, not fetched), so the
+  sampled checks sit 0.02-0.05 away from alpha_d. Not implemented: K = 2, the UNSAT
+  (MAX-XORSAT) ground energy, non-Poisson degree laws.
 - Banked values often come from secondary open sources where the original is paywalled; each bank
   entry names the source its digits were read from (`reference/*.json`, field `cite`), and where the
   cite says the original was not fetched the digits come from the secondary source named there. Check
@@ -461,7 +506,7 @@ RSB analysis of [SK94]; the Viana-Bray model [VB85], the sparse cavity and popul
 [MP01] [MP03] and the transition conditions [MK04] [GT03]; the dense cavity method [MPV87] with
 [TAP77]; AMP, state evolution and the TAP free energy (`amp/`) follow [Bol14] [BM11] [FMM18] with
 [Ple82], universality [BLM15] [CL20] and TAP complexity [BM80]; GAMP and its state evolution follow
-[Ran11] [BKMMZ19] with [JM13], the binary teacher-student thresholds [Gyo90] [BKMMZ19] [LHZH22]. The universality of the SK free energy used in the held-out test is [CH04]. Reference digits are read
+[Ran11] [BKMMZ19] with [JM13], the binary teacher-student thresholds [Gyo90] [BKMMZ19] [LHZH22]. Random K-XORSAT (`csp/`): the cavity / leaf-removal solution [MRZ03] [CDMM03], the proofs of the threshold [DM02] [PS16] and of the 2-core [Mol05], the textbook treatment [MM09] and the solution geometry [AM15]. The universality of the SK free energy used in the held-out test is [CH04]. Reference digits are read
 from [Sto25] [OSS07] [CRT03] [SY17] [DM15] [FP16] [Gyo01] [PRGE20] [Cov65] [Bar97] as stated in the bank
 cites. The typed-step architecture, the symbolic level (a), the composer, the refusal and
 finality discipline and the LaTeX writer are ours. Each bank entry names the source its digits were

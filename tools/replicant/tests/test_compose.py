@@ -277,6 +277,7 @@ _DOCUMENTED = {
     ("teacher_student", "amp"): {"alpha", "learning", "N", "seeds", "iters"},
     ("hopfield", "replica"): {"alpha", "beta", "branch"},
     ("hopfield", "cavity"): {"alpha", "beta", "branch"},
+    ("xorsat", "cavity"): {"K", "alpha", "N", "seeds"},
     ("viana_bray", "cavity"): {"graph", "k", "c", "J", "beta", "ansatz", "m", "ys", "pop",
                                "inner", "sweeps", "burn_in", "runs", "seed",
                                "require_equilibrated"},

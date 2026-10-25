@@ -1,0 +1,58 @@
+{
+  "alpha_d_k3": {
+    "value": "0.818469",
+    "tol": "1.5e-6",
+    "cite": "Dynamical (clustering) threshold of random 3-XORSAT = appearance of a nonempty 2-core (leaf-removal transition), M = gamma N checks on K = p = 3 distinct uniform variables: Mezard, Ricci-Tersenghi & Zecchina, 'Two solutions to diluted p-spin models and XORSAT problems', J. Stat. Phys. 111, 505 (2003), arXiv:cond-mat/0207140 (PDF of v3, titled 'Alternative solutions to diluted p-spin models and XORSAT problems', read): Sec. I, Sec. II.A.3 below Eq. (11), Sec. III.B below Eq. (30) and the table of Sec. III.D: 'gamma_d = 0.818469'. Also Mezard & Montanari, Information, Physics, and Computation (OUP 2009), ch. 18 (draft Part E PDF from the authors' web page read), Sec. 18.2 after Eq. (18.8): 'alpha_d(K) ~ 0.818469' for K = 3; Cocco, Dubois, Mandler & Monasson, PRL 90, 047205 (2003), arXiv:cond-mat/0206239 (PDF read): 'cd ~ 0.818' (rounded). tol covers the Mezard-Montanari Fig. 18.2 caption value (sources_disagree)",
+    "independent_route": "replicant's own tangency of the leaf-removal map (csp/xorsat.py: Phi = dPhi/dq = 0 for Phi = 1 - G1(1 - q^(K-1); K alpha) - q, Poisson law through the DEGREE_LAWS hook, 30 digits): 0.81846916076 (build); tests also compute min_x x / (K (1 - e^-x)^(K-1)) (the Pittel-Sorkin / Molloy form) without the hook",
+    "sources_disagree": [{"value": "0.818468", "cite": "Mezard & Montanari (2009), ch. 18, Fig. 18.2 caption 'alpha_d(K = 3) ~ 0.818468' (truncated; their text gives 0.818469)"}]
+  },
+  "alpha_s_k3": {
+    "value": "0.917935",
+    "tol": "5e-7",
+    "cite": "Satisfiability (SAT/UNSAT) threshold of random 3-XORSAT, the gamma where the complexity of the core vanishes, N_c = M_c: Mezard, Ricci-Tersenghi & Zecchina, J. Stat. Phys. 111, 505 (2003), arXiv:cond-mat/0207140 (PDF of v3 read), Sec. II.A.3 below Eq. (14), Sec. III.D below Eq. (42) and the table of Sec. III.D: 'gamma_c = 0.917935'. Consistent (rounded): Mezard & Montanari (2009), ch. 18, Fig. 18.9 table 0.91794 and Fig. 18.11 caption (Sec. 18.4.2) 'alpha_s(3) ~ 0.917935'; Cocco et al., PRL 90, 047205 (2003), 'cs ~ 0.918'. Proof of the threshold: Dubois & Mandler, C. R. Acad. Sci. Paris Ser. I 335, 963 (2002) (PDF read; the FOCS 2002 full version, pp. 769-778, not fetched), Theorem 3 (no digits; the system g_c(lambda) = lambda, f_c(lambda) = 1); Pittel & Sorkin, Combin. Probab. Comput. 25, 236 (2016), arXiv:1212.3822v2 (PDF read), Theorem 16 for every k >= 3. tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own root of Sigma = ln 2 (V - C) on the largest leaf-removal root (csp/xorsat.py, through the DEGREE_LAWS hook): 0.91793527666 (build); tests also solve the Pittel-Sorkin form psi(mu) = k, alpha_s = g_k(mu) and the Dubois-Mandler system 1 - u = exp(-3cu^2), cu^3 = u - 3cu^2(1 - u) without the hook"
+  },
+  "lambda_d_k3": {
+    "value": "1.25643",
+    "tol": "5e-6",
+    "cite": "Mean degree lambda* of the (truncated-Poisson) core degrees at the leaf-removal transition, p = 3: Mezard, Ricci-Tersenghi & Zecchina (2003), arXiv:cond-mat/0207140 (PDF of v3 read), Sec. III.B, text after Fig. 8: 'lambda*(gamma_d) = 1.25643 for p = 3'. tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own K alpha_d q_d^(K-1) at its tangency (csp/xorsat.py): 1.2564312086 (build)"
+  },
+  "lambda_s_k3": {
+    "value": "2.14913",
+    "tol": "5e-6",
+    "cite": "lambda* at the SAT/UNSAT threshold, p = 3: Mezard, Ricci-Tersenghi & Zecchina (2003), arXiv:cond-mat/0207140 (PDF of v3 read), Sec. III.D below Eq. (42): 'lambda_c = 2.14913 and gamma_c = 0.917935'. The same number is mu* of Pittel & Sorkin (2016), Thm 16 (psi(mu*) = k), stated there without digits. tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own K alpha_s q_s^(K-1) at its own alpha_s (csp/xorsat.py): 2.1491257999 (build); tests compare it with psi^-1(3) solved without the hook"
+  },
+  "alpha_d_k4": {
+    "value": "0.772280",
+    "tol": "2e-6",
+    "cite": "2-core (leaf-removal, clustering) threshold of random 4-XORSAT: Mezard & Montanari, Information, Physics, and Computation (OUP 2009), ch. 18 (draft Part E PDF read), Sec. 18.2 after Eq. (18.8): 'alpha_d(K) ~ 0.818469, 0.772280, 0.701780 for K = 3, 4, 5' (Fig. 18.9 table: 0.77228). The table of Mezard, Ricci-Tersenghi & Zecchina (2003), Sec. III.D, gives 0.772278 (sources_disagree); tol = the spread of the two",
+    "independent_route": "replicant's own tangency of the leaf-removal map at K = 4 (csp/xorsat.py): 0.77227983980 (build); the hook-free form min g_k gives the same digits (tests)",
+    "sources_disagree": [{"value": "0.772278", "cite": "Mezard, Ricci-Tersenghi & Zecchina (2003), arXiv:cond-mat/0207140, table of Sec. III.D, p = 4"}]
+  },
+  "alpha_s_k4": {
+    "value": "0.976770",
+    "tol": "5e-7",
+    "cite": "SAT/UNSAT threshold of random 4-XORSAT: Mezard, Ricci-Tersenghi & Zecchina (2003), arXiv:cond-mat/0207140 (PDF of v3 read), table of Sec. III.D, p = 4: 'gamma_c = 0.976770'; consistent with Mezard & Montanari (2009), Fig. 18.9 table, 0.97677. Proof: Pittel & Sorkin (2016), Thm 16. tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own root of Sigma at K = 4 (csp/xorsat.py): 0.97677016488 (build)"
+  },
+  "alpha_d_k5": {
+    "value": "0.701780",
+    "tol": "5e-7",
+    "cite": "2-core threshold of random 5-XORSAT: Mezard, Ricci-Tersenghi & Zecchina (2003), table of Sec. III.D, p = 5: '0.701780'; Mezard & Montanari (2009), Sec. 18.2 after Eq. (18.8): '0.701780' (both read). tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own tangency at K = 5 (csp/xorsat.py): 0.70178026648 (build)"
+  },
+  "alpha_s_k5": {
+    "value": "0.992438",
+    "tol": "5e-7",
+    "cite": "SAT/UNSAT threshold of random 5-XORSAT: Mezard, Ricci-Tersenghi & Zecchina (2003), table of Sec. III.D, p = 5: '0.992438' (read); Mezard & Montanari (2009), Fig. 18.9 table, 0.99244. Proof: Pittel & Sorkin (2016), Thm 16. tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own root of Sigma at K = 5 (csp/xorsat.py): 0.99243839126 (build)"
+  },
+  "alpha_s_k6": {
+    "value": "0.997380",
+    "tol": "5e-7",
+    "cite": "SAT/UNSAT threshold of random 6-XORSAT: Mezard, Ricci-Tersenghi & Zecchina (2003), table of Sec. III.D, p = 6: '0.997380' (read; no second tabulation fetched). Proof: Pittel & Sorkin (2016), Thm 16. tol = half a unit in the last stated digit. The same table's p = 6 gamma_d (0.637080) is NOT banked: replicant computes 0.6370811 by two routes (1.1e-6 away) and no second source was fetched",
+    "independent_route": "replicant's own root of Sigma at K = 6 (csp/xorsat.py): 0.99737955278 (build)"
+  }
+}

@@ -74,6 +74,9 @@ MODELS = {
     "viana_bray": (r"E(s) = -\sum_{\langle ij\rangle} J_{ij} s_i s_j - H\sum_i s_i,\quad "
                    r"J_{ij} = \pm J, \\ \text{random regular (excess degree } k\text{) or "
                    r"Poisson (mean degree } c\text{) graph}", _MP01),
+    "xorsat": (r"x_{i_1^a} \oplus \dots \oplus x_{i_K^a} = y_a,\quad a = 1, \dots, M = \alpha N,"
+               r"\quad \{i^a\} \text{ uniform K-subsets},\ y_a \text{ uniform},\ K = 3",
+               "Mezard, Ricci-Tersenghi & Zecchina, J. Stat. Phys. 111, 505 (2003), Eq. (1)"),
 }
 
 
@@ -351,6 +354,9 @@ def derivation(name, route):
     if name == "viana_bray":
         from .latex_cavity import viana_bray
         return viana_bray()
+    if name == "xorsat":
+        from .latex_csp import xorsat
+        return xorsat(route)
     if name not in _ENTRIES:
         raise Refusal(f"missing-step:derivation:{name}", "no displayed derivation for "
                       f"catalog entry {name!r} (latex_entries.py)")
