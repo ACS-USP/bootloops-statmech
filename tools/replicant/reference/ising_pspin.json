@@ -1,0 +1,32 @@
+{
+  "tg_p3": {
+    "value": "0.24026",
+    "tol": "5e-6",
+    "cite": "Gardner temperature of the fully connected Ising p-spin, p = 3, couplings of variance p!/(2 N^(p-1)) (J = 1), zero field: Rizzo, Phys. Rev. E 88, 032135 (2013), doi:10.1103/PhysRevE.88.032135, arXiv:1305.2070 (PDF read), Sec. V, Eq. (27) (convention) and Fig. 1 caption and text: 'the Gardner temperature TG = 0.24026', defined as the crossing of the marginal line m_G(T) (1RSB replicon zero, after Gardner) with the static line m_s(T). Consistent (rounded) value: Yeo & Moore, Phys. Rev. E 101, 032127 (2020), doi:10.1103/PhysRevE.101.032127, arXiv:1911.02719 (PDF read), Sec. II A after Eq. (17): 'T > TG, where TG ~ 0.24 for p = 3'. Original: Gardner, Nucl. Phys. B 257 [FS14], 747 (1985) (paywalled, not fetched). Montanari & Ricci-Tersenghi, EPJB 33, 339 (2003), arXiv:cond-mat/0301591 (PDF read) show T_G only on the axis of their Fig. 2 (no digits). tol = half a unit in Rizzo's last digit",
+    "independent_route": "replicant's own static 1RSB (families/ising_pspin.py: q equation MRT Eq. (2.3), m equation Yeo-Moore Eq. (16), float64 Gauss-Legendre) and the 1RSB replicon rule (families/gardner.py: MRT Eq. (2.6), checked against the explicit integer-n functional by finite differences and spin enumeration); T_G = zero of the static-line replicon by an 18-point scan plus brentq: 0.2402600 (build). The sign scan in tests/test_gardner_transition.py does not root-find"
+  },
+  "ts_p3": {
+    "value": "0.651385",
+    "tol": "5e-7",
+    "cite": "Static (1RSB, m_s = 1) transition of the same model, p = 3: Rizzo, PRE 88, 032135 (2013), arXiv:1305.2070, Fig. 1 caption and Sec. V text 'Ts = .651385'; also Nishimori, arXiv:2608.23904 (2026, preprint, not peer reviewed; PDF read), Table I, 'Tc 0.651385' for p = 3; Yeo & Moore (2020), arXiv:1911.02719, Sec. II A: 'T_1RSB^c ~ 0.651 for p = 3' (rounded). tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own m = 1 condition on the larger-q branch (brentq in T of the m equation at m = 1): 0.65138523 (build); does not use the banked digits"
+  },
+  "td_p3": {
+    "value": "0.681598",
+    "tol": "5e-7",
+    "cite": "Dynamic transition (the m = 1 1RSB solution appears; marginal and spinodal lines cross at m = 1), p = 3: Rizzo, PRE 88, 032135 (2013), arXiv:1305.2070, Fig. 1 caption and Sec. V: 'Td = .681598'. tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own fold of the m = 1 q equation (brentq in beta on max_q [E_1 tanh^2 - q] = 0, families/ising_pspin.py); the m = 1 replicon vanishing there is checked separately in tests/test_gardner_transition.py"
+  },
+  "qs_p3": {
+    "value": "0.813518",
+    "tol": "5e-7",
+    "cite": "Innermost 1RSB overlap q1 at T_s (m = 1) of the same model (couplings of variance J^2 p!/(2 N^(p-1)), J = 1, their Eq. (4)), p = 3: Nishimori, 'Reentrance and temperature chaos in the p-spin Ising spin glass', arXiv:2608.23904 (2026, preprint dated 7 Oct 2026, not peer reviewed; PDF read), Table I, column mu (= q1c, 'the innermost 1RSB overlap q1 of the SG solution evaluated at Tc', Tc = 0.651385). tol = half a unit in the last stated digit",
+    "independent_route": "replicant's own larger nonzero root of the m = 1 q equation at its own T_s (families/ising_pspin.py): 0.8135176 (build)"
+  },
+  "replicon_ts_p3": {
+    "value": "0.3305",
+    "tol": "5e-5",
+    "cite": "Innermost-block 1RSB replicon at T_s (m = 1), normalised as 1 - p(p-1)/2 beta^2 q1^(p-2) E_x[sech^4] (their Eq. (22b), the form of MRT Eq. (2.6)), p = 3: Nishimori, arXiv:2608.23904 (2026, preprint, not peer reviewed; PDF read), Table I, column lambda(M) '+0.3305' (Eq. (23)). tol = half a unit in the last stated digit",
+    "independent_route": "replicant's replicon rule (families/gardner.py, checked against the explicit integer-n functional) at its own (T_s, q_s, m = 1): 0.3304579 (build); the formula is MRT's, so this checks the evaluation, not the formula's derivation"
+  }
+}

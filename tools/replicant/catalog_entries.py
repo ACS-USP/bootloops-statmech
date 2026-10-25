@@ -1,12 +1,12 @@
 """Catalog entries for the fully connected families (level (b)) and their dense cavity
-routes: REM, SK, spherical p-spin, spherical perceptron, Hopfield, and (catalog_ts.py)
-teacher-student.
+routes: REM, SK, spherical perceptron, Hopfield, and (catalog_ts.py) teacher-student,
+(catalog_pspin.py) the spherical and the Ising p-spin.
 
 Conventions are the families' own (stated in each families/*.py docstring):
   REM       2^N i.i.d. energies of variance N_scale N; default N_scale = 1/2, Derrida's
             J = 1 normalisation (beta_c = 2 sqrt(ln 2)), in which the bank is written.
   SK        J_ij ~ N(0, 1/N), field h, beta = 1/T.
-  p-spin    spherical, J = 1, couplings of variance p!/(2 N^(p-1)); default p = 3.
+  p-spin    spherical or Ising, J = 1, couplings of variance p!/(2 N^(p-1)); p = 3.
   perceptron spherical J.J = N, P = alpha N Gaussian patterns, margin kappa (default 0).
   teacher-student  spherical teacher and student, noiseless labels; learning gibbs|bayes.
   Hopfield  AGS: p = alpha N +-1 patterns, one condensed pattern, beta = 1/T.
@@ -21,15 +21,14 @@ import mpmath as mp
 from .agree import default_spec
 from .catalog import Out, RefCheck, Stability, entry, fstep, from_flag, has, lacks, saddle
 from .catalog_amp import sk_amp_route
+from .catalog_pspin import ising_pspin, pspin
 from .catalog_ts import teacher_student
 from .cavity import dense
 from .cavity.dense_hopfield import energy as hopfield_cavity_energy
 from .core import Refusal, Step
-from .families import pspin as P
 from .families.common import CAVEAT, CAVITY_CAVEAT
 from .families.hopfield import hopfield_alpha_c, hopfield_rs, hopfield_t0
 from .families.perceptron import gardner_capacity, gardner_entropy_point
-from .families.pspin import pspin_critical_temperature, pspin_spherical_1rsb
 from .families.rem import rem_1rsb, rem_critical_beta, rem_free_energy
 from .families.parisi import PARISI_CITE, krsb_ground_energy, parisi_ground_energy
 from .families.sk import FULLRSB_GRID, sk_1rsb, sk_ground_energy, sk_replicon, sk_rs
@@ -38,7 +37,6 @@ from .spec import ModelSpec
 SK_CITE = ("Sherrington & Kirkpatrick, PRL 35, 1792 (1975); de Almeida & Thouless, "
            "J. Phys. A 11, 983 (1978); Parisi, PRL 43, 1754 (1979)")
 REM_CITE = "Derrida, PRL 45, 79 (1980); Phys. Rev. B 24, 2613 (1981)"
-PSPIN_CITE = "Crisanti & Sommers, Z. Phys. B 87, 341 (1992)"
 GARDNER_CITE = "Gardner, J. Phys. A 21, 257 (1988); Gardner & Derrida, J. Phys. A 21, 271 (1988)"
 MEZARD_CITE = "Mezard, J. Phys. A 22, 2181 (1989)"
 AGS_CITE = ("Amit, Gutfreund & Sompolinsky, PRL 55, 1530 (1985); Ann. Phys. 173, 30 (1987)")
@@ -208,44 +206,6 @@ def sk():
                              "cavity": ("beta", "h", "require_stable"), "amp": amp.params})
 
 
-# ---- spherical p-spin ----------------------------------------------------------------
-def _pspin_t(p):
-    k = p.get("p", 3)
-    with mp.workdps(30):
-        return Out({"p": k, "T_s": pspin_critical_temperature(k),
-                    "T_d": pspin_critical_temperature(k, kind="dynamic"),
-                    "q_s": 1 - P._y(k)},
-                   "T_s and q_s = 1 - y at m = 1; T_d closed form")
-
-
-def _pspin_1rsb(p):
-    s = pspin_spherical_1rsb(p.get("p", 3), p["beta"])
-    return Out(_saddle("1rsb", None, q0=s.q0, q1=s.q1, m=s.m, f=s.f, e=s.e),
-               "1RSB, audited as a local maximum of f in (q0, q, m); replicon not computed")
-
-
-def pspin():
-    steps = [fstep("pspin-transitions", PSPIN_CITE + "; Castellani & Cavagna, J. Stat. Mech. "
-                   "(2005) P05012 (T_d)", _pspin_t),
-             fstep("pspin-1rsb", PSPIN_CITE, _pspin_1rsb, when=has("beta"), skip="no beta given")]
-    refs = [RefCheck("pspin", "ts_p3", lambda v: v["T_s"]),
-            RefCheck("pspin", "td_p3", lambda v: v["T_d"]),
-            RefCheck("pspin", "qs_p3", lambda v: v["q_s"]),
-            RefCheck("pspin", "e0_p3", lambda v: v["e"], params={"beta": 10000}, slow=True)]
-    exact = Stability("exact-by-literature", "1rsb",
-                      PSPIN_CITE + " (1RSB is the exact solution of the pure spherical p-spin, "
-                      "p >= 3, zero field); equilibrium 1RSB values as in Cugliandolo, Lozano & "
-                      "Nessi, J. Stat. Mech. (2017) 083301, Table 1")
-    fin = {k: exact for k in ("T_s", "q_s", "q0", "q1", "m", "f", "e")}
-    fin["T_d"] = Stability("exact-by-literature", "1rsb",
-                           "Castellani & Cavagna, J. Stat. Mech. (2005) P05012, Eq. (147)",
-                           "dynamic (mode-coupling) transition, closed form")
-    return entry("pspin", ModelSpec("pspin", "spherical", "gaussian", params={"p": 3}),
-                 PSPIN_CITE, {"replica": steps}, refs, {"replica": CAVEAT},
-                 "spherical p-spin: static and dynamic transitions, 1RSB", finality=fin,
-                 meta=("p",), parameters={"replica": ("p", "beta")})
-
-
 # ---- spherical perceptron ----------------------------------------------------------------
 def _gardner_cap(fn):
     def go(p):
@@ -352,7 +312,7 @@ def hopfield():
 
 
 def dense_entries():
-    return [rem(), sk(), pspin(), perceptron(), teacher_student(), hopfield()]
+    return [rem(), sk(), pspin(), ising_pspin(), perceptron(), teacher_student(), hopfield()]
 
 
 __all__ = ["dense_entries"]

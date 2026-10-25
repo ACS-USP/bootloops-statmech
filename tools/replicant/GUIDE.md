@@ -12,7 +12,7 @@ citation; a missing precondition is a named refusal, never a silent fallback; ev
 reader can follow to the paper, a per-value finality label, and a comparison with banked, cited reference
 values. Two levels: (a) a symbolic derivation (replicate, average the disorder, introduce order
 parameters, RS ansatz, n -> 0, stationarity, solve) that works for models you describe, and (b) the
-published pipelines of a catalog of 7 entries, each with a replica route and/or a cavity route (and an
+published pipelines of a catalog of 8 entries, each with a replica route and/or a cavity route (and an
 `amp` route for `sk` and `teacher_student`). A composer
 matches a model description against the catalog, reuses what applies, adapts what it can through
 registered hooks, and says what it reused, adapted, or could not do. A LaTeX writer turns any run into a
@@ -115,6 +115,16 @@ solved, every audited root in `roots`, `stable` always None; `derive_rsb.derived
 is the functional itself);
 `from replicant.derive_replicon import derived_replicon` (`derived_replicon(spec, solution_or_mapping)`:
 the level-(a) replicon at an RS solution, a mapping first checked to be a root of the derived equations);
+`from replicant.families import gardner` (E4, the 1RSB replicon toward further RSB):
+`gardner.onersb_replicon(family, p=3, beta=..., m=None) -> mpf` (`family` `pspin` | `ising_pspin`;
+`m` only for `ising_pspin`, default the static m), `gardner.onersb_stability(...)` (with the point and
+the outer-block replicon), `gardner.pspin_gardner_temperature(p, variables="spherical" | "ising")`
+(the Ising T_G 0.240260 at p = 3; spherical refused `no-transition:gardner`),
+`gardner.replicon_formula(variables, p, beta, q, m)`, `gardner.explicit_n_replicon(variables, p, beta,
+q, n, m)` (the independent integer-n check), `gardner.ising_perceptron_1rsb_replicon(alpha)` (refused
+`not-implemented:frozen-1rsb-replicon`); `from replicant.families.ising_pspin import
+ising_pspin_1rsb, ising_pspin_critical_temperature` (`ising_pspin_1rsb(3, 2.5)` -> q1 0.929223,
+m 0.554371, both nonzero q roots in `q_roots`).
 `from replicant import amp` (SK AMP / state evolution / TAP, an independent finite-N route that imports
 none of the replica or cavity code; `amp/sk.py` states the conventions): `amp.sk_matrix(N, seed, law)`
 (`gaussian` or `pm_one`, variance 1/N, zero diagonal); `amp.sk_amp(J, beta, *, iters, seed, h=0,
@@ -152,7 +162,7 @@ route reads, `CatalogEntry.parameters[route]`; any other name, e.g. a typo `kapa
 (`rs`|`1rsb`, at a `beta`), `fullrsb` (flag, slow tier); `sk` cavity: `beta`, `h`, `require_stable`;
 `sk` amp: `beta`, `h`, and for finite-N AMP `N`, `seeds` (default 0-5), `iters` (default 100), `law`
 (`gaussian`|`pm_one`; with `pm_one` every SE value is `not-computed`: SE is proved for Gaussian J only);
-a finite-N parameter without `N` is refused `precondition:known-parameter` ("need N"); `pspin`: `p` (default 3), `beta`; `perceptron` replica: `alpha`, `kappa` (default 0); `perceptron`
+a finite-N parameter without `N` is refused `precondition:known-parameter` ("need N"); `pspin` and `ising_pspin`: `p` (default 3), `beta`; `perceptron` replica: `alpha`, `kappa` (default 0); `perceptron`
 cavity: `alpha`, `kappa`, `variables` (`spherical`; `ising` is refused `not-implemented:cavity-ising`);
 `teacher_student`: `alpha`, `learning` (`gibbs`|`bayes`); `teacher_student` amp: `alpha`, `learning`
 (default `bayes`), and for finite-N GAMP `N`, `seeds` (default 0-5), `iters` (default 30; `seeds` and
@@ -189,7 +199,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `precondition:polynomial-energy-for-t0` | T = 0 1RSB asked for a Gaussian-integral energy (Hopfield, perceptron: needs q1 = 1 - C/beta, not implemented) |
 | `no-solution:not-a-local-maximum` | `branch="max-f"`: the largest-f 1RSB root is not a local maximum of f (Schur complement over the conjugates) |
 | `missing-step:derivation:<name>` | a requested document needs a derivation the entry does not provide |
-| `precondition:<name>` | an input or state precondition fails (state point incomplete: `state-point`; out-of-range or non-numeric input; `known-parameter`, `rs-reducible`, `rs-site-trace-form`, `supported-disorder-law`, `nonnegative-alpha`, `finite-kappa`, `known-ansatz`, `known-graph`, `tex-engine`, `latex-path`, `known-target`, `complete-spec`, ... and the step preconditions of the derivation) |
+| `precondition:<name>` | an input or state precondition fails (state point incomplete: `state-point`; out-of-range or non-numeric input; `known-parameter`, `rs-reducible`, `rs-site-trace-form`, `supported-disorder-law`, `nonnegative-alpha`, `finite-kappa`, `known-ansatz`, `known-graph`, `tex-engine`, `latex-path`, `known-target`, `complete-spec`, `known-variables`, `m-range`, `alpha-range`, `replicon-block`, `p-at-least-3`, ... and the step preconditions of the derivation) |
 | `unstable:<ansatz>` | `require_final` or `require_stable`: a computed stability is negative (RS replicon or cavity lambda < 0) |
 | `unknown-stability:rs` | `require_final`: an RS value whose stability is not computed |
 | `not-final:<ansatz>` | `require_final`: a non-RS value that is not final |
@@ -197,8 +207,9 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `ambiguous:several-saddles` | more than one RS saddle found and no branch chosen: name one with `--param branch=...` |
 | `no-convergence`, `no-convergence:equilibration`, `:tap` | BP or a survey did not converge; a population-dynamics run is still drifting and `require_equilibrated` is set; `amp.tap_fixed_point`: Newton from the AMP iterate left the TAP residual above tol |
 | `no-transition` | the branching number rules out a spin-glass transition |
+| `no-transition:gardner` | `pspin_gardner_temperature`: the pure spherical p-spin (no Gardner transition; the detail carries the computed replicon scan), or no sign change of the Ising static-line replicon on the scan |
 | `unsupported:degree-law`, `unsupported:J-law` | a graph/coupling law the sparse code does not implement |
-| `not-implemented:annealed`, `:cavity-ising`, `:spherical-rsb`, `:mismatched-teacher-student` | the named case is outside v1 (the last: GAMP state evolution off the Nishimori line) |
+| `not-implemented:annealed`, `:cavity-ising`, `:spherical-rsb`, `:mismatched-teacher-student`, `:frozen-1rsb-replicon` | the named case is outside v1 (`:mismatched-teacher-student`: GAMP state evolution off the Nishimori line; `:frozen-1rsb-replicon`: `ising_perceptron_1rsb_replicon`, the stability of the frozen Ising-perceptron 1RSB is not computed) |
 | `unbanked:missing-entry`, `:malformed`, `:no-citation`, `:no-independent-route` | a banked reference value is absent or has no citation / no independent route (a value that fed a fit never certifies it) |
 | `tex-engine:failed`, `tex-engine:unavailable` | `--pdf`: the engine ran and failed, or could not reach its offline resources |
 
@@ -208,7 +219,8 @@ CATALOG (v1; `list` shows the live table; values at the default / banked state p
 |---|---|---|---|---|
 | `rem` random energy model | replica | `beta_c` 1.66511 (`T_c` 0.600561, N_scale 1/2) | `T_c`, frozen ground energy, 1RSB `m beta/beta_c = 1` (Derrida) | exact-by-literature (1RSB) |
 | `sk` Sherrington-Kirkpatrick | replica, cavity, amp | `tc` 1; RS `-sqrt(2/pi)` = -0.797885; 1RSB -0.765259; at `beta`: RS `q, f, e, replicon`; amp: SE `q_se`, with `N` finite-N `q_amp` | `tc`, RS, 1RSB; slow tier: 2RSB -0.76361, 3RSB -0.76331, full-RSB -0.763166 | `tc` stable; RS ground energy unstable; 1RSB not-computed; full RSB exact-by-literature (slow); amp `q_se` exact-by-literature (AMP limit, BM11 Thm 4), `q_amp` not-computed (statistical) |
-| `pspin` spherical p-spin | replica | p = 3: `T_s` 0.586054, `T_d` 0.612372, `q_s` 0.645007 | `T_s`, `T_d`, `q_s`; slow: `e0` -1.172 | exact-by-literature (1RSB) |
+| `pspin` spherical p-spin | replica | p = 3: `T_s` 0.586054, `T_d` 0.612372, `q_s` 0.645007; at `beta`: 1RSB `q1, m, f, e, replicon_1rsb` | `T_s`, `T_d`, `q_s`; slow: `e0` -1.172 | 1RSB values `stable` by the COMPUTED 1RSB replicon (= 1 - (p-1) y = 0.290015 at p = 3, the same for every T < T_s: no Gardner transition, `pspin_gardner_temperature(3)` refuses `no-transition:gardner`); `T_d` exact-by-literature (CC05 closed form) |
+| `ising_pspin` Ising p-spin (Gardner 1985) | replica | p = 3: `T_s` 0.651385, `T_d` 0.681598, `T_G` 0.240260, `q_s` 0.813518; at `beta` (T < T_s): 1RSB `q1, m, f, e, replicon_1rsb` | `T_s`, `T_d`, `T_G` (Rizzo 2013), `q_s` and the replicon at `T_s` 0.3305 (Nishimori 2026 preprint) | `T_s`, `q_s`, `T_G` stable (computed replicon); state-point values `stable` for T_G < T < T_s, `unstable` below T_G (e.g. `--param beta=5`); `T_d` not-computed (marginal by construction) |
 | `perceptron` spherical (Gardner) | replica, cavity | `alpha_c(kappa=0)` = 2; entropy `S` and its `replicon` at `alpha` | `alpha_c`, both routes | `alpha_c` stable for kappa >= 0 (RS exact), unstable and not final for kappa < 0; `S` carries its own computed replicon label. The entry is RS only: `--param ansatz=1rsb` is refused `precondition:known-parameter`; in Python `gardner_capacity("spherical", ansatz="1rsb")` is refused `not-implemented:spherical-rsb` |
 | `teacher_student` | replica, amp | Gibbs 0.624658 / Bayes 0.441700 asymptotic constants (`eps ~ c/alpha`); amp: GAMP SE `q_se`, `mse_se`, `eps_se`, with `N` finite-N `q_gamp`, `eps_gamp` | both constants (bank tol is a 3-digit rounding) | exact-by-literature; amp values not-computed (GAMP SE is a claim) |
 | `hopfield` (AGS) | replica, cavity | `alpha_c(T=0)` 0.137906, `m` 0.967417, `E` -0.501445, `alpha_global` 0.051854 | all four (Steffan-Kuehn; AGS 0.051 for the global one) | T = 0 values not-computed; state-point values carry their replicon |
@@ -242,12 +254,12 @@ banked in `reference/perceptron.json` as independent targets. Honest limits:
   is a theorem for Gaussian J only, so for +-J this is sampled numerical evidence, not a theorem, and
   the band (+-0.019) excludes errors of the size of the planted one (0.053), not small ones (slow).
 
-ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 291 tests, about 20 s on a
+ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 304 tests, about 21 s on a
 laptop; also `python3 run_selftests.py replicant`) covers the core and refusal paths, the symbolic
 derivation against independent expressions, level agreement (a)=(b) for every family where both exist,
 every catalog entry against its banked non-slow values, the cavity routes, the composer and the held-out
-models, the CLI and the LaTeX writer (displayed equations re-checked numerically). `--full` adds 101
-`@slow` tests (full-RSB Parisi up to K = 9, population dynamics at reference sizes, the Hopfield replicon
+models, the CLI and the LaTeX writer (displayed equations re-checked numerically), the 1RSB replicon
+and the Gardner transition. `--full` adds 102 `@slow` tests (full-RSB Parisi up to K = 9, population dynamics at reference sizes, the Hopfield replicon
 scans, the p-spin T -> 0 energy, solver-based composed and LaTeX checks, a PDF compile when a TeX engine
 is present) and takes about 9-10 minutes on a laptop (measured 9 min 28 s); run it before merging a
 change to a family. The `@slow` marker is honoured by
@@ -279,8 +291,8 @@ KNOWN HAZARDS:
   stated identity (the code differentiates the recorded site factor). The replicon value is accepted
   only when two quadrature rules agree (else fine-panel rules, else `no-convergence:quadrature`): at
   large beta the fixed splits alone can be off by 1e-3 (Hopfield beta ~ 43).
-- 1RSB at level (a) (`solve_derived_1rsb`): every value has `stable: null` (`not-computed`, 1RSB
-  stability toward further RSB is E4's); physics-level. Float64 product quadrature for the search and
+- 1RSB at level (a) (`solve_derived_1rsb`): every value has `stable: null` (`not-computed`: the
+  1RSB replicon of E4 exists only for the two p-spin entries, below); physics-level. Float64 product quadrature for the search and
   polish (composite Gauss-Legendre; Gauss-Hermite only for the search, measured 1e-8 off on Hopfield
   integrands); the trapezoid audit of every candidate is a QUADRATURE check only (same compiled
   integrands); the accepted roots are audited through an independent evaluation path (`QuadNum`:
@@ -310,6 +322,34 @@ KNOWN HAZARDS:
   1RSB: no independent target and nothing banked (its T = 0 limit is refused, so no code route could
   check a published T = 0 value); the finite-T spin-glass root at alpha = 0.05, beta = 3 is a local
   maximum of f with f_1RSB > f_RS.
+- 1RSB stability, the Gardner transition (E4, `families/gardner.py`): the innermost-block 1RSB
+  replicon Lambda_R = 1 - Sigma(q1) chi_R, Sigma = beta^2 p (p-1) q1^(p-2) / 2, chi_R = (1 - q1)^2
+  (spherical; Crisanti-Leuzzi 2006 Eq. (31)) or E_m[sech^4] (Ising; Montanari-Ricci-Tersenghi 2003
+  Eq. (2.6)). The formula is IMPLEMENTED AS CITED (neither p-spin is a level-(a) family, so the E1/E2
+  rule machinery does not produce it); it is checked against an independent rule, the second
+  derivative of the explicit integer-n replica functional along a replicon vector (finite
+  differences, exact spin enumeration), at integer m (4, 5) only: its use at the solution's
+  non-integer m is the analytic continuation in m. A planted sech^2 / (1 - q) is caught by that check
+  and by the banked T_G. Computed: the innermost replicon and the outer one (exactly 1 at q0 = 0,
+  Sigma(0) = 0); for the spherical model also the (q0, q, m) Hessian of f. NOT computed: the
+  longitudinal / anomalous modes of the full replica Hessian and, for the Ising p-spin, the (q, m)
+  Hessian; `stable` means "replicon positive", local in that sector. Spherical pure p-spin: on the
+  static line Lambda_R = 1 - (p-1) y (0.290015 at p = 3) for every T < T_s, so there is no Gardner
+  transition (also stated by Crisanti-Leuzzi App. C and MRT Sec. 1); this replaces v1's blanket
+  literature label by a computed one. Ising p-spin (float64 Gauss-Legendre, about 1e-12 on the
+  equations; `audit_residuals` re-evaluates them by mpmath quadrature): the larger nonzero q root is
+  the 1RSB branch (Rizzo 2013; the smaller one is an unstable fixed point, slope > 1, reported); the
+  root finder assumes one hump of E_m tanh^2 - q (checked against a dense sign scan at four points,
+  not proved); the static m is searched on a 21-point m grid (several roots refused
+  `ambiguous:several-saddles`). T_G is the first zero of the static-line replicon below T_s (18-point scan in [0.15, 0.98] T_s,
+  then Newton-continued brentq, the end point re-solved in full; a dense slow scan at p = 3 sees one
+  sign change; p = 4 gives 0.127841, not banked: no fetched source tabulates it); T_d is the fold of the m = 1 q equation,
+  where the m = 1 replicon vanishes like sqrt(T_d - T) (tested). Below T_G the 1RSB values are
+  `unstable` and the FRSB solution is not computed. T_d is `not-computed` (the 1RSB threshold states
+  are in the 1RSB-unstable region, MRT). Ising perceptron: the 1RSB that sets the capacity is
+  frozen (q1 = 1), where Lambda_R is a 0 x infinity limit not evaluated here; its stability toward
+  further RSB is NOT computed (`ising_perceptron_1rsb_replicon` refuses). The T_s, q_s and replicon
+  digits of Nishimori (arXiv:2608.23904) come from a 2026 preprint, not peer reviewed.
 - AMP / state evolution / TAP (`amp/`): finite-N results are STATISTICAL (one run has no error bar;
   `sk_amp_ensemble` gives a 99% Student-t band over named seeds), never certified. SE is a theorem for
   each fixed t as N -> oo for Gaussian J (Bayati-Montanari 2011, Thm 4; Bolthausen 2014); Thm 4 is stated
@@ -411,7 +451,8 @@ CREDIT: the replica method, the Parisi ansatz and the cavity method are due to o
 reproduces their published calculations and credits them by key (bracketed keys resolve in
 REFERENCES.md at the repository root). Models and methods: the SK model [SK75], its stability analysis
 [AT78], the replica-symmetry-breaking scheme [Par79] [Par80] and its proof [Tal06] [Pan13]; the random
-energy model [Der80] [Der81]; the spherical p-spin [CS92] with [CC05] [CLN17]; the Gardner capacity [Gar88]
+energy model [Der80] [Der81]; the spherical p-spin [CS92] with [CC05] [CLN17]; the Ising p-spin and its Gardner transition [Gar85]
+[MRT03] [Riz13] [YM20] [Nis26], the spherical 1RSB replicon [CL06]; the Gardner capacity [Gar88]
 [GD88], the Ising perceptron thresholds [KM89] [DS18] and the cavity treatment [Mez89]; teacher-student
 learning [SST92] [OH91] [Gyo90] [BTG97] and its proof [BKMMZ19]; Hopfield model [AGS85] [AGS87] with the
 RSB analysis of [SK94]; the Viana-Bray model [VB85], the sparse cavity and population-dynamics method

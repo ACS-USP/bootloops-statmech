@@ -1,6 +1,6 @@
 """Displayed equations of the replica-route catalog entries (REM, SK, p-spin, perceptron,
 teacher-student, Hopfield) and the model definitions; latex_cavity.py has the cavity
-routes, latex_amp.py the amp routes.  derivation(entry, route) -> [TexBlock] is what CatalogEntry.derivation returns.
+routes, latex_amp.py the amp routes, latex_pspin.py the spherical and Ising p-spin.  derivation(entry, route) -> [TexBlock] is what CatalogEntry.derivation returns.
 
 Each equation is either built in sympy from what the family code holds (its
 rs_equations_symbolic(), quadratic_term, pspin_functional, rem_1rsb_functional) or
@@ -58,6 +58,11 @@ MODELS = {
     "pspin": (r"H(s) = -\sum_{i_1<\dots<i_p} J_{i_1\dots i_p} s_{i_1}\cdots s_{i_p},\quad "
               r"\textstyle\sum_i s_i^2 = N,\quad J \sim \mathcal{N}\!\left(0, "
               r"\frac{p!}{2 N^{p-1}}\right),\ p = 3", _CS),
+    ("pspin", "ising"): (r"H(s) = -\sum_{i_1<\dots<i_p} J_{i_1\dots i_p} s_{i_1}\cdots s_{i_p},"
+                         r"\quad s_i = \pm 1,\quad J \sim \mathcal{N}\!\left(0, "
+                         r"\frac{p!}{2 N^{p-1}}\right),\ p = 3",
+                         "Gardner, Nucl. Phys. B 257, 747 (1985); Montanari & "
+                         "Ricci-Tersenghi, EPJB 33, 339 (2003), Eq. (2.1)"),
     "perceptron": (r"V(\xi) = \int_{J\cdot J = N} dJ \prod_{\mu=1}^{\alpha N} "
                    r"\Theta\!\left(\frac{J\cdot\xi^\mu}{\sqrt N} - \kappa\right),\quad "
                    r"\xi_i^\mu \sim \mathcal{N}(0,1),\quad S = \frac{1}{N}\ln V", _GARDNER),
@@ -77,8 +82,9 @@ def model_blocks(spec):
     exact cumulant generating function K(t) = ln E exp(t J) (sympy, from the code)."""
     from . import derive as D
     out = []
-    if spec.family in MODELS:
-        body, src = MODELS[spec.family]
+    key = (spec.family, spec.variables) if (spec.family, spec.variables) in MODELS else spec.family
+    if key in MODELS:
+        body, src = MODELS[key]
         out.append(cited("Hamiltonian and conventions", body, src))
     else:
         out.append(text("Model", f"family {spec.family!r}: no displayed definition"))
@@ -208,44 +214,6 @@ def rem(route):
     ]
 
 
-# ---- spherical p-spin ------------------------------------------------------------------
-_CLN = "Cugliandolo, Lozano & Nessi, J. Stat. Mech. (2017) 083301, Eqs. (8)-(10)"
-_CC = "Castellani & Cavagna, J. Stat. Mech. (2005) P05012"
-
-
-def pspin(route):
-    from .families import pspin as F
-    p, y = sp.Symbol("p", positive=True), sp.Symbol("y", positive=True)
-    fun = F.pspin_functional(3)
-    betas = ("2", "3", "5")
-    sols = lambda: tuple((s.q0, s.q1, s.m, b) for b in betas
-                         for s in [F.pspin_spherical_1rsb(3, b)])
-    ys = lambda: tuple((k, F._y(k)) for k in (3, 4, 5))
-    return [
-        text("1RSB functional", "q0 between blocks, q inside blocks of size m; (1/n) sum_ab "
-             "Q_ab^p by ansatz.sum_offdiag_power and lim (1/n) ln det Q from the 1RSB "
-             "eigenvalues (families/pspin.py); the q-independent sphere entropy is omitted"),
-        sym("-beta f (1RSB, p = 3)", sp.Eq(-F._B * sp.Symbol("f"), fun),
-            Check((F._Q0, F._Q, F._M, F._B), lambda q0, q, m, b: -mp.mpf(b) *
-                  F.pspin_spherical_1rsb(3, b).f, sols, "rhs", slow=True)),
-        cited("Reduced stationarity (zero field, q0 = 0)",
-              r"\frac{1}{p} = -\frac{y(1 - y + \ln y)}{(1-y)^2},\quad "
-              r"\frac{p}{2}\, q^{p-2}(1-q)^2 = y\, T^2,\quad m = \frac{(1-y)(1-q)}{y\, q}",
-              f"{_CS}; {_CLN}"),
-        sym("Static transition (m = 1, q_s = 1 - y)",
-            sp.Eq(sp.Symbol("T_s"), sp.sqrt(p * y / 2) * (1 - y)**(p / 2 - 1)),
-            Check((p, y), lambda k, yy: F.pspin_critical_temperature(int(k)), ys, "rhs")),
-        sym("Dynamic (mode-coupling) transition",
-            sp.Eq(sp.Symbol("T_d"), sp.sqrt(p * (p - 2)**(p - 2) / (2 * (p - 1)**(p - 1)))),
-            Check((p,), lambda k: F.pspin_critical_temperature(int(k), kind="dynamic"),
-                  ((3,), (4,), (5,)), "rhs")),
-        sym("Energy per spin (p = 3)", sp.Eq(sp.Symbol("e"),
-                                              -(F._B / 2) * (1 + (F._M - 1) * F._Q**3)),
-            Check((F._Q0, F._Q, F._M, F._B), lambda q0, q, m, b:
-                  F.pspin_spherical_1rsb(3, b).e, sols, "rhs", slow=True)),
-    ]
-
-
 # ---- perceptron (Gardner) --------------------------------------------------------------
 def perceptron(route):
     if route == "cavity":
@@ -364,8 +332,15 @@ def hopfield(route):
     ]
 
 
-_ENTRIES = {"rem": rem, "sk": sk, "pspin": pspin, "perceptron": perceptron,
-            "teacher_student": teacher_student, "hopfield": hopfield}
+def _pspin(name):
+    def blocks(route):
+        from . import latex_pspin
+        return getattr(latex_pspin, name)(route)
+    return blocks
+
+
+_ENTRIES = {"rem": rem, "sk": sk, "pspin": _pspin("pspin"), "ising_pspin": _pspin("ising_pspin"),
+            "perceptron": perceptron, "teacher_student": teacher_student, "hopfield": hopfield}
 
 
 @lru_cache(maxsize=None)

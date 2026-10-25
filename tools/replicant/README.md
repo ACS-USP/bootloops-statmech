@@ -14,7 +14,7 @@ From the repository root:
 
 ```
 python3 tools/replicant/selftest.py                        # default battery, about 16 s
-cd tools && python3 -m replicant list                      # the 7 catalog entries
+cd tools && python3 -m replicant list                      # the 8 catalog entries
 python3 -m replicant run perceptron --param alpha=1.5 --out /tmp/result.json --latex /tmp/p.tex
 ```
 
@@ -35,14 +35,16 @@ compile the derivation.
   stationarity), the derived replicon (`derive_replicon*.py`: SK, perceptrons, Hopfield), the
   solver for the derived equations, and the 1RSB functional (`derive_rsb*.py`, `gauss_rsb.py`,
   `solve_derived_rsb.py`, `_rsb_num.py`; composer route `compose_rsb.py`, `--param ansatz=1rsb`).
-- `families/`: level (b), the published pipelines (SK, REM, p-spin, perceptron, teacher-student,
-  Hopfield, Parisi full RSB).
+- `families/`: level (b), the published pipelines (SK, REM, spherical and Ising p-spin,
+  perceptron, teacher-student, Hopfield, Parisi full RSB); `families/gardner.py`: the 1RSB replicon
+  (stability toward further RSB, the Gardner transition) for the two p-spin entries.
 - `cavity/`: dense cavity, sparse BP / population dynamics, sparse 1RSB.
 - `amp/`: AMP, state evolution and the TAP free energy for SK, GAMP and its state evolution for the
   teacher-student perceptron (finite N, statistical; independent of the replica and cavity code);
   catalog route `amp` (`catalog_amp.py`, `latex_amp.py`) for `sk` and `teacher_student`.
 - `catalog*.py`, `compose.py` (+ `compose_result.py`: `Result` and the finality rule), `cli.py`,
-  `__main__.py`: the 7-entry catalog (`catalog_ts.py` holds the teacher-student entry), the composer,
+  `__main__.py`: the 8-entry catalog (`catalog_ts.py` holds the teacher-student entry,
+  `catalog_pspin.py` the two p-spin entries; LaTeX in `latex_pspin.py`), the composer,
   the command line.
 - `latex*.py`, `tex*.py`, `derive_tex.py`: the LaTeX derivation writer.
 - `tests/`, `selftest.py`: the battery.

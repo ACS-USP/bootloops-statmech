@@ -269,6 +269,7 @@ _DOCUMENTED = {
     ("sk", "replica"): {"beta", "h", "fullrsb", "ansatz"},
     ("sk", "cavity"): {"beta", "h"},
     ("pspin", "replica"): {"p", "beta"},
+    ("ising_pspin", "replica"): {"p", "beta"},
     ("perceptron", "replica"): {"alpha", "kappa"},
     ("perceptron", "cavity"): {"alpha", "kappa"},
     ("teacher_student", "replica"): {"alpha", "learning"},
