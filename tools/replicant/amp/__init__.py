@@ -10,7 +10,8 @@ cavity code (this subpackage imports only numpy, mpmath and replicant.core).
   sk_tap_gradient(m, J, beta, h, *, onsager)      -> N d phi_TAP / d m
   tap_fixed_point(J, beta, h, *, seed, ...)       -> TAPResult
 See amp/sk.py for conventions and the validity statement (SE is a theorem for Gaussian J
-at each fixed t; convergence of the iterates only at/below the AT line with h > 0).
+at each fixed t; convergence of the iterates only on the RS-stable side of the AT line,
+beta^2 E cosh^-4 <= 1, with h > 0).
 """
 from ._stats import Band, student_band
 from .sk import AMPEnsemble, AMPResult, check_matrix, sk_amp, sk_amp_ensemble, sk_matrix

@@ -7,7 +7,8 @@ phi_TAP(m) = -beta F_TAP(m) / N, with Q = <m, m> (amp/sk.py conventions):
     onsager="plefka":    (beta^2 / 4N) sum_{i != j} J_ij^2 (1 - m_i^2)(1 - m_j^2)
     onsager="none":      0 (naive mean field; the positive control).
 The averaged form is Fan, Mei & Montanari, "TAP free energy, spin glasses, and variational
-inference", Ann. Probab. 49, 1 (2021), arXiv:1808.07890, eq. (1.6) (their F = -phi_TAP,
+inference", Ann. Probab. 49(1), 1-45 (2021), doi:10.1214/20-AOP1443 (Crossref),
+arXiv:1808.07890, eq. (1.6) (their F = -phi_TAP,
 Y = J, lambda = 0), whose stationarity condition is their eq. (1.7), the TAP equations
 m = tanh(beta h + beta J m - beta^2 (1 - Q) m) (Thouless, Anderson & Palmer, Phil. Mag. 35,
 593 (1977), not fetched).  The "plefka" form is the second-order term of Plefka's expansion

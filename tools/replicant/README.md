@@ -48,7 +48,7 @@ compile the derivation.
 
 - Default: `python3 tools/replicant/selftest.py` (282 tests, about 20 s). Also
   `python3 run_selftests.py replicant` from the repository root.
-- Full: `python3 tools/replicant/selftest.py --full` adds the 95 `@slow` tests (full RSB,
+- Full: `python3 tools/replicant/selftest.py --full` adds the 97 `@slow` tests (full RSB,
   population dynamics at reference sizes, solver-based checks); about 9-10 minutes on a laptop (measured 9 min 28 s).
 - `@slow` is a plain function attribute honoured by `selftest.py` only. pytest ignores the
   marker and would run every test, slow ones included.

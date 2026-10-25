@@ -213,7 +213,7 @@ ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 282 tests
 laptop; also `python3 run_selftests.py replicant`) covers the core and refusal paths, the symbolic
 derivation against independent expressions, level agreement (a)=(b) for every family where both exist,
 every catalog entry against its banked non-slow values, the cavity routes, the composer and the held-out
-models, the CLI and the LaTeX writer (displayed equations re-checked numerically). `--full` adds 95
+models, the CLI and the LaTeX writer (displayed equations re-checked numerically). `--full` adds 97
 `@slow` tests (full-RSB Parisi up to K = 9, population dynamics at reference sizes, the Hopfield replicon
 scans, the p-spin T -> 0 energy, solver-based composed and LaTeX checks, a PDF compile when a TeX engine
 is present) and takes about 9-10 minutes on a laptop (measured 9 min 28 s); run it before merging a
@@ -279,17 +279,28 @@ KNOWN HAZARDS:
   maximum of f with f_1RSB > f_RS.
 - AMP / state evolution / TAP (`amp/`): finite-N results are STATISTICAL (one run has no error bar;
   `sk_amp_ensemble` gives a 99% Student-t band over named seeds), never certified. SE is a theorem for
-  each fixed t as N -> oo for Gaussian J (Bayati-Montanari 2011, Thm 4; Bolthausen 2014); convergence of
-  the iterates is proved only at or below the AT line with h > 0 (Bolthausen Thm 2.1). At h = 0, beta > 1
-  the iterates do not converge (measured: increment 0.73 +- 0.12 at t = 10, N = 1500, two-time SE 0.706)
-  and any fixed point need not describe the equilibrium measure; the TAP equations then have
-  exponentially many solutions (and m = 0 at h = 0), so `tap_fixed_point` returns ONE of them. +-J:
-  universality is proved for polynomial nonlinearities only (Bayati-Lelarge-Montanari 2015, abstract
-  read); for tanh the +-J agreement is numerical. Finite-N convergence is slower than SE predicts (beta =
-  1.5, h = 0.8, N = 1500: one seed of six needs about 100 steps for an increment < 1e-10, SE predicts
-  about 45). Measured 99% bands at N = 1500, seeds 0-5: q +- 0.031 (h = 0.8, t = 100) and +- 0.015 (h =
-  0, t = 10); they exclude naive mean field and a +-10% error in the Onsager coefficient, not smaller
-  ones. damping changes the iterates (SE does not apply) but not the fixed points.
+  each fixed t as N -> oo for Gaussian J (Bayati-Montanari 2011, Thm 4; Bolthausen 2014); Thm 4 is stated
+  for a GOE-type matrix with diagonal variance 2/N, the code uses a zero diagonal (as Bolthausen's g):
+  an O(N^-1/2) operator-norm perturbation not literally covered by Thm 4 as stated. Convergence of the
+  iterates is proved only on the RS-stable side of the AT line (beta^2 E cosh^-4 <= 1) with h > 0
+  (Bolthausen Thm 2.1). At h = 0, beta > 1 the iterates do not converge (measured: increment 0.73 +-
+  0.12 at t = 10, N = 1500, two-time SE 0.706) and any fixed point need not describe the equilibrium
+  measure; the TAP equations then have exponentially many solutions (and m = 0 at h = 0), so
+  `tap_fixed_point` returns ONE of them. +-J: not covered by Bayati-Lelarge-Montanari 2015 (polynomial
+  nonlinearities; abstract read); Chen & Lam, arXiv:2003.10431, claim universality for Lipschitz
+  iterations with a symmetric random matrix (abstract only; entry assumptions not checked); the +-J
+  test is numerical evidence. Measured 99% bands at N = 1500, seeds 0-5: q +- 0.031 (h = 0.8, t = 100)
+  and +- 0.015 (h = 0, t = 10). At h = 0 the comparison is at t = 10 because SE is a fixed-t statement
+  there and at t = 20-40 the finite-N spread roughly triples (+- 0.044). At h = 0.8 finite-N
+  convergence is slower than SE predicts (one seed of six needs about 100 steps for an increment
+  < 1e-10, SE about 45), hence t = 100 there. Resolving power (`test_onsager_coefficient_resolution`,
+  slow): the Onsager coefficient scaled by 0.9 or 1.1 falls outside both bands, x0.95 only outside the
+  h = 0 band, x0.97 and x1.05 inside both (measured with the same hook and seeds): errors below
+  about 10% are not excluded. The TAP free-energy band (+- 0.0215 at beta = 1.5, h = 0.8) excludes only
+  errors of about 25% or more in the (beta^2/4)(1 - Q)^2 term (that term is about 0.086 there); the
+  stationarity check (directional derivatives of the functional at the AMP fixed point, < 1e-2 vs > 1
+  without the term) is the sharper detector. damping changes the iterates (SE does not apply) but not
+  the fixed points.
 - Root searches are seeded: a saddle may be missed; the solver refuses with `ambiguous:several-saddles`
   when it sees more than one, but absence of that refusal is not a proof there is only one.
 - Population dynamics near `T_c`: the spin-glass label is trustworthy only for `beta/beta_c <~ 0.95` or
@@ -349,7 +360,7 @@ learning [SST92] [OH91] [Gyo90] [BTG97] and its proof [BKMMZ19]; Hopfield model 
 RSB analysis of [SK94]; the Viana-Bray model [VB85], the sparse cavity and population-dynamics method
 [MP01] [MP03] and the transition conditions [MK04] [GT03]; the dense cavity method [MPV87] with
 [TAP77]; AMP, state evolution and the TAP free energy (`amp/`) follow [Bol14] [BM11] [FMM18] with
-[Ple82], universality [BLM15] and TAP complexity [BM80]. The universality of the SK free energy used in the held-out test is [CH04]. Reference digits are read
+[Ple82], universality [BLM15] [CL20] and TAP complexity [BM80]. The universality of the SK free energy used in the held-out test is [CH04]. Reference digits are read
 from [Sto25] [OSS07] [CRT03] [SY17] [DM15] [FP16] [Gyo01] [PRGE20] [Cov65] [Bar97] as stated in the bank
 cites. The typed-step architecture, the symbolic level (a), the composer, the refusal and
 finality discipline and the LaTeX writer are ours. Each bank entry names the source its digits were

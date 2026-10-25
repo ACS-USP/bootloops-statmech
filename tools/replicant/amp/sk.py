@@ -22,13 +22,17 @@ the SE no longer describes the iterates (the Onsager coefficient is for d = 0).
 Status and validity (stated in every result note): finite-N iterates are STATISTICAL,
 never certified; a single run carries no error bar (sk_amp_ensemble gives a 99% Student-t
 band over named seeds).  SE is a theorem for each fixed t as N -> oo for Gaussian J
-(Bayati-Montanari Thm 4; Bolthausen for tanh started at the SE fixed point); convergence
-of the iterates as t -> oo is proved only at or below the AT line with h > 0 (Bolthausen
-Thm 2.1).  In the spin-glass phase (h = 0, beta > 1) the iterates need not converge, and
-any fixed point need not describe the equilibrium measure.  +-J: universality of the
-iterates is proved for polynomial nonlinearities (Bayati, Lelarge & Montanari, Ann. Appl.
-Probab. 25, 753 (2015), arXiv:1207.7321, abstract read); tanh is not polynomial, so
-agreement for +-J is numerical evidence here, not a theorem.
+(Bayati-Montanari Thm 4; Bolthausen for tanh started at the SE fixed point).  Bayati-
+Montanari Thm 4 is stated for a GOE-type G with diagonal variance 2/N; the code uses a zero
+diagonal (Bolthausen's g has zero diagonal): the diagonal is an O(N^-1/2) operator-norm
+perturbation not literally covered by Thm 4 as stated.  Convergence of the iterates as
+t -> oo is proved only on the RS-stable side of the AT line (beta^2 E cosh^-4 <= 1) with
+h > 0 (Bolthausen Thm 2.1).  In the spin-glass phase (h = 0, beta > 1) the iterates need
+not converge, and any fixed point need not describe the equilibrium measure.  +-J: not
+covered by Bayati, Lelarge & Montanari (Ann. Appl. Probab. 25, 753 (2015), arXiv:1207.7321,
+abstract read: polynomial nonlinearities); Chen & Lam (arXiv:2003.10431, abstract only;
+entry assumptions not checked) claim universality for Lipschitz iterations with a
+symmetric random matrix.  The +-J test is numerical evidence, not a theorem application.
 """
 import math
 from dataclasses import dataclass, field
@@ -44,10 +48,13 @@ INITS = ("random", "bolthausen")
 _VALIDITY = (
     "statistical (finite N, one matrix, one seed; not certified).  SE holds for each fixed t "
     "as N -> oo for Gaussian J (Bayati-Montanari 2011 Thm 4; Bolthausen 2014); convergence "
-    "of the iterates is a theorem only at/below the AT line with h > 0 (Bolthausen Thm 2.1); "
-    "for h = 0, beta > 1 the iterates need not converge and a fixed point need not be the "
-    "equilibrium state; +-J: universality proved for polynomial nonlinearities only "
-    "(Bayati-Lelarge-Montanari 2015), tanh is not covered")
+    "of the iterates is a theorem only on the RS-stable side of the AT line (beta^2 E "
+    "cosh^-4 <= 1) with h > 0 (Bolthausen Thm 2.1); for h = 0, beta > 1 the iterates need "
+    "not converge and a fixed point need not be the equilibrium state; +-J: not covered by "
+    "Bayati-Lelarge-Montanari 2015 (polynomial nonlinearities); Chen-Lam arXiv:2003.10431 "
+    "claim universality for Lipschitz iterations (abstract only, assumptions not checked); "
+    "the +-J agreement is numerical evidence")
+_onsager_scale = 1.0    # private: tests plant 0.9 / 1.1 to measure what the bands resolve
 
 
 @dataclass
@@ -153,7 +160,7 @@ def sk_amp(J, beta, *, iters, seed, damping=None, h=0.0, reaction=True, init="ra
     m_old = np.zeros(N)
     qs, incs = [float(m @ m / N)], []
     for _ in range(iters):
-        lam = b * (1 - qs[-1]) if reaction else 0.0
+        lam = _onsager_scale * b * (1 - qs[-1]) if reaction else 0.0
         x = J @ m - lam * m_old
         new = np.tanh(b * (hh + x))
         if damping:

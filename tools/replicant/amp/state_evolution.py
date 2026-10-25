@@ -9,8 +9,9 @@ Sec. 4, eq. (4.2), there tau_{t+1}^2 = E f(tau_t Z)^2):
 F is increasing, so from Q_0 = 1 the recursion decreases monotonically to the largest
 fixed point.  All fixed points in [0, 1] found by a grid scan are listed with their SE
 slope F'(q) (q = 0 is one at h = 0: unstable for beta > 1).
-Two-time SE (consecutive iterates; Bolthausen, Commun. Math. Phys. 325, 333 (2014),
-arXiv:1201.2891, Lemma 2.2, his psi): (X_{t+1}, X_t) centred Gaussian with covariance
+Two-time SE (consecutive iterates; Bolthausen, Commun. Math. Phys. 325, 333-366
+(2014), doi:10.1007/s00220-013-1862-3, arXiv:1201.2891, Lemma 2.2, his psi):
+(X_{t+1}, X_t) centred Gaussian with covariance
 [[Q_t, D_t], [D_t, Q_{t-1}]], Q_{t+1} = E f(X_{t+1})^2, D_{t+1} = E f(X_{t+1}) f(X_t),
 D_1 = mean(m^0) E f(sqrt(Q_0) Z) (x^1 = J m^0 is asymptotically independent of m^0).
 The predicted increment <m^t - m^{t-1}, m^t - m^{t-1}> = Q_t + Q_{t-1} - 2 D_t.
@@ -23,7 +24,7 @@ Status: SE is an N -> oo statement for each fixed t (a theorem for Gaussian J, t
 references above); it is NOT a statement about the Gibbs measure.  Numbers here are
 deterministic float64 quadrature: the trajectory, the fixed-point polish (secant) and
 the grid scan with a 120-node Gauss-Hermite rule; the polished fixed point is audited with
-an independent rule (adaptive mpmath quadrature, |F(q) - q| <= 1e-12, and within 1e-8 of
+an independent rule (adaptive mpmath quadrature, |F(q) - q| <= 1e-15, and within 1e-8 of
 the trajectory end, else the result says not converged); the two-time map with an
 80 x 80 Gauss-Hermite product rule.  q carries float64 accuracy (~1e-13).
 """
@@ -238,7 +239,8 @@ def sk_state_evolution(beta, h=0, *, q0=1, iters=None, tol=1e-13) -> SEResult:
                 "AMP iterates predicted to converge (Bolthausen Thm 2.1, h > 0)" if conv else
                 "AMP iterates predicted NOT to converge (h = 0: psi(0) = 0, a zero-mean start "
                 "decorrelates successive iterates)" if hh == 0 else
-                "AMP iterates predicted NOT to converge (psi'(q) >= 1: beyond the AT line)"))
+                "AMP iterates predicted NOT to converge (psi'(q) >= 1: on the RS-unstable side of "
+                "the AT line)"))
         elif converged:
             conv = True
             note.append("q = 0 (paramagnet): Q_t -> 0, so the increments vanish")

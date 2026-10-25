@@ -43,15 +43,13 @@ def _inside(band, x):
 
 # ---- state evolution (default tier) ---------------------------------------------------
 def test_state_evolution_fixed_point_equals_rs_q():
-    from replicant.agree import default_spec
-    from replicant.solve_derived import solve_derived_rs
+    """Default tier: one point against sk_rs (target).  The derived RS q and the h != 0
+    point are in the slow test below (budget)."""
     dps = mp.mp.dps
     se = A.sk_state_evolution("1.5")
     assert se.converged and se.q > mp.mpf("0.3"), se
     ref = sk_rs("1.5")                                    # comparison target only
     assert abs(se.q - ref.q) < mp.mpf("1e-10"), (se.q, ref.q)
-    der = solve_derived_rs(default_spec("sk"), beta="1.5", h=0, branch="nontrivial", dps=12)
-    assert abs(se.q - der.values["q"]) < mp.mpf("1e-10"), (se.q, der.values)
     # h = 0, beta > 1: q = 0 is also a fixed point (SE-unstable, slope beta^2); both listed
     assert [float(p.q) for p in se.fixed_points][0] == 0.0 and len(se.fixed_points) == 2
     assert abs(se.fixed_points[0].slope - mp.mpf("2.25")) < mp.mpf("1e-6")
@@ -60,24 +58,39 @@ def test_state_evolution_fixed_point_equals_rs_q():
     tr = se.trajectory
     assert tr[0] == 1 and all(a >= b for a, b in zip(tr, tr[1:])), tr[:5]
     assert abs(tr[-1] - float(se.q)) < 1e-9
-    # with a field: one fixed point, equal to the RS q
+    # with a field: one fixed point, the trajectory's limit
     se1 = A.sk_state_evolution("1.5", "0.8")
-    assert len(se1.fixed_points) == 1 and abs(se1.q - sk_rs("1.5", "0.8").q) < 1e-10
+    assert len(se1.fixed_points) == 1 and se1.fixed_points[0].q == se1.q and se1.converged
     assert mp.mp.dps == dps
+
+
+@slow
+def test_state_evolution_fixed_point_equals_derived_rs_q():
+    """The SE fixed point against the derived RS q (level (a), dps 12) at beta = 1.5,
+    h = 0, and against sk_rs and the AT eigenvalue at h = 0.8 (comparison targets)."""
+    from replicant.agree import default_spec
+    from replicant.solve_derived import solve_derived_rs
+    se = A.sk_state_evolution("1.5")
+    der = solve_derived_rs(default_spec("sk"), beta="1.5", h=0, branch="nontrivial", dps=12)
+    assert abs(se.q - der.values["q"]) < mp.mpf("1e-10"), (se.q, der.values)
+    se1 = A.sk_state_evolution("1.5", "0.8")
+    assert abs(se1.q - sk_rs("1.5", "0.8").q) < 1e-10, se1.q
+    assert abs((1 - se1.corr_slope) - sk_replicon("1.5", "0.8")) < 1e-5, se1.corr_slope
 
 
 def test_two_time_slope_is_the_at_eigenvalue():
     """Bolthausen's psi'(q) (the correlation map between successive iterates), computed
-    by differencing the bivariate SE map, equals 1 - lambda_AT (sk_replicon: target)."""
-    for b, h in (("1.5", "0"), ("1.5", "0.8")):
-        se = A.sk_state_evolution(b, h)
-        lam = sk_replicon(b, h)
-        assert abs((1 - se.corr_slope) - lam) < 1e-5, (b, h, se.corr_slope, lam)
+    by differencing the bivariate SE map, equals 1 - lambda_AT (sk_replicon: target;
+    h = 0.8 in the slow test above)."""
+    se = A.sk_state_evolution("1.5")
+    lam = sk_replicon("1.5")
+    assert abs((1 - se.corr_slope) - lam) < 1e-5, (se.corr_slope, lam)
     assert A.sk_state_evolution("1.5", "0.8").amp_converges is True
     assert A.sk_state_evolution("1.5").amp_converges is False
 
 
 def test_planted_error_in_state_evolution_is_caught():
+    ref = A.sk_state_evolution("1.5").q               # unplanted engine
     good = SE._field
     SE._field = lambda b, h, q, z: b * (h + (2 * q)**0.5 * z)    # doubled field variance
     try:
@@ -85,7 +98,7 @@ def test_planted_error_in_state_evolution_is_caught():
     finally:
         SE._field = good
     assert SE._field is good
-    assert abs(bad.q - sk_rs("1.5").q) > mp.mpf("0.05"), bad.q
+    assert abs(bad.q - ref) > mp.mpf("0.05"), (bad.q, ref)
 
 
 def test_state_evolution_paramagnet():
@@ -179,12 +192,17 @@ def _amp_band(law, beta, h, t, *, reaction=True):
 
 @slow
 def test_amp_finite_N_matches_state_evolution():
-    """Gaussian J, N = 1500, seeds 0-5.  (a) beta = 1.5, h = 0.8 (above the AT line,
-    lambda_AT = 0.40): q_t at t = 100 against the SE fixed point; every run converged, as
-    the two-time SE predicts.  (b) beta = 1.5, h = 0 (AT-unstable): q_t at t = 10 against
+    """Gaussian J, N = 1500, seeds 0-5.  (a) beta = 1.5, h = 0.8 (on the RS-stable side of
+    the AT line, beta^2 E cosh^-4 <= 1; lambda_AT = 0.40): q_t at t = 100 against the SE
+    fixed point; every run converged, as the two-time SE predicts.  (b) beta = 1.5, h = 0
+    (AT-unstable): q_t at t = 10 against
     the SE trajectory from the same initial law; the runs do NOT converge, and the
     increment matches the two-time SE value 2 q*.  Positive control: naive mean field (no
-    Onsager term) falls outside both bands."""
+    Onsager term) falls outside both bands.  Why t = 10 at h = 0: SE is a fixed-t statement
+    and the iterates do not converge there; at t = 20-40 the finite-N spread roughly
+    triples (+-0.044).  Why t = 100 at h = 0.8: finite-N convergence is slower than SE
+    predicts (one seed needs ~100 steps for an increment < 1e-10, SE ~45); that remark
+    is about h = 0.8 only."""
     for beta, h, t in ((1.5, 0.8, 100), (1.5, 0.0, 10)):
         se = A.sk_state_evolution(beta, h, q0=A.random_init_q(beta, h), iters=t)
         target = se.trajectory[t]
@@ -208,6 +226,30 @@ def test_amp_finite_N_matches_state_evolution():
 
 
 @slow
+def test_onsager_coefficient_resolution():
+    """What the q bands resolve (Gaussian J, N = 1500, seeds 0-5, 99% Student-t): the
+    Onsager coefficient scaled by 0.9 or 1.1 (private engine hook AS._onsager_scale, used
+    only here, restored in finally) moves the ensemble mean OUTSIDE both bands, at
+    beta = 1.5, h = 0.8, t = 100 (band +-0.031) and h = 0, t = 10 (band +-0.015).
+    Measured with the same hook and seeds: x0.95 is outside only at h = 0 (0.3935 vs
+    0.3615 +- 0.0148; 0.6335 inside at h = 0.8); x0.97 and x1.05 fall inside both, so
+    errors below ~10% are NOT excluded by these bands."""
+    good = AS._onsager_scale
+    for beta, h, t in ((1.5, 0.8, 100), (1.5, 0.0, 10)):
+        ref = _amp_band("gaussian", beta, h, t).band
+        for scale in (0.9, 1.1):
+            AS._onsager_scale = scale
+            try:
+                bad = _amp_band("gaussian", beta, h, t).band
+            finally:
+                AS._onsager_scale = good
+            assert AS._onsager_scale is good
+            print(f"Onsager x{scale} beta={beta} h={h} t={t}: q = {bad.mean:.4f} vs band "
+                  f"{ref.mean:.4f} +- {ref.half_width:.4f}")
+            assert not _inside(ref, bad.mean), (scale, beta, h, bad, ref)
+
+
+@slow
 def test_pm_one_matrix_universality():
     """+-1/sqrt(N) couplings: the same q within the band (numerical universality; the
     theorem of Bayati-Lelarge-Montanari covers polynomial nonlinearities only)."""
@@ -227,7 +269,9 @@ def test_tap_free_energy_stationary_at_amp_fixed_point():
     functional is stationary (directional finite differences ~ 0; the naive functional is
     not); phi_TAP per spin lies in the Student-t band around the RS -beta f (sk_rs:
     target); the naive functional at the same points does not; tap_fixed_point polishes
-    the AMP iterate by Newton and gives the same phi."""
+    the AMP iterate by Newton and gives the same phi.  Resolving power: the phi band
+    (+-0.0215) excludes only errors of ~25% or more in the (beta^2/4)(1 - Q)^2 term (~0.086
+    here); the stationarity check (< 1e-2 vs > 1 without the term) is the sharper detector."""
     beta, h = 1.5, 0.8
     phis, naive, plefka = [], [], []
     for s in SEEDS:
