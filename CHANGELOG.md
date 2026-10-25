@@ -38,6 +38,17 @@ All notable changes to BootLoops are recorded here. The format follows
   (`solve_derived_1rsb`); composer route `ansatz=1rsb` (values never final). Checked against the SK
   family 1RSB (T = 0 and finite T, 1e-8) and the banked Krauth-Mezard frozen capacity of the Ising
   perceptron; each rule against brute force at integer n.
+- `replicant` (E3a): AMP, state evolution and the TAP free energy for SK (`replicant.amp`), a finite-N
+  route that imports none of the replica or cavity code: Bolthausen's iteration with the Onsager term
+  for Gaussian and +-J matrices (`sk_amp`, `sk_amp_ensemble` with 99% Student-t bands over named
+  seeds), the scalar and two-time state evolution (`sk_state_evolution`, all fixed points listed, the
+  predicted AMP convergence from psi'(q)), the TAP free energy (averaged, Plefka and naive forms) and
+  TAP fixed points. Checked: the SE fixed point equals the RS q of `families/sk.py` and of the derived
+  RS equations (1e-10); psi'(q) equals 1 - lambda_AT (1e-5); at N = 1500 the AMP q lies in the band
+  around the SE value for both coupling laws while naive mean field does not; the TAP functional is
+  stationary at the AMP fixed point and its value lies in the band around the RS -beta f. Statistical,
+  not certified; validity statements (SE theorem for Gaussian J, convergence only above the AT line,
+  many TAP solutions at low temperature) are in the GUIDE. No catalog route yet.
 
 ## 1.0.1 (2026-10-09)
 

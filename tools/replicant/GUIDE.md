@@ -32,7 +32,8 @@ NOT-FOR:
   Nothing here is "certified". The only theorem-level statement is a value flagged
   `exact-by-literature`, which rests on the cited paper, not on this package.
 - Population-dynamics results are statistical (value +- stderr over independent runs), never certified.
-- Dynamics, TAP, DMFT, or quantum models (excluded from v1; TAP is explicitly out).
+- Dynamics beyond AMP, DMFT, or quantum models. AMP, state evolution and the TAP free energy exist for
+  SK only, as the finite-N Python module `amp/` (no catalog entry or CLI route yet).
 - Automatic discovery of the RSB structure: the ansatz is an input; RS stability is computed or reported
   as unknown, and there is no search for the right ansatz.
 - A model with no level-(a) hook (families: `sk`, `perceptron`, `hopfield`; variables `ising`,
@@ -102,6 +103,22 @@ solved, every audited root in `roots`, `stable` always None; `derive_rsb.derived
 is the functional itself);
 `from replicant.derive_replicon import derived_replicon` (`derived_replicon(spec, solution_or_mapping)`:
 the level-(a) replicon at an RS solution, a mapping first checked to be a root of the derived equations);
+`from replicant import amp` (SK AMP / state evolution / TAP, an independent finite-N route that imports
+none of the replica or cavity code; `amp/sk.py` states the conventions): `amp.sk_matrix(N, seed, law)`
+(`gaussian` or `pm_one`, variance 1/N, zero diagonal); `amp.sk_amp(J, beta, *, iters, seed, h=0,
+damping=None, reaction=True, init="random")` -> `AMPResult(m, q_trace, converged, increments, ...)`
+(x^{t+1} = J m^t - beta (1 - Q_t) m^{t-1}, m = tanh(beta (h + x)); `reaction=False` is naive mean field);
+`amp.sk_amp_ensemble(N, beta, h, *, seeds, iters, law)` (99% Student-t band over named seeds);
+`amp.sk_state_evolution(beta, h=0, *, q0=1, iters=None)` -> `SEResult(q, trajectory, fixed_points,
+corr_slope, amp_converges, ...)`; `amp.sk_two_time_state_evolution(beta, h, *, iters)` (predicted
+increments between successive iterates); `amp.sk_tap_free_energy(m, J, beta, h=0, *,
+onsager="averaged"|"plefka"|"none")` -> mpf phi_TAP = -beta F_TAP / N; `amp.sk_tap_gradient`;
+`amp.tap_fixed_point(J, beta, h=0, *, seed)` -> `TAPResult` (AMP then Newton on the TAP equations).
+Example: `J = amp.sk_matrix(1500, 0); r = amp.sk_amp(J, 1.5, h=0.8, iters=150, seed=0)` -> `r.converged`
+True, `r.q_trace[-1]` 0.5895 (one seed; the seeds 0-5 band is 0.609 +- 0.031, SE q* 0.613094);
+refusals `precondition:symmetric-matrix`, `:zero-diagonal`, `:coupling-variance`, `:beta-nonnegative`,
+`:known-init`, `:positive-iters`, `:damping-range`, `:known-law`, `:known-onsager`,
+`:magnetization-range`, `no-convergence:tap`.
 `from replicant.latex import render_latex, write_latex` (`write_latex(result, path, pdf=False)`; a
 `Refusal` is also accepted and writes its partial derivation).
 
@@ -151,7 +168,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `not-final:<ansatz>` | `require_final`: a non-RS value that is not final |
 | `no-solution`, `no-solution:audit`, `:solver`, `:bracket`, `:retrieval`, `:retrieval-fold`, `:paramagnet`, `:spinglass`, `:no-maximum`, `:negative-entropy`, `:rs-t0`, `:graph`, `:estimator-mismatch` | no saddle/root in the searched range, or a found one fails its audit (residual, non-finite output, divergence) |
 | `ambiguous:several-saddles` | more than one RS saddle found and no branch chosen: name one with `--param branch=...` |
-| `no-convergence`, `no-convergence:equilibration` | BP or a survey did not converge; a population-dynamics run is still drifting and `require_equilibrated` is set |
+| `no-convergence`, `no-convergence:equilibration`, `:tap` | BP or a survey did not converge; a population-dynamics run is still drifting and `require_equilibrated` is set; `amp.tap_fixed_point`: Newton from the AMP iterate left the TAP residual above tol |
 | `no-transition` | the branching number rules out a spin-glass transition |
 | `unsupported:degree-law`, `unsupported:J-law` | a graph/coupling law the sparse code does not implement |
 | `not-implemented:annealed`, `:cavity-ising`, `:spherical-rsb` | the named case is outside v1 |
@@ -192,11 +209,11 @@ banked in `reference/perceptron.json` as independent targets. Honest limits:
 - The annealed bound does not detect the spherical-site swap (the other checks do).
 - Enumeration slack c/N with c = 1 is an assumption of the test.
 
-ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 274 tests, about 19 s on a
+ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 282 tests, about 20 s on a
 laptop; also `python3 run_selftests.py replicant`) covers the core and refusal paths, the symbolic
 derivation against independent expressions, level agreement (a)=(b) for every family where both exist,
 every catalog entry against its banked non-slow values, the cavity routes, the composer and the held-out
-models, the CLI and the LaTeX writer (displayed equations re-checked numerically). `--full` adds 91
+models, the CLI and the LaTeX writer (displayed equations re-checked numerically). `--full` adds 95
 `@slow` tests (full-RSB Parisi up to K = 9, population dynamics at reference sizes, the Hopfield replicon
 scans, the p-spin T -> 0 energy, solver-based composed and LaTeX checks, a PDF compile when a TeX engine
 is present) and takes about 9-10 minutes on a laptop (measured 9 min 28 s); run it before merging a
@@ -260,6 +277,19 @@ KNOWN HAZARDS:
   1RSB: no independent target and nothing banked (its T = 0 limit is refused, so no code route could
   check a published T = 0 value); the finite-T spin-glass root at alpha = 0.05, beta = 3 is a local
   maximum of f with f_1RSB > f_RS.
+- AMP / state evolution / TAP (`amp/`): finite-N results are STATISTICAL (one run has no error bar;
+  `sk_amp_ensemble` gives a 99% Student-t band over named seeds), never certified. SE is a theorem for
+  each fixed t as N -> oo for Gaussian J (Bayati-Montanari 2011, Thm 4; Bolthausen 2014); convergence of
+  the iterates is proved only at or below the AT line with h > 0 (Bolthausen Thm 2.1). At h = 0, beta > 1
+  the iterates do not converge (measured: increment 0.73 +- 0.12 at t = 10, N = 1500, two-time SE 0.706)
+  and any fixed point need not describe the equilibrium measure; the TAP equations then have
+  exponentially many solutions (and m = 0 at h = 0), so `tap_fixed_point` returns ONE of them. +-J:
+  universality is proved for polynomial nonlinearities only (Bayati-Lelarge-Montanari 2015, abstract
+  read); for tanh the +-J agreement is numerical. Finite-N convergence is slower than SE predicts (beta =
+  1.5, h = 0.8, N = 1500: one seed of six needs about 100 steps for an increment < 1e-10, SE predicts
+  about 45). Measured 99% bands at N = 1500, seeds 0-5: q +- 0.031 (h = 0.8, t = 100) and +- 0.015 (h =
+  0, t = 10); they exclude naive mean field and a +-10% error in the Onsager coefficient, not smaller
+  ones. damping changes the iterates (SE does not apply) but not the fixed points.
 - Root searches are seeded: a saddle may be missed; the solver refuses with `ambiguous:several-saddles`
   when it sees more than one, but absence of that refusal is not a proof there is only one.
 - Population dynamics near `T_c`: the spin-glass label is trustworthy only for `beta/beta_c <~ 0.95` or
@@ -318,7 +348,8 @@ energy model [Der80] [Der81]; the spherical p-spin [CS92] with [CC05] [CLN17]; t
 learning [SST92] [OH91] [Gyo90] [BTG97] and its proof [BKMMZ19]; Hopfield model [AGS85] [AGS87] with the
 RSB analysis of [SK94]; the Viana-Bray model [VB85], the sparse cavity and population-dynamics method
 [MP01] [MP03] and the transition conditions [MK04] [GT03]; the dense cavity method [MPV87] with
-[TAP77]. The universality of the SK free energy used in the held-out test is [CH04]. Reference digits are read
+[TAP77]; AMP, state evolution and the TAP free energy (`amp/`) follow [Bol14] [BM11] [FMM18] with
+[Ple82], universality [BLM15] and TAP complexity [BM80]. The universality of the SK free energy used in the held-out test is [CH04]. Reference digits are read
 from [Sto25] [OSS07] [CRT03] [SY17] [DM15] [FP16] [Gyo01] [PRGE20] [Cov65] [Bar97] as stated in the bank
 cites. The typed-step architecture, the symbolic level (a), the composer, the refusal and
 finality discipline and the LaTeX writer are ours. Each bank entry names the source its digits were
