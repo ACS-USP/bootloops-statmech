@@ -186,6 +186,31 @@ def test_spiked_se_near_the_threshold():
                      "--param", "prior=rademacher"], out, err) == 0, err.getvalue()
 
 
+def test_spiked_se_below_the_root_search_floor_is_not_final():
+    """Fix round 2: for lambda > 1 with the nontrivial root below the search floor (gamma* ~ lambda^2
+    - 1 < 1e-9 lambda^2, i.e. 1 < lambda < about 1 + 5e-10) the reported gamma = 0 is a floor, not
+    the fixed point (LM: q* > 0 for every lambda > 1): flagged and not final.  lambda <= 1 keeps
+    gamma = 0 exact; 1 + 1e-8 and 1.00001 resolve the root and stay final."""
+    e = catalog()["spiked_wigner"]
+    for prior in ("gaussian", "rademacher"):
+        se = S.spiked_state_evolution("1.0000000001", prior)
+        assert se.below_floor and se.q == 0 and "floor" in se.note, se
+        res = compose(e.spec, "amp").run(snr="1.0000000001", prior=prior)
+        assert not res.final and res.values["se_below_floor"]
+        for k in ("gamma_se", "q_se", "overlap_se", "mmse_se", "matrix_mmse_se"):
+            st = res.finality[k]
+            assert st.state == "not-computed" and "below the root-search floor" in st.note, (k, st)
+        assert any("below the root-search floor" in n for n in res.notes), res.notes
+        for lam, want in (("1.00000001", 2e-8), ("1.00001", 2e-5)):
+            ok = compose(e.spec, "amp").run(snr=lam, prior=prior)
+            assert ok.final and not ok.values["se_below_floor"], (prior, lam)
+            assert abs(ok.values["q_se"] - want) < 1e-3 * want, (prior, lam, ok.values["q_se"])
+        for lam in ("0.9", "1"):
+            low = compose(e.spec, "amp").run(snr=lam, prior=prior)
+            assert low.values["q_se"] == 0 and not low.values["se_below_floor"]
+            assert low.finality["q_se"].state == ("exact-by-literature" if lam == "0.9" else "not-computed")
+
+
 # ---- finite N ----------------------------------------------------------------------------------
 def test_spiked_matrix_normalisation():
     Y, x = S.spiked_matrix(400, "2", "rademacher", 0)

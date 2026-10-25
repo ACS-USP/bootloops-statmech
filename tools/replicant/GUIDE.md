@@ -676,7 +676,8 @@ KNOWN HAZARDS:
   hook, a trapezoid rule over G (Gauss-Hermite with 101 nodes was off by 3e-7 at gamma = 3.7) and
   1 - mmse = 2 E[X F] - E[F^2] (no cancellation against E X^2 = 1: computing mmse first gave a
   spurious root gamma ~ 1e-7 at lambda = 1 and a crash at 0.99999); roots below 1e-9 lambda^2 are
-  not searched (|lambda^2 - 1| below about 1e-9 reports gamma = 0). The code reports the largest
+  not searched: for 1 < lambda < about 1 + 5e-10 the SE reports gamma = 0 with `se_below_floor`
+  true and every SE value `not-computed` (a floor, not the fixed point; LM: q* > 0 for lambda > 1). The code reports the largest
   root, MV Thm 2 the smallest positive one (gamma_ALG): they coincide because several nontrivial
   roots are refused;
   planting the Gaussian denoiser y/(1 + 2 gamma) moves q out of the bank and makes the root

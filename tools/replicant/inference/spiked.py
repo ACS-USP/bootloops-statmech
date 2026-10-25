@@ -172,6 +172,7 @@ class SEResult:
     bayes: bool
     potential: float
     note: str = ""
+    below_floor: bool = False     # lambda > 1 but no root above the search floor: gamma = 0 is a floor
 
 
 def _roots(lam2, prior):
@@ -206,10 +207,15 @@ def spiked_state_evolution(snr, prior="gaussian") -> SEResult:
                                 float(spiked_potential(lam, gs - h, prior))) / (2 * h) < 1e-6
     bayes = bool(stationary and psi[gs] <= min(psi.values()) + 1e-13)
     q = gs / L2
+    below = bool(lam > 1 and len(roots) == 1)
     note = (f"largest SE fixed point gamma* = {gs:.12g} of {len(roots)} (gamma = 0 included); "
             f"{'' if bayes else 'NOT '}the global minimum of the RS potential (DAM Eq. (9))")
+    if below:
+        note = (f"lambda > 1 and below the root-search floor (gamma < 1e-9 lambda^2): reported gamma = 0 is a floor, not the fixed point (LM: q* > 0 for every lambda > 1; the nontrivial root "
+                "gamma* ~ lambda^2 - 1 is not resolved for 1 < lambda < about 1 + 5e-10)")
     roots = tuple(0 if r == 0 else r for r in roots)
-    return SEResult(lam, prior, gs, q, math.sqrt(q), 1 - q, 1 - q * q, roots, bayes, psi[gs], note)
+    return SEResult(lam, prior, gs, q, math.sqrt(q), 1 - q, 1 - q * q, roots, bayes, psi[gs], note,
+                    below)
 
 
 def spiked_threshold(prior="gaussian"):

@@ -71,8 +71,9 @@ def _sw_se(p):
     se = S.spiked_state_evolution(p["snr"], p.get("prior", "gaussian"))
     return Out({"snr": se.snr, "gamma_se": se.gamma, "q_se": se.q, "overlap_se": se.overlap,
                 "mmse_se": se.mmse, "matrix_mmse_se": se.matrix_mmse,
-                "se_fixed_points": [float(g) for g in se.fixed_points], "se_bayes": se.bayes},
-               se.note)
+                "se_fixed_points": [float(g) for g in se.fixed_points], "se_bayes": se.bayes,
+                "se_below_floor": se.below_floor},
+               se.note, notes=(f"NOT final: {se.note}",) if se.below_floor else ())
 
 
 def _sw_finite(p):
@@ -91,7 +92,17 @@ def _sw_finite(p):
                statistical=tuple(keys.values()), notes=(ens.note,))
 
 
+_FLOOR_NOTE = "below the root-search floor (gamma < 1e-9 lambda^2): reported gamma = 0 is a floor, not the fixed point"
+
+
+def _floor(src, ansatz):
+    return Stability("not-computed", ansatz, src, f"{_FLOOR_NOTE}; LM: q* > 0 for every lambda > 1: "
+                     "NOT final")
+
+
 def _sw_rs(v):
+    if v.get("se_below_floor"):
+        return _floor(LM, "rs")
     if v.get("se_bayes") and v.get("snr") != 1:
         return Stability("exact-by-literature", "rs", LM,
                          "LM Thm 1: lim MMSE_n = 1 - q*^2 with q* the maximiser of F(lambda_LM, q), "
@@ -103,6 +114,8 @@ def _sw_rs(v):
 
 
 def _sw_amp(v):
+    if v.get("se_below_floor"):
+        return _floor(MV, "amp-se")
     if v.get("se_bayes") and v.get("snr", 0) > 1:
         return Stability("exact-by-literature", "amp-se", MV,
                          "MV Thm 2, Eqs. (2.28)-(2.29): the N -> oo then t -> oo cosine and "
@@ -143,7 +156,7 @@ def spiked_wigner():
     fin = {"lambda_c": lc, "gamma_se": _sw_rs, "q_se": _sw_rs, "matrix_mmse_se": _sw_rs,
            "overlap_se": _sw_amp, "mmse_se": _sw_amp,
            **{k: stat for k in ("q_amp", "overlap_amp", "mmse_amp", "matrix_mmse_amp")}}
-    meta = ("prior", "snr", "se_fixed_points", "se_bayes", "N", "seeds", "iters",
+    meta = ("prior", "snr", "se_fixed_points", "se_bayes", "se_below_floor", "N", "seeds", "iters",
             "amp_converged_fraction", "q_amp_halfwidth99", "overlap_amp_halfwidth99",
             "mmse_amp_halfwidth99", "matrix_mmse_amp_halfwidth99")
     spec = ModelSpec("spiked_wigner", "real", "gaussian", constraint="rank-one spike, Bayes-optimal",
