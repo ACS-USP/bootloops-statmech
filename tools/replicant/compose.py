@@ -34,8 +34,7 @@ site:ising) and REUSED otherwise.  A hook that does not exist is a Refusal, neve
   missing-step:disorder:<d>      the family's average does not handle this law
   missing-step:constraint:<c>, missing-step:prior:<p>   not implemented by the hooks
   missing-step:route:<r>         unknown route, a catalog entry without that route, or
-                                 cavity for a composed spec (there is no generic cavity
-                                 composer)
+                                 cavity / amp for a composed spec (no generic composer)
 The detail wraps the underlying step's own refusal reason where there is one.
 
 ansatz="1rsb": the level-(a) 1RSB route for any spec with level-(a) hooks (compose_rsb.py:
@@ -65,7 +64,7 @@ from .core import Refusal, State, Step, Trace, run_pipeline
 from .solve_derived import lift_numeric_beta, solve_derived_rs
 from .spec import ModelSpec
 
-ROUTES = ("replica", "cavity")
+ROUTES = ("replica", "cavity", "amp")
 FIELDS = ("family", "variables", "disorder", "constraint", "prior")
 LEVEL_A_STEPS = ("replicate", "average-disorder", "introduce-order-parameters", "rs-ansatz",
                  "replica-limit", "rs-stationarity", "solve-derived")
@@ -368,8 +367,9 @@ def _compose(spec, route):
     if route != "replica":
         raise Refusal(f"missing-step:route:{route}",
                       "a spec outside the catalog is composed from level-(a) replica steps "
-                      "only; the cavity pipelines exist for catalog entries "
-                      "(cavity/dense.py, cavity/sparse.py), no generic cavity composer")
+                      "only; the cavity and amp pipelines exist for catalog entries "
+                      "(cavity/dense.py, cavity/sparse.py, catalog_amp.py), no generic "
+                      "cavity or AMP composer")
     adapted, reused = [], []
     steps = level_a_steps(spec)
     if near is None:            # a level-(a) family with no catalog entry: nothing to compare

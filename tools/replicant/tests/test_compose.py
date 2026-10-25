@@ -272,6 +272,8 @@ _DOCUMENTED = {
     ("perceptron", "replica"): {"alpha", "kappa"},
     ("perceptron", "cavity"): {"alpha", "kappa"},
     ("teacher_student", "replica"): {"alpha", "learning"},
+    ("sk", "amp"): {"beta", "h", "N", "seeds", "iters", "law"},
+    ("teacher_student", "amp"): {"alpha", "learning", "N", "seeds", "iters"},
     ("hopfield", "replica"): {"alpha", "beta", "branch"},
     ("hopfield", "cavity"): {"alpha", "beta", "branch"},
     ("viana_bray", "cavity"): {"graph", "k", "c", "J", "beta", "ansatz", "m", "ys", "pop",

@@ -31,7 +31,8 @@ from replicant.tex_print import WIDTH, lines, width
 
 # cheap parameters per (entry, route): every route of every entry gets a document
 CHEAP = {("sk", "cavity"): {"beta": "1.5", "h": "0.3"},
-         ("hopfield", "cavity"): {"alpha": "0.05", "beta": 3}}
+         ("hopfield", "cavity"): {"alpha": "0.05", "beta": 3},
+         ("sk", "amp"): {"beta": "1.5", "h": "0.3"}, ("teacher_student", "amp"): {"alpha": "2"}}
 PM_ONE_SK = ModelSpec("sk", "ising", "pm_one", params={"beta": "0.5"})
 
 

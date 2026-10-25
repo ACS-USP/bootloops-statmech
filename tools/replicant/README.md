@@ -20,7 +20,8 @@ python3 -m replicant run perceptron --param alpha=1.5 --out /tmp/result.json --l
 
 `run` also takes a spec file for a model near a catalogued one
 (`python3 -m replicant run spec.json --param beta=1.5 --param h=0`; schema in the GUIDE),
-`--route cavity` for the entries that have a cavity route (required for `viana_bray`, which is
+`--route amp` for `sk` and `teacher_student` (state evolution, and finite-N AMP / GAMP with
+`--param N=...`), `--route cavity` for the entries that have a cavity route (required for `viana_bray`, which is
 cavity-only: `python3 -m replicant run viana_bray --route cavity`), and `--pdf` (with `--latex`) to
 compile the derivation.
 
@@ -37,8 +38,9 @@ compile the derivation.
 - `families/`: level (b), the published pipelines (SK, REM, p-spin, perceptron, teacher-student,
   Hopfield, Parisi full RSB).
 - `cavity/`: dense cavity, sparse BP / population dynamics, sparse 1RSB.
-- `amp/`: AMP, state evolution and the TAP free energy for SK (finite N, statistical; independent of
-  the replica and cavity code).
+- `amp/`: AMP, state evolution and the TAP free energy for SK, GAMP and its state evolution for the
+  teacher-student perceptron (finite N, statistical; independent of the replica and cavity code);
+  catalog route `amp` (`catalog_amp.py`, `latex_amp.py`) for `sk` and `teacher_student`.
 - `catalog*.py`, `compose.py`, `cli.py`, `__main__.py`: the 7-entry catalog, the composer,
   the command line.
 - `latex*.py`, `tex*.py`, `derive_tex.py`: the LaTeX derivation writer.
@@ -46,9 +48,9 @@ compile the derivation.
 
 ## Test tiers
 
-- Default: `python3 tools/replicant/selftest.py` (282 tests, about 20 s). Also
+- Default: `python3 tools/replicant/selftest.py` (289 tests, about 20 s). Also
   `python3 run_selftests.py replicant` from the repository root.
-- Full: `python3 tools/replicant/selftest.py --full` adds the 97 `@slow` tests (full RSB,
+- Full: `python3 tools/replicant/selftest.py --full` adds the 101 `@slow` tests (full RSB,
   population dynamics at reference sizes, solver-based checks); about 9-10 minutes on a laptop (measured 9 min 28 s).
 - `@slow` is a plain function attribute honoured by `selftest.py` only. pytest ignores the
   marker and would run every test, slow ones included.

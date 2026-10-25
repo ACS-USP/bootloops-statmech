@@ -1,6 +1,6 @@
 """Displayed equations of the replica-route catalog entries (REM, SK, p-spin, perceptron,
 teacher-student, Hopfield) and the model definitions; latex_cavity.py has the cavity
-routes.  derivation(entry, route) -> [TexBlock] is what CatalogEntry.derivation returns.
+routes, latex_amp.py the amp routes.  derivation(entry, route) -> [TexBlock] is what CatalogEntry.derivation returns.
 
 Each equation is either built in sympy from what the family code holds (its
 rs_equations_symbolic(), quadratic_term, pspin_functional, rem_1rsb_functional) or
@@ -109,9 +109,10 @@ _AT = "de Almeida & Thouless, J. Phys. A 11, 983 (1978)"
 
 
 def sk(route):
-    if route == "cavity":
+    if route in ("cavity", "amp"):
+        from .latex_amp import sk_amp
         from .latex_cavity import sk_cavity
-        return sk_cavity()
+        return sk_cavity() if route == "cavity" else sk_amp()
     from .families import sk as F
     xi = B * (HF + sp.sqrt(Q) * Z)
     quad = F.quadratic_term("rs").subs(sp.Symbol("q"), Q)
@@ -286,6 +287,9 @@ def _gibbs_point(F, a):
 
 
 def teacher_student(route):
+    if route == "amp":
+        from .latex_amp import ts_amp
+        return ts_amp()
     from .families import teacher_student as F
     Rs = sp.Symbol("R", positive=True)
     EG = sp.Symbol("epsilon_G", positive=True)

@@ -12,7 +12,8 @@ citation; a missing precondition is a named refusal, never a silent fallback; ev
 reader can follow to the paper, a per-value finality label, and a comparison with banked, cited reference
 values. Two levels: (a) a symbolic derivation (replicate, average the disorder, introduce order
 parameters, RS ansatz, n -> 0, stationarity, solve) that works for models you describe, and (b) the
-published pipelines of a catalog of 7 entries, each with a replica route and/or a cavity route. A composer
+published pipelines of a catalog of 7 entries, each with a replica route and/or a cavity route (and an
+`amp` route for `sk` and `teacher_student`). A composer
 matches a model description against the catalog, reuses what applies, adapts what it can through
 registered hooks, and says what it reused, adapted, or could not do. A LaTeX writer turns any run into a
 derivation document. For theoretical physicists and agents who need a published statistical-mechanics
@@ -33,7 +34,8 @@ NOT-FOR:
   `exact-by-literature`, which rests on the cited paper, not on this package.
 - Population-dynamics results are statistical (value +- stderr over independent runs), never certified.
 - Dynamics beyond AMP, DMFT, or quantum models. AMP, state evolution and the TAP free energy exist for
-  SK only, as the finite-N Python module `amp/` (no catalog entry or CLI route yet).
+  SK, and GAMP with its state evolution for the Bayes-optimal teacher-student perceptron (gaussian or
+  +-1 prior), in the module `amp/`; the catalog route `amp` exists for `sk` and `teacher_student` only.
 - Automatic discovery of the RSB structure: the ansatz is an input; RS stability is computed or reported
   as unknown, and there is no search for the right ansatz.
 - A model with no level-(a) hook (families: `sk`, `perceptron`, `hopfield`; variables `ising`,
@@ -42,7 +44,7 @@ NOT-FOR:
 INVOKE:
 CLI (from `tools/`):
 `python3 -m replicant list` prints the catalog (entry, routes, citation).
-`python3 -m replicant run <entry|spec.json> [--route replica|cavity] [--param k=v ...] [--out result.json]
+`python3 -m replicant run <entry|spec.json> [--route replica|cavity|amp] [--param k=v ...] [--out result.json]
 [--latex out.tex [--pdf]]`
 - JSON result to `--out` (default stdout); the rendered step trace to stderr. Exit 0 ok, 2 refusal
   (`REFUSED: <reason>: <detail>` on stderr; with `--latex` the partial derivation and the reason are still
@@ -65,6 +67,16 @@ CLI (from `tools/`):
   (RS; under 1 s measured at the default sizes) or `... --route cavity --param beta=1.25 --param k=5
   --param ansatz=1rsb --param m=0.24` (1RSB population of populations; about 13 s measured), are
   STATISTICAL (value +- stderr); reference-size runs are slower (minutes).
+- Worked example, amp route (`sk`, `teacher_student`; under 1 s each, measured):
+  `python3 -m replicant run sk --route amp --param beta=1.5` -> `q_se` 0.352602 (the SE fixed point,
+  `exact-by-literature`: Bayati-Montanari Thm 4 proves SE for AMP on Gaussian J; it is the AMP limit,
+  not a Gibbs-measure statement). With `--param h=0.8 --param N=1500` it also runs finite-N AMP over
+  the seeds 0-5: `q_amp` 0.6091 +- 0.0076 (stderr, in `errors`), `q_amp_halfwidth99` 0.0307, SE at the
+  same t `q_se_t` 0.613094; `q_amp` is statistical and `not-computed` (never final).
+  `python3 -m replicant run teacher_student --route amp --param alpha=2 --param learning=bayes` ->
+  `eps_se` 0.174534 (= the replica route's Bayes error to 1e-15), `q_se` 0.728298, all `not-computed`
+  (GAMP SE for GLMs is a claim, Barbier et al. 2019 Claim 1); with `--param N=800`: `q_gamp` 0.7269 +-
+  0.0369 (99%), `eps_gamp` 0.1726 (plug-in error of the GAMP estimate).
 - Composing from a spec: `python3 -m replicant run spec.json --param beta=1.5 --param h=0`. spec.json:
   `{"family": "sk", "variables": "ising", "disorder": "pm_one", "constraint": null, "prior": null,
   "params": {"beta": null, "h": null}}`. Required keys: `family`, `variables`, `disorder`; optional:
@@ -119,6 +131,17 @@ True, `r.q_trace[-1]` 0.5895 (one seed; the seeds 0-5 band is 0.609 +- 0.031, SE
 refusals `precondition:symmetric-matrix`, `:zero-diagonal`, `:coupling-variance`, `:beta-nonnegative`,
 `:known-init`, `:positive-iters`, `:damping-range`, `:known-law`, `:known-onsager`,
 `:magnetization-range`, `no-convergence:tap`.
+GAMP (teacher-student perceptron, `amp/gamp.py`, `amp/gamp_se.py` state the conventions: teacher and
+patterns i.i.d., `y = sign(Phi w*/sqrt N)`, rho = 1, Bayes-optimal): `amp.perceptron_instance(N, alpha,
+prior, seed)` -> `(Phi, y, w*)` (`prior` `gaussian` | `ising`); `amp.gamp_perceptron(X, y, prior, *,
+iters, seed, teacher=None)` -> `GAMPResult(x_hat, v, overlap_trace, norm_trace, converged, ...)`;
+`amp.gamp_ensemble(N, alpha, prior, *, seeds, iters)` (99% Student-t bands of the overlap and of the
+plug-in generalization error); `amp.perceptron_state_evolution(alpha, prior="gaussian", teacher=True,
+*, iters=None)` -> `SEResult(overlap, mse, r, trajectory, converged, eps_bayes, eps_gibbs,
+free_entropy, fixed_points, optimal_overlap, gamp_is_optimal, ...)`; `amp.ising_thresholds()` ->
+`Thresholds(alpha_it, alpha_amp)` (1.244684, 1.492632). Refusals `precondition:known-prior`,
+`:nonnegative-alpha`, `:positive-alpha`, `:pattern-matrix`, `:label-count`, `:sign-labels`,
+`:teacher-length`, `:positive-iters`, `not-implemented:mismatched-teacher-student`.
 `from replicant.latex import render_latex, write_latex` (`write_latex(result, path, pdf=False)`; a
 `Refusal` is also accepted and writes its partial derivation).
 
@@ -127,9 +150,11 @@ route reads, `CatalogEntry.parameters[route]`; any other name, e.g. a typo `kapa
 `precondition:known-parameter` with the accepted names, never ignored):
 `rem`: `beta`, `N_scale` (default 1/2, Derrida's normalization); `sk` replica: `beta`, `h`, `ansatz`
 (`rs`|`1rsb`, at a `beta`), `fullrsb` (flag, slow tier); `sk` cavity: `beta`, `h`, `require_stable`;
-`pspin`: `p` (default 3), `beta`; `perceptron` replica: `alpha`, `kappa` (default 0); `perceptron`
+`sk` amp: `beta`, `h`, and for finite-N AMP `N`, `seeds` (default 0-5), `iters` (default 100), `law`
+(`gaussian`|`pm_one`); `pspin`: `p` (default 3), `beta`; `perceptron` replica: `alpha`, `kappa` (default 0); `perceptron`
 cavity: `alpha`, `kappa`, `variables` (`spherical`; `ising` is refused `not-implemented:cavity-ising`);
-`teacher_student`: `alpha`, `learning` (`gibbs`|`bayes`); `hopfield` (both routes): `alpha`, `beta`,
+`teacher_student`: `alpha`, `learning` (`gibbs`|`bayes`); `teacher_student` amp: `alpha`, `learning`
+(default `bayes`), and for finite-N GAMP `N`, `seeds` (default 0-5), `iters` (default 30); `hopfield` (both routes): `alpha`, `beta`,
 `branch`; `viana_bray`: `graph` (`regular` with excess degree `k`, or `poisson` with mean degree `c`),
 `J`, `beta`, `ansatz` (`rs`|`1rsb`), `m`, `ys`, and the sampling knobs `pop`, `inner`, `sweeps`,
 `burn_in`, `runs`, `seed`, `require_equilibrated`, `field`, `init_field`, `init_spread`, `init`,
@@ -156,7 +181,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | reason | when |
 |---|---|
 | `missing-step:family:<f>`, `:site:<v>`, `:disorder:<d>`, `:constraint:<c>`, `:prior:<p>` | composer: the level-(a) hook the spec needs does not exist (the detail names what exists and the nearest catalog entry) |
-| `missing-step:route:<r>` | unknown route, entry without that route, or cavity for a spec outside the catalog (no generic cavity composer) |
+| `missing-step:route:<r>` | unknown route, entry without that route, or cavity / amp for a spec outside the catalog (no generic cavity or AMP composer) |
 | `missing-step:ansatz:<a>` | composer: an ansatz other than `rs`, `1rsb` |
 | `precondition:counting-measure-for-frozen`, `:discrete-variables-for-frozen` | frozen 1RSB asked for an energy that is not an indicator pattern average, or continuous variables |
 | `precondition:polynomial-energy-for-t0` | T = 0 1RSB asked for a Gaussian-integral energy (Hopfield, perceptron: needs q1 = 1 - C/beta, not implemented) |
@@ -171,7 +196,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `no-convergence`, `no-convergence:equilibration`, `:tap` | BP or a survey did not converge; a population-dynamics run is still drifting and `require_equilibrated` is set; `amp.tap_fixed_point`: Newton from the AMP iterate left the TAP residual above tol |
 | `no-transition` | the branching number rules out a spin-glass transition |
 | `unsupported:degree-law`, `unsupported:J-law` | a graph/coupling law the sparse code does not implement |
-| `not-implemented:annealed`, `:cavity-ising`, `:spherical-rsb` | the named case is outside v1 |
+| `not-implemented:annealed`, `:cavity-ising`, `:spherical-rsb`, `:mismatched-teacher-student` | the named case is outside v1 (the last: GAMP state evolution off the Nishimori line) |
 | `unbanked:missing-entry`, `:malformed`, `:no-citation`, `:no-independent-route` | a banked reference value is absent or has no citation / no independent route (a value that fed a fit never certifies it) |
 | `tex-engine:failed`, `tex-engine:unavailable` | `--pdf`: the engine ran and failed, or could not reach its offline resources |
 
@@ -180,10 +205,10 @@ CATALOG (v1; `list` shows the live table; values at the default / banked state p
 | entry | routes | headline values | banked references | finality |
 |---|---|---|---|---|
 | `rem` random energy model | replica | `beta_c` 1.66511 (`T_c` 0.600561, N_scale 1/2) | `T_c`, frozen ground energy, 1RSB `m beta/beta_c = 1` (Derrida) | exact-by-literature (1RSB) |
-| `sk` Sherrington-Kirkpatrick | replica, cavity | `tc` 1; RS `-sqrt(2/pi)` = -0.797885; 1RSB -0.765259; at `beta`: RS `q, f, e, replicon` | `tc`, RS, 1RSB; slow tier: 2RSB -0.76361, 3RSB -0.76331, full-RSB -0.763166 | `tc` stable; RS ground energy unstable; 1RSB not-computed; full RSB exact-by-literature (slow) |
+| `sk` Sherrington-Kirkpatrick | replica, cavity, amp | `tc` 1; RS `-sqrt(2/pi)` = -0.797885; 1RSB -0.765259; at `beta`: RS `q, f, e, replicon`; amp: SE `q_se`, with `N` finite-N `q_amp` | `tc`, RS, 1RSB; slow tier: 2RSB -0.76361, 3RSB -0.76331, full-RSB -0.763166 | `tc` stable; RS ground energy unstable; 1RSB not-computed; full RSB exact-by-literature (slow); amp `q_se` exact-by-literature (AMP limit, BM11 Thm 4), `q_amp` not-computed (statistical) |
 | `pspin` spherical p-spin | replica | p = 3: `T_s` 0.586054, `T_d` 0.612372, `q_s` 0.645007 | `T_s`, `T_d`, `q_s`; slow: `e0` -1.172 | exact-by-literature (1RSB) |
 | `perceptron` spherical (Gardner) | replica, cavity | `alpha_c(kappa=0)` = 2; entropy `S` and its `replicon` at `alpha` | `alpha_c`, both routes | `alpha_c` stable for kappa >= 0 (RS exact), unstable and not final for kappa < 0; `S` carries its own computed replicon label. The entry is RS only: `--param ansatz=1rsb` is refused `precondition:known-parameter`; in Python `gardner_capacity("spherical", ansatz="1rsb")` is refused `not-implemented:spherical-rsb` |
-| `teacher_student` | replica | Gibbs 0.624658 / Bayes 0.441700 asymptotic constants (`eps ~ c/alpha`) | both constants (bank tol is a 3-digit rounding) | exact-by-literature |
+| `teacher_student` | replica, amp | Gibbs 0.624658 / Bayes 0.441700 asymptotic constants (`eps ~ c/alpha`); amp: GAMP SE `q_se`, `mse_se`, `eps_se`, with `N` finite-N `q_gamp`, `eps_gamp` | both constants (bank tol is a 3-digit rounding) | exact-by-literature; amp values not-computed (GAMP SE is a claim) |
 | `hopfield` (AGS) | replica, cavity | `alpha_c(T=0)` 0.137906, `m` 0.967417, `E` -0.501445, `alpha_global` 0.051854 | all four (Steffan-Kuehn; AGS 0.051 for the global one) | T = 0 values not-computed; state-point values carry their replicon |
 | `viana_bray` sparse +-J | cavity | `beta_c` (3-regular) 0.881374; T = 0 RS `p0` 1/3, `e0` -23/18; factorized 1RSB -1.27231, mu* 0.4174 | those, plus slow/statistical population-dynamics RS and 1RSB at k = 5, T = 0.8 | `beta_c` stable; the rest not-computed |
 
@@ -208,12 +233,18 @@ banked in `reference/perceptron.json` as independent targets. Honest limits:
   (Carmona and Hu) was read from its abstract only.
 - The annealed bound does not detect the spherical-site swap (the other checks do).
 - Enumeration slack c/N with c = 1 is an assumption of the test.
+- (E3b) An independent finite-N route for (1): AMP run on actually sampled +-J matrices (`amp/`, which
+  imports none of the replica, cavity or family code), N = 2000, seeds 0-7, t = 100, at beta = 1.5,
+  h = 0.8 (RS-stable side): 0.60715 +- 0.01899 (99%), composed q 0.61309 inside; the composed q with
+  the planted doubled +-J variance (0.66054) and naive mean-field AMP (0.82513) fall outside. AMP's SE
+  is a theorem for Gaussian J only, so for +-J this is sampled numerical evidence, not a theorem, and
+  the band (+-0.019) excludes errors of the size of the planted one (0.053), not small ones (slow).
 
-ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 282 tests, about 20 s on a
+ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 289 tests, about 20 s on a
 laptop; also `python3 run_selftests.py replicant`) covers the core and refusal paths, the symbolic
 derivation against independent expressions, level agreement (a)=(b) for every family where both exist,
 every catalog entry against its banked non-slow values, the cavity routes, the composer and the held-out
-models, the CLI and the LaTeX writer (displayed equations re-checked numerically). `--full` adds 97
+models, the CLI and the LaTeX writer (displayed equations re-checked numerically). `--full` adds 101
 `@slow` tests (full-RSB Parisi up to K = 9, population dynamics at reference sizes, the Hopfield replicon
 scans, the p-spin T -> 0 energy, solver-based composed and LaTeX checks, a PDF compile when a TeX engine
 is present) and takes about 9-10 minutes on a laptop (measured 9 min 28 s); run it before merging a
@@ -301,6 +332,28 @@ KNOWN HAZARDS:
   stationarity check (directional derivatives of the functional at the AMP fixed point, < 1e-2 vs > 1
   without the term) is the sharper detector. damping changes the iterates (SE does not apply) but not
   the fixed points.
+- GAMP / teacher-student (`amp/gamp.py`, `amp/gamp_se.py`, route `amp` of `teacher_student`): GAMP's
+  state evolution for GLMs is stated as Claim 1 by Barbier, Krzakala, Macris, Miolane & Zdeborova (PNAS
+  2019; from Rangan 2011, "some steps of the proof are missing"; Javanmard-Montanari 2013 state SE for
+  general AMP covering GAMP, which BKMMZ do not count as a proof; abstracts read): every SE value is
+  `not-computed`. The Bayes-optimal
+  errors are their Thm 2 (the replica route). Bayes-optimal only on the Nishimori line (teacher drawn
+  from the prior, matched channel). With the gaussian prior the SE fixed-point equation IS Gyorgyi's
+  spherical Gibbs equation (r = q/(1 - q)): the 1e-6 agreement with `teacher_student_error` checks the
+  implementation of an identity, not the physics. The catalog route uses the gaussian prior and an
+  i.i.d. N(0, 1) teacher, not the sphere. Ising prior: no RS formula for the binary teacher-student
+  overlap exists in the package; its checks are the banked thresholds (`reference/gamp.json`): alpha_IT
+  1.244684 computed (BKMMZ state 1.249(1); a secondary source, Li et al. 2022, 1.245; the bank tol 0.004
+  covers both, and a dps-25 recomputation agrees with ours: BKMMZ's value looks 0.004 high) and alpha_AMP
+  1.492632 (BKMMZ 1.493(1), Li et al. 1.492). In (alpha_IT, alpha_AMP) GAMP's fixed point is NOT the
+  Bayes-optimal one (`gamp_is_optimal` False). Finite N (N = 800, seeds 0-23, t = 30): the 99% bands
+  (about +-0.011) contain the SE trajectory for the gaussian prior at alpha = 1, 2 and the ising prior at
+  alpha = 1 and exclude Onsager-coefficient errors of 10% (closest margin 0.0035); smaller errors are not
+  claimed. Ising at alpha = 2 > alpha_AMP: SE reaches q = 1 but only 14 of 24 instances do at N = 800
+  (the rest freeze a few wrong spins, band 0.9928 +- 0.0074 excludes 1): a finite-N effect. When the
+  ising variances collapse (<v> < 1e-6) the iterate is frozen (the scalar-variance update underflows
+  there; the result note says so). The fixed-point list is a 240-point grid scan plus the trajectory
+  limit and (ising) q = 1: roots closer than the grid spacing could be missed.
 - Root searches are seeded: a saddle may be missed; the solver refuses with `ambiguous:several-saddles`
   when it sees more than one, but absence of that refusal is not a proof there is only one.
 - Population dynamics near `T_c`: the spin-glass label is trustworthy only for `beta/beta_c <~ 0.95` or
@@ -360,7 +413,8 @@ learning [SST92] [OH91] [Gyo90] [BTG97] and its proof [BKMMZ19]; Hopfield model 
 RSB analysis of [SK94]; the Viana-Bray model [VB85], the sparse cavity and population-dynamics method
 [MP01] [MP03] and the transition conditions [MK04] [GT03]; the dense cavity method [MPV87] with
 [TAP77]; AMP, state evolution and the TAP free energy (`amp/`) follow [Bol14] [BM11] [FMM18] with
-[Ple82], universality [BLM15] [CL20] and TAP complexity [BM80]. The universality of the SK free energy used in the held-out test is [CH04]. Reference digits are read
+[Ple82], universality [BLM15] [CL20] and TAP complexity [BM80]; GAMP and its state evolution follow
+[Ran11] [BKMMZ19] with [JM13], the binary teacher-student thresholds [Gyo90] [BKMMZ19] [LHZH22]. The universality of the SK free energy used in the held-out test is [CH04]. Reference digits are read
 from [Sto25] [OSS07] [CRT03] [SY17] [DM15] [FP16] [Gyo01] [PRGE20] [Cov65] [Bar97] as stated in the bank
 cites. The typed-step architecture, the symbolic level (a), the composer, the refusal and
 finality discipline and the LaTeX writer are ours. Each bank entry names the source its digits were

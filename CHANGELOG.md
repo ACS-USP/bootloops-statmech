@@ -49,6 +49,13 @@ All notable changes to BootLoops are recorded here. The format follows
   stationary at the AMP fixed point and its value lies in the band around the RS -beta f. Statistical,
   not certified; validity statements (SE theorem for Gaussian J, convergence only above the AT line,
   many TAP solutions at low temperature) are in the GUIDE. No catalog route yet.
+- `replicant` (E3b): GAMP for the Bayes-optimal teacher-student perceptron (gaussian or +-1 prior,
+  noiseless sign channel) and its state evolution (`amp/gamp.py`, `amp/gamp_se.py`), the RS potential
+  and the binary-prior thresholds alpha_IT 1.244684 / alpha_AMP 1.492632 (banked targets from Barbier
+  et al. 2019 and a secondary source, which disagree by 0.004 on alpha_IT); catalog route `amp` for
+  `sk` (SE value exact-by-literature by Bayati-Montanari Thm 4; finite-N AMP statistical) and
+  `teacher_student` (GAMP SE values not-computed: a claim, not a theorem); a new independent held-out
+  check, the composed +-J SK q against AMP on sampled +-J matrices (slow).
 
 ## 1.0.1 (2026-10-09)
 

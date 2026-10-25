@@ -29,6 +29,9 @@ Independent routes (none is computed by the code under test, none feeds it):
           probability exactly 1/2, independently over patterns: E Z = 2^N 2^-P);
           (d) exact enumeration at N <= 14 (statistical, named seeds, Student-t bands
           plus an explicit finite-size slack c/N, c = 1, an assumption stated here).
+  SK (d)  AMP run on actually sampled +-J matrices (amp/sk.py, which imports none of the
+          replica, cavity or family code): the composed q at beta = 1.5, h = 0.8 against
+          the 99% Student-t band of the finite-N AMP q over named seeds (E3b).
 """
 import itertools
 import math
@@ -330,6 +333,54 @@ def test_sk_pm_one_composed_matches_independent_routes():
     assert any("NOT final" in n for n in res.notes)
     rf = _refusal(lambda: calc.run(beta="1.5", h=0, dps=15, require_final=True))
     assert rf.reason == "unstable:rs" and "replicon" in rf.detail, rf
+
+
+AMP_N, AMP_SEEDS, AMP_ITERS = 2000, tuple(range(8)), 100
+
+
+def _amp_failures(q, band):
+    """The composed q inside the 99% Student-t band of the finite-N AMP q."""
+    return [] if abs(float(q) - band.mean) <= band.half_width else \
+        [f"composed q {float(q):.5f} outside AMP {band.mean:.5f} +- {band.half_width:.5f}"]
+
+
+@slow
+def test_heldout_pm_one_sk_q_vs_amp_on_pm_one_matrix():
+    """(d) The composed +-J SK q at beta = 1.5, h = 0.8 (the RS-stable side of the AT line,
+    where the AMP iterates converge) against AMP on sampled +-J matrices J_ij =
+    +-1/sqrt(N): N = 2000, seeds 0-7, t = 100, 99% Student-t band (df = 7).  AMP does not
+    use the composer or any family (amp/ imports none of them) and is run after the
+    composed solve.  What it rests on: AMP's state evolution is a theorem for Gaussian J
+    (Bayati-Montanari 2011); for +-J it is numerical evidence (amp/sk.py), so this route
+    checks the composed universality claim against an independent sampled computation,
+    not against a theorem.  Positive controls: the composed calculation with the planted
+    doubled +-J variance (J = +-sqrt(2/N), the (b') law) falls outside the band, and so
+    does naive mean-field AMP (no Onsager term) against the composed q."""
+    import dataclasses
+    from replicant import amp as A
+    calc = compose(_pm_one_sk())
+    res = calc.run(beta="1.5", h="0.8", dps=15)
+    assert res.report.kind == "composed" and res.entry is None
+    q = res.values["q"]
+    ens = A.sk_amp_ensemble(AMP_N, 1.5, 0.8, seeds=AMP_SEEDS, iters=AMP_ITERS, law="pm_one")
+    b = ens.band
+    print(f"+-J AMP N={AMP_N} t={AMP_ITERS}: q = {b.mean:.5f} +- {b.half_width:.5f} "
+          f"(stderr {b.stderr:.5f}); composed {float(q):.5f}; converged {sum(ens.converged)}"
+          f"/{len(ens.converged)}")
+    assert not _amp_failures(q, b), _amp_failures(q, b)
+    assert all(ens.converged), ens.converged
+    law = D.LAWS["pm_one"]
+    doubled = dataclasses.replace(
+        law, cgf=lambda t, N: sp.log(sp.cosh(sp.sqrt(2) * t / sp.sqrt(N))))
+    wrong = _with(D.LAWS, "pm_one", doubled,
+                  lambda: compose(_pm_one_sk()).run(beta="1.5", h="0.8", dps=15))
+    assert D.LAWS["pm_one"] is law
+    print(f"planted doubled variance: composed q = {float(wrong.values['q']):.5f}")
+    assert _amp_failures(wrong.values["q"], b), wrong.values["q"]
+    naive = A.sk_amp_ensemble(AMP_N, 1.5, 0.8, seeds=AMP_SEEDS, iters=AMP_ITERS,
+                              law="pm_one", reaction=False).band
+    print(f"naive mean field: q = {naive.mean:.5f} +- {naive.half_width:.5f}")
+    assert _amp_failures(q, naive), naive
 
 
 # ---- 2. Ising perceptron ------------------------------------------------------------

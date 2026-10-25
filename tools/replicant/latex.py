@@ -55,7 +55,10 @@ ROUTES = {"replica": "replica method: replicated partition function Z^n, disorde
                      "ansatz, continuation n -> 0",
           "cavity": "cavity method: remove a site, the law of its cavity field, add the site "
                     "back (marginal and reaction), self-consistency; on sparse graphs "
-                    "population dynamics for the law of the cavity fields"}
+                    "population dynamics for the law of the cavity fields",
+          "amp": "approximate message passing: AMP / GAMP iterations with the Onsager term on "
+                 "sampled instances (finite N, statistical) and their state evolution (the "
+                 "N -> oo law of the iterates)"}
 _STAB = ("replicon", "stability", "capacity_stable", "stable", "mode_eig")
 
 
@@ -153,13 +156,14 @@ def _derivation(res):
             return rows, LEVEL_A_CITE, None
         _, rep, _ = _level_a(_spec_key(lift_numeric_beta(res.spec, {})[0]))
         return rows + ([(None, rep_title, rep)] if rep else []), LEVEL_A_CITE, None
-    trace, rep, why = (None, [], "cavity route") if res.route != "replica" else \
+    trace, rep, why = (None, [], f"{res.route} route") if res.route != "replica" else \
         _level_a(_spec_key(res.entry.spec))
     rows = [(e, None, e.tex) for e in trace.entries] if trace else []
     if rep:
         rows.append((None, rep_title, rep))
-    rows.append((None, "Equations implemented by the family code"
-                 if res.route == "replica" else "The cavity argument",
+    rows.append((None, {"replica": "Equations implemented by the family code",
+                        "amp": "AMP and state evolution (amp/)"}.get(res.route,
+                                                                  "The cavity argument"),
                  res.entry.derivation(res.route)))
     return rows, LEVEL_A_CITE, why
 
@@ -313,6 +317,10 @@ def _result_body(res, bib, extra, slow):
     if composed or rows[0][0] is not None:
         intro = ("Level (a): each step is rendered from the sympy objects that step put in "
                  "the State (sympy.latex); nothing is retyped.")
+    elif res.route == "amp":
+        intro = ("The iterations and state-evolution maps as amp/ implements them; each map in "
+                 "sympy form is checked against that code by tests/test_latex.py, the "
+                 "iterations are cited.")
     elif res.route == "cavity":
         intro = ("The cavity equations as the cavity code implements them (cavity/*.py): for "
                  "the dense models in the order of its four steps (remove a site, the cavity-"

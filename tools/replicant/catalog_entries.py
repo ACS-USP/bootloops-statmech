@@ -19,6 +19,7 @@ import mpmath as mp
 
 from .agree import default_spec
 from .catalog import Out, RefCheck, Stability, entry, fstep, from_flag, has, lacks, saddle
+from .catalog_amp import sk_amp_route, ts_amp_route
 from .cavity import dense
 from .cavity.dense_hopfield import energy as hopfield_cavity_energy
 from .core import Refusal, Step
@@ -198,12 +199,14 @@ def sk():
                            "a variational bound below the full-RSB one")
               for k in ("rsb2_ground_energy", "rsb3_ground_energy")},
            **{k: saddle(AT_CITE) for k in ("q", "f", "e", "replicon", "q0", "q1", "m")}}
-    return entry("sk", default_spec("sk"), SK_CITE, {"replica": steps, "cavity": cav}, refs,
-                 {"replica": CAVEAT, "cavity": CAVITY_CAVEAT},
-                 "Sherrington-Kirkpatrick: RS, AT stability, 1RSB, full RSB (flag)", finality=fin,
-                 meta=("rs_replicon_T0p5",),
+    amp = sk_amp_route()
+    return entry("sk", default_spec("sk"), SK_CITE, {"replica": steps, "cavity": cav,
+                                                     "amp": amp.steps}, refs,
+                 {"replica": CAVEAT, "cavity": CAVITY_CAVEAT, "amp": amp.caveat},
+                 "Sherrington-Kirkpatrick: RS, AT stability, 1RSB, full RSB (flag); AMP / SE",
+                 finality={**fin, **amp.finality}, meta=("rs_replicon_T0p5", *amp.meta),
                  parameters={"replica": ("beta", "h", "ansatz", "fullrsb"),
-                             "cavity": ("beta", "h", "require_stable")})
+                             "cavity": ("beta", "h", "require_stable"), "amp": amp.params})
 
 
 # ---- spherical p-spin ----------------------------------------------------------------
@@ -326,10 +329,12 @@ def teacher_student():
                       "sampling, so the Nishimori identity applies (overlap concentration of "
                       "Barbier et al.)")
     fin = {k: exact for k in ("gibbs_asymptotic_constant", "bayes_asymptotic_constant", "eps")}
-    return entry("teacher_student", spec, TS_CITE, {"replica": steps}, refs,
-                 {"replica": CAVEAT}, "teacher-student perceptron: Gibbs and Bayes learning curves",
-                 finality=fin, meta=("learning",),
-                 parameters={"replica": ("alpha", "learning")})
+    amp = ts_amp_route()
+    return entry("teacher_student", spec, TS_CITE, {"replica": steps, "amp": amp.steps}, refs,
+                 {"replica": CAVEAT, "amp": amp.caveat},
+                 "teacher-student perceptron: Gibbs and Bayes learning curves; GAMP / SE",
+                 finality={**fin, **amp.finality}, meta=("learning", *amp.meta),
+                 parameters={"replica": ("alpha", "learning"), "amp": amp.params})
 
 
 # ---- Hopfield -----------------------------------------------------------------------------
