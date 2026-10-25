@@ -177,7 +177,8 @@ def test_amp_modules_do_not_import_replica_code():
         for line in src.splitlines():
             if re.match(r"\s*(from|import)\s", line):
                 assert re.match(r"\s*(import (math|mpmath as mp|numpy as np)|from (dataclasses|"
-                                r"\.\.core|\.|\.sk|\.tap|\._stats|\.state_evolution) import)",
+                                r"\.\.core|\.|\.sk|\.tap|\._stats|\.state_evolution|"
+                                r"\.gamp|\.gamp_se) import)",
                                 line), (mod.__name__, line)
         for bad in ("families", "derive_", "derive import", "solve_derived", "sk_rs", "sk_replicon",
                     "gauss_expect", "..cavity", "..solve"):

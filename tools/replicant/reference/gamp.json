@@ -1,0 +1,26 @@
+{
+  "ising_alpha_it": {
+    "value": "1.249",
+    "tol": "0.004",
+    "cite": "Barbier, Krzakala, Macris, Miolane & Zdeborova, PNAS 116, 5451 (2019), arXiv:1708.03395v3 (PDF read): Sec. 3.3 and Fig. 4 caption, perceptron phi = sign with a Rademacher (+-1) signal, 'perfect generalization is information-theoretically possible starting from alpha = 1.249(1)' (main text also 'alpha_IT ~ 1.249', 'as predicted already in' Gyorgyi, Phys. Rev. A 41, 7097 (1990)). tol = 0.004 covers the disagreeing secondary value below (their quoted uncertainty is (1)). Conventions: i.i.d. N(0, 1) patterns scaled by 1/sqrt(n), noiseless labels, Bayes-optimal (teacher +-1)",
+    "sources_disagree": [
+      {
+        "value": "1.245",
+        "cite": "Li, Huang, Zou & Huang, arXiv:2212.02846v1 (2022) (PDF read; a SECONDARY source): 'at alpha ~ 1.245, a first order phase transition to perfect generalization occurs', citing Sompolinsky, Tishby & Seung, PRL 65, 1683 (1990) (not fetched)"
+      }
+    ],
+    "independent_route": "replicant's own GAMP state evolution and RS potential (amp/gamp_se.py): bisection in alpha on f_RS(GAMP fixed point from q = 0) + ln 2 = 0 (f_RS = -ln 2 is the perfect-recovery point); tests/test_gamp.py. Does not use either number. A dps-25 mpmath recomputation in the build gave 1.244684, inside the secondary source's window and 0.004 below BKMMZ's value: the two sources disagree by more than BKMMZ's stated (1)"
+  },
+  "ising_alpha_amp": {
+    "value": "1.493",
+    "tol": "0.001",
+    "cite": "Barbier, Krzakala, Macris, Miolane & Zdeborova, PNAS 116, 5451 (2019), arXiv:1708.03395v3 (PDF read): Fig. 4 caption 'the state evolution predicts that GAMP will allow such perfect prediction only from alpha = 1.493(1)'; Sec. 3.3 'alpha_AMP ~ 1.493', identified with the spinodal of the RS solution of Gyorgyi (1990). tol = their quoted (1), which also covers the secondary value below",
+    "sources_disagree": [
+      {
+        "value": "1.492",
+        "cite": "Li, Huang, Zou & Huang, arXiv:2212.02846v1 (2022) (PDF read; SECONDARY): 'a spinodal point locates at alpha_sp = 1.492'"
+      }
+    ],
+    "independent_route": "replicant's GAMP state evolution (amp/gamp_se.py): bisection in alpha on the sign of min_q [F(q) - q] over q in [0.5, 0.99] (the low fixed point of the SE map F disappears); tests/test_gamp.py. Does not use either number"
+  }
+}

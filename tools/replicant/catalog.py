@@ -227,6 +227,9 @@ _HELD_OUT = ("Ising perceptron: held out of the catalog on purpose (Task 16 comp
 _HELD_OUT_SK = ("+-J SK: held out of the catalog (Task 16); the composed level-(a) "
                 "calculation is checked against it in tests/test_heldout.py, never a "
                 "catalog pipeline")
+_GAMP = ("Ising-prior (binary teacher) GAMP thresholds: located by bisection on the state "
+         "evolution and RS potential of amp/gamp_se.py (ising_thresholds) in tests/test_gamp.py; "
+         "the teacher_student catalog entry is the spherical teacher, so no pipeline outputs it")
 UNCLAIMED = {
     ("heldout", "sk_pm_one_tc"): _HELD_OUT_SK,
     ("heldout", "sk_pm_one_rs_ground_energy"): _HELD_OUT_SK,
@@ -237,6 +240,8 @@ UNCLAIMED = {
     ("perceptron", "ising_1rsb_capacity"): _HELD_OUT,
     ("perceptron", "ising_1rsb_q"): _HELD_OUT,
     ("perceptron", "ising_1rsb_qhat"): _HELD_OUT,
+    ("gamp", "ising_alpha_it"): _GAMP,
+    ("gamp", "ising_alpha_amp"): _GAMP,
     ("hopfield", "low_alpha_error_prefactor"):
         "an alpha -> 0 extrapolation of (1 - m) e^{1/(2 alpha)}/sqrt(alpha) from two T = 0 "
         "points, done in tests/test_hopfield.py: not a pipeline output",
