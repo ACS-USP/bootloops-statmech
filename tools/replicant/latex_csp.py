@@ -98,7 +98,11 @@ def ksat(route):
               r"N\Sigma = \sum_a \ln\Big[\prod_{j\in a}(\Pi^u+\Pi^s+\Pi^0)_{j\to a}"
               r" - \prod_{j\in a}\Pi^u_{j\to a}\Big] - \sum_i (n_i - 1)\ln\big[P^+_i + P^-_i"
               r" - P^+_i P^-_i\big]", f"{_BMZ}; {_MMZ}, Eqs. (3)-(5)"),
-        cited("Complexity of the SP population (MMZ Eq. (18), with the fixed-point identity (17))",
+        cited("Complexity of the SP population (MMZ Eq. (18), with the fixed-point identity (17)); "
+              "pi = e^-x and pi' = e^-z with x, z independent sums of phi = -ln(1 - eta) over "
+              "Poisson(K alpha / 2) population members (the no-warning probabilities of the two "
+              "sign classes), rho = pi' (1 - pi) / (pi + pi' - pi pi') (the SP factor of one "
+              "input), the expectations over independent draws",
               r"\Sigma = \Sigma_0 + \alpha\left[K I_{K-1} - (K-1) I_K\right] = "
               r"\mathbb{E}\ln(\pi + \pi' - \pi\pi') - \alpha (K-1)\,\mathbb{E}\ln\Big(1 - "
               r"\prod_{i=1}^{K}\rho_i\Big)", f"{_MMZ}, Eqs. (13), (15), (17), (18)"),

@@ -1,17 +1,13 @@
 {
   "alpha_s_k3": {
     "value": "4.26675",
-    "tol": "5e-3",
-    "cite": "SAT/UNSAT threshold of random 3-SAT as the root of the SP (1RSB, y -> oo) complexity, population dynamics: Mertens, Mezard & Zecchina, 'Threshold values of random K-SAT from the cavity method', Random Struct. Algorithms 28, 340 (2006), arXiv:cs/0309020 (PDF read), Sec. 5.3, Eq. (43): 'alpha_c(3) = 4.26675 +- 0.00015' (+-2 sigma over runs; Table 1, bold: 4.267). Consistent: Mezard & Zecchina, 'Random K-satisfiability problem: from an analytic solution to an efficient algorithm', Phys. Rev. E 66, 056126 (2002), arXiv:cond-mat/0207194 (PDF of v3 read), Sec. VI.D: 'alpha_c = 4.267'; Braunstein, Mezard & Zecchina, 'Survey propagation: an algorithm for satisfiability', Random Struct. Algorithms 27, 201 (2005), arXiv:cs/0212002 (PDF read), Sec. IV: 'alpha_c = 4.267'. MMZ write alpha_c for this threshold. A cavity conjecture, not a theorem, for K = 3 (Ding, Sly & Sun, Ann. of Math. 196, 1 (2022), doi:10.4007/annals.2022.196.1.1, arXiv:1411.0650, Theorem 1: proved for k >= k0, an unspecified absolute constant). Lundow & Markstrom, 'Revisiting the cavity-method threshold for random 3-SAT', Phys. Rev. E 99, 022106 (2019), arXiv:1712.04888 (abstract only), argue from finite-size data that alpha_3 <= 4.262 (sources_disagree, banked as the value of that bound). tol covers MMZ's error bar and the spread to 4.267 and to 4.262",
+    "tol": "5e-4",
+    "cite": "SAT/UNSAT threshold of random 3-SAT as the root of the SP (1RSB, y -> oo) complexity, population dynamics: Mertens, Mezard & Zecchina, 'Threshold values of random K-SAT from the cavity method', Random Struct. Algorithms 28, 340 (2006), arXiv:cs/0309020 (PDF read), Sec. 5.3, Eq. (43): 'alpha_c(3) = 4.26675 +- 0.00015' (+-2 sigma over runs; Table 1, bold: 4.267). Consistent: Mezard & Zecchina, 'Random K-satisfiability problem: from an analytic solution to an efficient algorithm', Phys. Rev. E 66, 056126 (2002), arXiv:cond-mat/0207194 (PDF of v3 read), Sec. VI.D: 'alpha_c = 4.267'; Braunstein, Mezard & Zecchina, 'Survey propagation: an algorithm for satisfiability', Random Struct. Algorithms 27, 201 (2005), arXiv:cs/0212002 (PDF read), Sec. IV: 'alpha_c = 4.267'. MMZ write alpha_c for this threshold. A cavity conjecture, not a theorem, for K = 3 (Ding, Sly & Sun, Ann. of Math. 196, 1 (2022), doi:10.4007/annals.2022.196.1.1, arXiv:1411.0650, Theorem 1: proved for k >= k0, an unspecified absolute constant). Not banked as a value: Lundow & Markstrom, 'Revisiting the cavity-method threshold for random 3-SAT', Phys. Rev. E 99, 022106 (2019), arXiv:1712.04888 (abstract only) give a conditional upper bound alpha_3 <= 4.262, from Monte Carlo data 'in combination with a monotonicity assumption' (its precise form is not stated in the abstract), in tension with MMZ: if the assumption holds the threshold is below the cavity value. tol = 5e-4 covers MMZ's error bar (1.5e-4) and the spread to the rounded 4.267 of MZ / BMZ / MMZ Table 1 (sources_disagree), the estimates that agree",
     "independent_route": "replicant's own root of the SP-population complexity Sigma(alpha) (csp/sp.py ksat_sp_crossing at sp.CROSSING: per run a line fitted to Sigma on alpha = 4.18..4.34, 6 runs, pop 30000): 4.2623 +- 0.0108 (99% Student-t half-width, build); compared in that band, the bank value only as a target",
     "sources_disagree": [
       {
         "value": "4.267",
         "cite": "Mezard & Zecchina, 'Random K-satisfiability problem: from an analytic solution to an efficient algorithm', Phys. Rev. E 66, 056126 (2002), arXiv:cond-mat/0207194 (PDF of v3 read), Sec. VI.D; Mertens, Mezard & Zecchina, 'Threshold values of random K-SAT from the cavity method', Random Struct. Algorithms 28, 340 (2006), arXiv:cs/0309020 (PDF read), Table 1 (rounded)"
-      },
-      {
-        "value": "4.262",
-        "cite": "Lundow & Markstrom, Phys. Rev. E 99, 022106 (2019), arXiv:1712.04888, abstract: 'alpha_3 <= 4.262' (an upper bound from finite-size numerics; abstract only)"
       }
     ]
   },
@@ -127,7 +123,7 @@
     "value": "1.64",
     "tol": "0.045",
     "cite": "Smallest density where the zero-survey equation of random 3-SAT has a solution t < 1 (t = weight of the delta peak of the surveys at 0): Mezard & Zecchina, Phys. Rev. E 66, 056126 (2002), arXiv:cond-mat/0207194 (PDF of v3 read), Sec. VI.E: 'although the t equation (59) in principle allows for the existence of nontrivial knowledges above alpha ~ 1.64, we have not found such a solution'; Mertens, Mezard & Zecchina, Random Struct. Algorithms 28, 340 (2006), arXiv:cs/0309020 (PDF read), Sec. 5.1 below Eq. (39): 'alpha_t(K) is a decreasing function of K and alpha_t(3) ~ 1.6' (sources_disagree; tol covers the spread). Not a phase transition: the non-zero surveys still collapse below the SP onset",
-    "independent_route": "replicant's own tangency of MMZ Eq. (39) (csp/ksat.py ksat_sp_support_threshold): 1.6369383215 (build); tests check it equals twice the K-XORSAT 2-core threshold computed by csp/xorsat.py through its DEGREE_LAWS hook (the same recursion at density alpha/2), and that the SP population's measured fraction of exactly-zero surveys matches t(alpha)",
+    "independent_route": "replicant's own tangency of MMZ Eq. (39) (csp/ksat.py ksat_sp_support_threshold): 1.6369383215 (build). Cross-check of the numerics through separate code (not an independent derivation: under q = u^(1/(K-1)), alpha -> alpha/2 the equation is the K-XORSAT leaf-removal recursion): it equals twice the 2-core threshold computed by csp/xorsat.py. Independent evidence: the SP population's measured fraction of exactly-zero surveys matches t(alpha) of Eq. (39) (tests/test_ksat.py)",
     "sources_disagree": [
       {
         "value": "1.6",

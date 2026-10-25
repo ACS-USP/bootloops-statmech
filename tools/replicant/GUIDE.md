@@ -75,7 +75,9 @@ CLI (from `tools/`):
   0.594959) and `complexity` 0.008399; with `--param N=1000` (seeds 0-19) also `sat_fraction` 0.95
   (99% Clopper-Pearson [0.683, 1.000]; `errors` gives 0.267, that interval's larger half-width) from exact GF(2) elimination and the sampled core
   (`core_variables_sampled` 0.6134 +- 0.0052): statistical, `not-computed`, so `final` is false.
-- Worked example, random K-SAT (`ksat`, cavity-only; measured times): `python3 -m replicant run ksat
+- Worked example, random K-SAT (`ksat`, cavity-only; measured times; the catalog's SP population
+  is fixed at seed 0, 4 runs, burn-in 100: other seeds through `sp.ksat_population_dynamics_sp`;
+  an `undetermined` population says so in its finality note): `python3 -m replicant run ksat
   --route cavity` (0.5 s) -> `alpha_1` 5.190893 (first-moment root, `exact-by-literature`: an upper
   bound on the threshold, not the threshold) and `alpha_t` 1.636938 (tangency of the zero-survey
   equation, `not-computed`), so `final` is false. `... --param alpha=3.0 --param N=16` (0.6 s):
@@ -219,7 +221,8 @@ GF(2) check `N` (needs `alpha`; refused `precondition:state-point` without it) a
 0-19; without `N` refused `precondition:known-parameter`, "need N"); `ksat` (cavity): `K` (integer >= 2,
 default 3), `alpha`, `N` (needs `alpha`; N <= 22 exhaustive counts, larger N BP and SP on instances),
 `seeds` (default 0-19 for counts, 0-9 for BP / SP; needs `N`), `pop` (the SP population; needs
-`alpha`), `sweeps` (default 30; needs `pop`), `crossing` (`true`: the SP-population root, K = 3). Without `beta` an entry returns its T = 0 / critical headline values. A composed spec
+`alpha`), `sweeps` (default 30; needs `pop`), `crossing` (`true` or `false` only: the SP-population root, K = 3;
+any other value, e.g. `yes`, `on`, `2`, is refused `precondition:known-parameter`). Without `beta` an entry returns its T = 0 / critical headline values. A composed spec
 (not a catalog entry) does not refuse an unknown name: its notes list "unused parameters [...]".
 
 OUTPUTS: the `Result` object (`values`, `errors`, `rigor`, `route`, `stable`, `final`, `finality`,
@@ -527,17 +530,25 @@ KNOWN HAZARDS:
   threshold here is `not-computed`. The crossing (`ksat_sp_crossing`, settings `sp.CROSSING`: alpha =
   4.18, 4.22, 4.26, 4.30, 4.34, pop 30000, 30 measured sweeps, burn-in 100 then 33 per warm-started
   density, 6 runs, seed 0; about 40 s) fits a line to Sigma per run and averages the roots: measured
-  4.2623 +- 0.0108 (99% Student-t half-width over runs), which contains MMZ's 4.26675 +- 0.00015
-  and Lundow-Markstrom's bound 4.262 alike: the band cannot separate them. A planted 1.005 power on
+  4.2623 +- 0.0108 (99% Student-t half-width over runs), which contains MMZ's 4.26675 +- 0.00015.
+  The catalog RefCheck (`run ksat --param crossing=true`, slow) uses t_{0.995,5} hypot(stderr, tol)
+  with the bank tol 5e-4: 4.03 x hypot(0.00267, 0.0005) = +-0.011, the same band. It cannot
+  separate MMZ from values a few 1e-3 away, e.g. the conditional upper bound alpha_3 <= 4.262 of
+  Lundow-Markstrom 2019 (Monte Carlo plus a monotonicity assumption; abstract only; cited in the
+  bank, not banked as a value). A planted 1.005 power on
   the SP factor moves the root to 4.3402 +- 0.0207 (excluded); the band excludes shifts of about
   0.03 and larger, not small ones. The population uses MMZ Eq. (18) rewritten with the fixed-point
   identity (17) (variance about 2.3x smaller; the unrewritten form `complexity_mmz18` is reported
-  too and agrees within its band on an equilibrated population, slow test), keeps zero surveys
+  too and agrees within its band on an equilibrated population, slow test). Instance SP (BMZ Eqs.
+  (39)-(41), N = 20000, seeds 0-7, all converged) gives 0.005996 +- 0.000232 at alpha = 4.2 against
+  the population's 0.005983 +- 0.000460 (pop 50000, 8 runs): the 99% band 0.0018 is 0.3 Sigma and
+  excludes |Delta Sigma| >~ 0.002; a planted 1.005 power in the population only (0.0139) is
+  excluded (slow, about 60 s). The population keeps zero surveys
   (no Sec. 5.1 regularisation) and caps phi = -ln(1 - eta) at 50. The SP factor is a hook
   (`sp.SP_UPDATES`) audited against an enumeration of warning configurations (max deviation
   4e-16); a planted rule is caught there and changes the instance complexity. Near the SP onset
-  (MMZ 3.927) the population relaxes slowly and is labelled `undetermined` (pop 2000: 3.85 and 3.9
-  undetermined, 4.0 non-trivial); the onset is bracketed (3.6 trivial, 4.2 non-trivial), not
+  (MMZ 3.927) the population relaxes slowly and is labelled `undetermined` (pop 2000, burn-in 40: 3.85
+  and 3.9 undetermined, 4.0 non-trivial; with the catalog's burn-in 100 both collapse to trivial); the onset is bracketed (3.6 trivial, 4.2 non-trivial), not
   located. BP on instances: the measured convergence edge (synchronous BP, damping 0.5, 1000
   sweeps, seeds 0-19) is 3.5 -> 20/20, 3.8 -> 8, 3.9 -> 2, 4.0 -> 0 at N = 2000 and 3.7 -> 18, 3.8 ->
   3, 3.9 -> 0 at N = 6000 (damping 0.8 gives the same counts at N = 2000; undamped synchronous BP
@@ -546,11 +557,14 @@ KNOWN HAZARDS:
   instances: synchronous sweeps, tol 1e-6; at N = 1000, 3 of seeds 0-3 converge at alpha = 4.2 (BMZ
   report non-convergence at small N too). MMZ find the 1RSB solution stable only for 4.15 < alpha <=
   alpha_s (K = 3); replicant computes no SP stability. Small N: exhaustive counts (N <= 22) agree
-  with an independent backtracking counter; on named seeds Jensen (mean ln Z <= ln mean Z) holds
-  exactly and the sample mean of Z / E Z contains 1 (a (1 - 2^-(K-1))^M law is excluded); at N =
+  with an independent backtracking counter; on named seeds mean ln Z <= ln mean Z holds (AM-GM:
+  true for any data, a tautology kept because the brief asked for it); the content is that the
+  sample mean of Z / E Z contains 1 (a (1 - 2^-(K-1))^M law is excluded); at N =
   12 the quenched-annealed entropy gap is NOT resolved (alpha = 2: 0.4177 +- 0.0042 against
-  0.4261). `alpha_t` = 2 alpha_d^XOR(K) exactly (the zero-survey equation is the XORSAT leaf-removal
-  recursion at density alpha / 2); it is not a phase transition. Not implemented: SP stability,
+  0.4261). `alpha_t` = 2 alpha_d^XOR(K) exactly: under q = u^(1/(K-1)), alpha -> alpha / 2 the
+  zero-survey equation IS the XORSAT leaf-removal recursion, so this confirms the numerics
+  through separate code, not by an independent derivation; the independent check is the
+  population's measured zero-survey fraction against t(alpha). It is not a phase transition. Not implemented: SP stability,
   reconstruction / condensation thresholds (banked from KMRSZ, UNCLAIMED), SP decimation, the 3-
   coloring stretch.
 - Banked values often come from secondary open sources where the original is paywalled; each bank

@@ -194,7 +194,22 @@ KSAT_CAVEAT = ("cavity route (1RSB at y -> oo: survey propagation on the factor 
                f"is not a theorem ({_KS_DSS}: K >= k0 only)")
 
 
+_FLAG = {True: True, False: False, "true": True, "false": False}
+
+
+def _crossing_flag(p):
+    """`crossing` must be true or false (a bool, as the CLI parses `crossing=true`, or the exact
+    strings "true" / "false"); anything else (yes, on, 1, 2, "TRUE") is refused, never read
+    as "not requested"."""
+    v = p.get("crossing", False)
+    if not (isinstance(v, bool) or v in ("true", "false")):
+        raise Refusal("precondition:known-parameter",
+                      f"crossing = {v!r}: accepted values are true and false")
+    return _FLAG[v]
+
+
 def _ks_check(p):
+    _crossing_flag(p)
     if p.get("N") is None and "seeds" in p:
         raise Refusal("precondition:known-parameter", "seeds is a finite-N parameter: need N")
     if p.get("pop") is None and "sweeps" in p:
@@ -266,13 +281,17 @@ def _ks_finite(p):
                       "ones), named seeds",))
 
 
+PD_SEED, PD_RUNS = 0, 4        # the catalog's SP-population run (documented in the GUIDE)
+
+
 def _ks_population(p):
     r = SP.ksat_population_dynamics_sp(_K(p), p["alpha"], pop=p["pop"], sweeps=p.get("sweeps", 30),
-                                       seed=0, burn_in=100, runs=4)
+                                       seed=PD_SEED, burn_in=100, runs=PD_RUNS)
     return Out({**r.value, "sp_phase": r.phase}, f"SP population ({r.phase}): {r.note}",
                errors=dict(r.stderr), statistical=tuple(r.value),
-               notes=("statistical: SP population dynamics (4 runs, seed 0, burn_in 100), mean "
-                      "+- stderr over runs; phase " + r.phase,))
+               notes=(f"statistical: SP population dynamics ({PD_RUNS} runs, seed {PD_SEED}, "
+                      "burn_in 100; fixed here, use csp/sp.ksat_population_dynamics_sp for other "
+                      "seeds), mean +- stderr over runs; phase " + r.phase,))
 
 
 def _ks_crossing(p):
@@ -289,10 +308,6 @@ def _ks_crossing(p):
                       f"{r.runs} runs; 99% Student-t half-width {r.halfwidth99:.3g}",))
 
 
-def _truthy(key):
-    return lambda p: p.get(key) in (True, 1, "1", "true")
-
-
 def ksat():
     steps = [fstep("ksat-first-moment", f"{_KS_DSS}, Eq. (2.3) and Markov's inequality",
                    _ks_first_moment),
@@ -302,7 +317,7 @@ def ksat():
              fstep("ksat-sp-population", f"{_KS_MMZ}, Secs. 3 and 5.2, Eq. (18)", _ks_population,
                    when=has("alpha", "pop"), skip="needs alpha and pop"),
              fstep("ksat-sp-crossing", f"{_KS_MMZ}, Sec. 5.3 (root of Sigma by regression)",
-                   _ks_crossing, when=_truthy("crossing"), skip="crossing not requested")]
+                   _ks_crossing, when=_crossing_flag, skip="crossing not requested")]
     refs = [RefCheck("ksat", "alpha_t_k3", lambda v: v["alpha_t"], route="cavity"),
             RefCheck("ksat", "alpha_s_k3", lambda v: v["alpha_s_sp"], statistical=True,
                      params={"crossing": True}, route="cavity", slow=True,
@@ -312,9 +327,13 @@ def ksat():
                       "upper-bounds the SAT threshold (Markov); it is NOT the threshold")
     fin_n = Stability("not-computed", "rs", "csp/ksat.py, csp/sp.py",
                       "finite-N statistical estimate over named seeds: NOT final")
-    cav = Stability("not-computed", "1rsb", _KS_MMZ,
-                    "SP population dynamics (1RSB cavity, y -> oo): statistical, a cavity "
-                    "conjecture: NOT final")
+    def cav(v):
+        und = (" The population is undetermined: not equilibrated (the mean survey still "
+               "drifts, typically near the SP onset), so the values carry burn-in bias not in "
+               "stderr." if v.get("sp_phase") == "undetermined" else "")
+        return Stability("not-computed", "1rsb", _KS_MMZ,
+                         "SP population dynamics (1RSB cavity, y -> oo): statistical, a cavity "
+                         "conjecture: NOT final." + und)
     cross = Stability("not-computed", "1rsb", f"{_KS_MMZ}; {_KS_DSS}",
                       "root of the SP complexity (statistical): the cavity conjecture for the "
                       "SAT threshold; for K = 3 not proven (Ding-Sly-Sun: K >= k0, an unspecified "

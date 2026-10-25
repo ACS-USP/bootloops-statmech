@@ -98,8 +98,9 @@ def _counts(K, N, alpha, seeds):
 
 
 def _jensen_and_first_moment(K, N, alpha, seeds):
-    """(i) Jensen on the sampled set, exactly: mean ln Z <= ln mean Z (every sampled instance
-    satisfiable, so ln Z is finite); (ii) E Z = 2^N (1 - 2^-K)^M exactly for this ensemble:
+    """(i) mean ln Z <= ln mean Z on the sample: this is AM-GM, true for ANY positive data (a
+    tautology, kept because the brief asks for it; every sampled instance satisfiable, so ln Z
+    is finite); the real content is (ii): E Z = 2^N (1 - 2^-K)^M exactly for this ensemble:
     the sample mean of Z / E Z contains 1 in its 99% Student-t band, and the positive control
     (1 - 2^-(K-1))^M (a wrong clause-violation probability) does not; (iii) mean ln Z / N is
     not above the annealed bound beyond its band."""
@@ -121,7 +122,8 @@ def test_small_N_exact_counts_below_annealed_bound():
     """Exhaustive counts on named seeds (independent of BP/SP), N = 12, seeds 0-39, alpha = 2
     and 2.5 (every sampled instance satisfiable: measured).  At this N the quenched-annealed
     gap is not resolved (alpha = 2: mean ln Z / N = 0.4177 +- 0.0042 against 0.4261): only
-    the exact Jensen inequality and the exact E Z are asserted."""
+    the AM-GM inequality on the sample (a tautology) and the exact E Z with its control are
+    asserted."""
     for alpha in ("2.0", "2.5"):
         _jensen_and_first_moment(3, 12, alpha, range(40))
 
@@ -134,10 +136,12 @@ def test_small_N_exact_counts_below_annealed_bound_N18():
 
 # ---- support of the surveys (MMZ Eq. (39)) -----------------------------------------------
 def test_sp_support_threshold_matches_bank_and_xorsat():
-    """alpha_t(3) against the bank (MZ 2002: 1.64; MMZ: 1.6; a target).  Independent route:
-    with q = u^(1/(K-1)) the zero-survey equation is the K-XORSAT leaf-removal recursion at
-    density alpha / 2, so alpha_t(K) = 2 alpha_d^XOR(K), computed by csp/xorsat.py through its
-    own degree-law hook.  Positive control: the SP onset (3.927) is not within tolerance."""
+    """alpha_t(3) against the bank (MZ 2002: 1.64; MMZ: 1.6; a target).  Cross-check of the
+    numerics through separate code: with q = u^(1/(K-1)) the zero-survey equation IS the
+    K-XORSAT leaf-removal recursion at density alpha / 2 (the same recursion, not an
+    independent derivation), so alpha_t(K) = 2 alpha_d^XOR(K) as computed by csp/xorsat.py.
+    The independent evidence is the population's measured zero-survey fraction (next test).
+    Positive control: the SP onset (3.927) is not within tolerance."""
     from replicant.csp import xorsat as X
     from replicant.refdata import check
     a3 = S.ksat_sp_support_threshold(3)
@@ -189,9 +193,10 @@ def test_bp_on_loopy_formula_is_not_exact_and_reports_iterations():
 
 @slow
 def test_bp_converges_below_alpha_d_and_not_above():
-    """Finite N, named seeds (see BP_WINDOW for the measured window).  Below alpha_d (KMRSZ
-    2007: 3.86 for K = 3, banked as a target only) every seed converges; at alpha = 4.2, above
-    alpha_d, most seeds do not."""
+    """Finite N, named seeds (see BP_WINDOW for the measured window).  The test BRACKETS
+    alpha_d (KMRSZ 2007: 3.86 for K = 3, banked as a target only), it does not measure it: at
+    3.5 every seed of 0-19 converges, at 4.0 none does (Clopper-Pearson upper edge < 0.5); at
+    3.8 / 3.9 8 / 2 of 20 converge at N = 2000 (and 2/20 near 3.86, reviewer's measurement)."""
     w = S.BP_WINDOW
     lo = S.ksat_bp_converged_fraction(3, w["N"], w["below"], w["seeds"], iters=w["iters"],
                                       damping=w["damping"])
@@ -213,8 +218,10 @@ def test_sp_rule_matches_warning_enumeration():
 
 def test_planted_error_in_sp_update_is_caught():
     """Planted errors in the SP_UPDATES hook (a 1.003 power on the factor, a 1.1 weight on
-    Pi^0) are caught by the warning-enumeration audit and change the population's complexity
-    at alpha = 4.2; the registry is restored with an identity assert."""
+    Pi^0) are caught by the warning-enumeration audit (deviations 1.1e-3 and 0.024), and the
+    1.1 weight changes the converged SP fixed point of an instance at alpha = 4.2 (instance SP,
+    N = 1000: trivial, Sigma = 0, against 0.0113); the registry is restored with an identity
+    assert."""
     orig = SP.SP_UPDATES["bmz"]
     try:
         SP.SP_UPDATES["bmz"] = SP.planted_power_rule(1.003)
@@ -268,14 +275,34 @@ def test_complexity_estimators_agree():
 @slow
 def test_instance_complexity_matches_population():
     """BMZ Eqs. (39)-(41) on sampled instances (no fixed-point identity, no sampling of the
-    degree law) against the population estimate at alpha = 4.2."""
-    vals = [SP.ksat_sp(S.random_ksat(3, 20000, "4.2", seed=s), iters=500, seed=s).complexity
-            for s in range(4)]
-    pd = SP.ksat_population_dynamics_sp(3, "4.2", pop=20000, sweeps=40, seed=1, burn_in=100,
-                                        runs=4)
-    m, se = np.mean(vals), np.std(vals, ddof=1) / 2
-    band = t_quantile(0.995, 3) * math.hypot(se, pd.stderr["complexity"])
-    assert abs(m - pd.value["complexity"]) < band + 1e-3, (m, se, pd.value, pd.stderr)
+    degree law) against the population estimate at alpha = 4.2, in a 99% Student-t band with no
+    extra allowance.  Measured before the asserts (fix round 1): instances N = 20000, seeds 0-7,
+    all converged, 0.005996 +- 0.000232; population pop 50000, 60 sweeps, 8 runs, seed 1,
+    0.005983 +- 0.000460; band 0.0018, i.e. 0.30 Sigma (it tells Sigma from 0 and excludes
+    |Delta Sigma| >~ 0.002).  Positive control: a planted 1.005 power on the SP factor in the
+    population only (hook-level, restored) gives 0.0139 +- 0.0004 (4 runs), outside its band.
+    About 60 s (measured 58 s)."""
+    runs = [SP.ksat_sp(S.random_ksat(3, 20000, "4.2", seed=s), iters=500, seed=s)
+            for s in range(8)]
+    assert all(r.converged and not r.trivial for r in runs), [r.note for r in runs]
+    vals = [r.complexity for r in runs]
+    m, se = np.mean(vals), np.std(vals, ddof=1) / math.sqrt(len(vals))
+    pd = SP.ksat_population_dynamics_sp(3, "4.2", pop=50000, sweeps=60, seed=1, burn_in=100,
+                                        runs=8)
+    assert pd.phase == "nontrivial", pd.note
+    band = t_quantile(0.995, 7) * math.hypot(se, pd.stderr["complexity"])
+    assert abs(m - pd.value["complexity"]) < band, (m, se, pd.value, pd.stderr, band)
+    assert band < 0.5 * m, (band, m)                  # the band resolves Sigma from 0
+    orig = SP.SP_UPDATES["bmz"]
+    try:
+        SP.SP_UPDATES["bmz"] = SP.planted_power_rule(1.005)
+        bad = SP.ksat_population_dynamics_sp(3, "4.2", pop=50000, sweeps=60, seed=2,
+                                             burn_in=100, runs=4)
+    finally:
+        SP.SP_UPDATES["bmz"] = orig
+    assert SP.SP_UPDATES["bmz"] is orig
+    ctl = t_quantile(0.995, 3) * math.hypot(se, bad.stderr["complexity"])
+    assert abs(m - bad.value["complexity"]) > ctl, (m, bad.value, bad.stderr, ctl)
 
 
 @slow
@@ -345,7 +372,7 @@ def test_catalog_entry_ksat():
     assert "Ding" in res.finality["alpha_1"].cite
     pt = compose(e.spec, "cavity").run(alpha="3.0", N=12, seeds=(0, 1, 2, 3))
     v = pt.values
-    assert v["sat_fraction"] == 1 and v["ln_mean_z"] >= v["entropy_exact_mean"]   # Jensen
+    assert v["sat_fraction"] == 1 and v["ln_mean_z"] >= v["entropy_exact_mean"]   # AM-GM
     assert pt.finality["entropy_exact_mean"].state == "not-computed"
     assert "entropy_exact_mean" in pt.statistical and not pt.final
     r = _refuses(lambda: compose(e.spec, "cavity").run(alfa="3"), "precondition:known-parameter")
@@ -361,6 +388,54 @@ def test_catalog_entry_ksat():
                            "GUIDE.md")) as f:
         guide = f.read()
     assert "| `ksat`" in guide and "precondition:integer-k-at-least-2" in guide
+
+
+def test_crossing_flag_outside_true_false_is_refused():
+    """Fix round 1 (Important 1): a `crossing` value other than true/false is refused by name,
+    never reported as "crossing not requested"."""
+    import io
+    from replicant.cli import main
+    e = catalog()["ksat"]
+    for bad in ("yes", "on", 2, "TRUE", 1):
+        r = _refuses(lambda: compose(e.spec, "cavity").run(crossing=bad),
+                     "precondition:known-parameter")
+        assert "true" in r.detail and "false" in r.detail, r.detail
+    for val in ("yes", "on", "2"):
+        err = io.StringIO()
+        code = main(["run", "ksat", "--route", "cavity", "--param", f"crossing={val}"],
+                    io.StringIO(), err)
+        assert code == 2 and "REFUSED: precondition:known-parameter" in err.getvalue(), err.getvalue()
+    out = compose(e.spec, "cavity").run(crossing=False)      # false: the step is skipped
+    assert "alpha_s_sp" not in out.values
+
+
+def test_alpha_s_bank_tolerance_is_from_agreeing_estimates():
+    """Fix round 1 (Important 2): the alpha_s_k3 tolerance comes from the estimates that agree
+    (MMZ 4.26675 +- 0.00015, MZ / BMZ 4.267); Lundow-Markstrom's conditional upper bound is in
+    the cite, not in sources_disagree, so the catalog band t hypot(stderr, tol) is the one the
+    GUIDE states."""
+    ref = BANK["alpha_s_k3"]
+    assert float(ref.tol) <= 5e-4
+    assert all(abs(float(d["value"]) - float(ref.value)) <= float(ref.tol)
+               for d in ref.sources_disagree)
+    assert not any("Lundow" in d["cite"] for d in ref.sources_disagree)
+    assert "conditional upper bound" in ref.cite
+    band = t_quantile(0.995, 5) * math.hypot(0.00267, float(ref.tol))   # measured stderr
+    assert band < 0.012, band
+
+
+def test_undetermined_population_finality_says_so():
+    """Fix round 1 (Minor 9): an `undetermined` SP population carries that in its finality
+    note; the population seed and runs are stated."""
+    e = catalog()["ksat"]
+    for key in ("complexity", "complexity_mmz18", "mean_survey", "zero_survey_fraction"):
+        und = e.finality[key]({"sp_phase": "undetermined"})
+        assert und.state == "not-computed"
+        assert "undetermined" in und.note and "not equilibrated" in und.note, und.note
+        assert "undetermined" not in e.finality[key]({"sp_phase": "nontrivial"}).note
+    pt = compose(e.spec, "cavity").run(alpha="4.2", pop=2000, sweeps=10)
+    assert pt.values["sp_phase"] == "nontrivial", pt.values
+    assert any("seed 0" in n and "4 runs" in n for n in pt.notes), pt.notes
 
 
 @slow
