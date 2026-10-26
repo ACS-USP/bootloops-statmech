@@ -75,11 +75,21 @@ def simulate_perceptron(rule, N, alpha_max, seeds, eta=1.0, noise=0.0, noise_est
         raise Refusal("precondition:eta", f"eta={eta!r}: need a finite learning rate > 0")
     if not (isinstance(noise, (int, float)) and 0 <= noise < 0.5):
         raise Refusal("precondition:noise", f"noise={noise!r}: a flip probability in [0, 1/2)")
+    if noise_estimate is not None and rule != "optimal":
+        raise Refusal("precondition:known-parameter", "noise_estimate is read by the optimal rule only")
+    if noise_estimate is not None and not (isinstance(noise_estimate, (int, float))
+                                           and 0 <= noise_estimate < 0.5):
+        raise Refusal("precondition:noise", f"noise_estimate={noise_estimate!r}: in [0, 1/2)")
+    if rule == "optimal" and eta != 1:
+        raise Refusal("precondition:optimal-eta", "the optimal modulation is the optimum at eta = 1 only")
     est = float(noise if noise_estimate is None else noise_estimate)
     if not (isinstance(alpha_max, (int, float)) and math.isfinite(alpha_max) and alpha_max > 0):
         raise Refusal("precondition:alpha", f"alpha_max={alpha_max!r}: need alpha > 0")
-    R0, Q0 = (float(v) for v in init)
-    if not (Q0 > 0 and abs(R0) < math.sqrt(Q0)) or (rule == "optimal" and R0 <= 0):
+    try:
+        R0, Q0 = (float(v) for v in init)
+    except (TypeError, ValueError):
+        raise Refusal("precondition:state-point", f"init={init!r}: need (R0, Q0)") from None
+    if not (math.isfinite(R0) and math.isfinite(Q0)) or not (Q0 > 0 and abs(R0) < math.sqrt(Q0)) or (rule == "optimal" and R0 <= 0):
         raise Refusal("precondition:initial-overlap", f"(R0, Q0) = ({R0}, {Q0}): need Q0 > 0, "
                       "|R0| < sqrt(Q0), and R0 > 0 for the optimal rule")
     marks = sorted({max(1, round(a * N)) for a in (alphas or (alpha_max,))})

@@ -10,7 +10,10 @@ Delta = b x); the functional derivative in W(V), V = {b, x}, vanishes at
 
 u = rho Delta / s, s = sqrt(1 - rho^2), lam the flip probability of the label (the y average
 done here; it is VKC Eq. (25) with their chi = 2 lam and their lambda = s/rho, and at lam = 0
-BR Eq. (10), whose F = |J| W*).  With W* the drift of rho is rho <W*^2> / 2 and <W* Delta> = 0.
+BR Eq. (10), whose F = |J| W*).  VKC's chi is inconsistent within their paper: their Eq. (1) says the
+label is flipped with probability chi, but their Eqs. (20) and (25) (P(b | y) = chi/2 + (1 - chi)
+Theta(b y)) flip it with probability chi/2.  This code follows Eqs. (20)/(25): lam = chi/2 is the flip
+probability (Copelli et al.'s lambda_o).  O3 reuses VKC's drift results: map their chi as 2 lam.  With W* the drift of rho is rho <W*^2> / 2 and <W* Delta> = 0.
 
 OPTIMALITY_CLASS states the class it is optimal in.  As rho -> 1 (Delta = s t / rho):
 eps -> C / alpha with C = 2 / I(lam), I = (1 - 2 lam)^2 int Dt e^{-t^2/2} / (lam + (1 - 2 lam) H(t))

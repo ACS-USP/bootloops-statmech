@@ -78,14 +78,16 @@ def online_perceptron(route):
             source=_BR, check=Check((RHO, LAM), _closed("adatron", "ax"), _PTS, "rhs")),
         sym("AdaTron: <F b (y - rho x)>", sp.Eq(sp.Symbol("D_a"), (1 - 2 * LAM) * s**3 / sp.pi),
             source=_BR, check=Check((RHO, LAM), _closed("adatron", "drive"), _PTS, "rhs")),
-        sym("Optimal modulation per unit |J|, u = rho Delta / sqrt(1 - rho^2) (VKC Eq. (25), chi = 2 lambda; "
+        sym("Optimal modulation per unit |J|, u = rho Delta / sqrt(1 - rho^2) (VKC Eq. (25) with chi = 2 lambda, "
+            "following their Eqs. (20), (25), where the flip probability is chi/2, not their Eq. (1)'s chi; "
             "BR Eq. (10) at lambda = 0): optimal among single-example modulated Hebbian rules that know rho",
             sp.Eq(sp.Symbol("W^*"), wstar), source=_VKC,
             check=Check((D, RHO, LAM), lambda d, rho, lam: float(OPT.w_star(
                 float(d), math.acos(float(rho)), float(lam))),
                 (("-0.5", "0.3", "0"), ("0.2", "0.8", "0.1"), ("-2", "0.95", "0.3")), "rhs")),
-        cited("Asymptote of the optimal rule with the noise known, eps -> C / alpha (derived here; Copelli et "
-              "al. Eq. (8) print Dt e^{-t^2}, which gives C(0) = 1.325, not the 0.88 of VKC Tables I-II)",
+        cited("Asymptote of the optimal rule with the noise known, eps -> C / alpha: derived here; differs from "
+              "Copelli et al. Eq. (8) as printed (Dt e^{-t^2}, which gives C(0) = 1.325, not the 0.88 of VKC "
+              "Tables I-II)",
               r"C(\lambda) = \frac{2}{I(\lambda)},\quad I(\lambda) = (1-2\lambda)^2 \int Dt\, "
               r"\frac{e^{-t^2/2}}{\lambda + (1-2\lambda) H(t)}", _CE,
               check=Check((LAM,), lambda lam: OPT.asymptotic_constant(float(lam)),

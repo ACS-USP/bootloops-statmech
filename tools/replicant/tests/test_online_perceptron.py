@@ -11,6 +11,7 @@ Bank: reference/online_perceptron.json.
 import math
 import os
 import sys
+from contextlib import contextmanager
 
 import mpmath as mp
 import numpy as np
@@ -27,6 +28,20 @@ from replicant.testing import slow
 
 BANK = load("online_perceptron")
 RULES = ("hebb", "perceptron", "adatron", "optimal")
+
+
+@contextmanager
+def planted(module, **changes):
+    """Set module._PLANT entries for the block; restore the SAME dict object (identity asserted)."""
+    hook = module._PLANT
+    saved = dict(hook)
+    try:
+        hook.update(changes)
+        yield
+    finally:
+        hook.clear()
+        hook.update(saved)
+        assert module._PLANT is hook and hook == saved
 
 
 def _refuses(fn, reason):
@@ -66,8 +81,8 @@ def test_fields_closed_vs_quadrature():
 
 def test_fields_quadrature_against_mpmath_and_planted_normalisation():
     """A third rule (mpmath 1D quadrature of the quadrant moments, x | y ~ N(rho y, 1 - rho^2))
-    at one point, and the positive
-    control: a closed form typed with sqrt(pi) for sqrt(2 pi) (fields._PLANT['norm']) is caught."""
+    at one point, and the positive control: sqrt(pi) typed for sqrt(2 pi) (fields._PLANT['norm'])
+    is caught on the elementary closed forms AND on the optimal rule's panel integral."""
     th, noise = math.acos(0.6), 0.1
     rho, s = math.cos(th), math.sin(th)
     with mp.workdps(20):
@@ -79,15 +94,14 @@ def test_fields_quadrature_against_mpmath_and_planted_normalisation():
         want = ((1 - noise) * (quadrant(-1, 1) - quadrant(1, -1))
                 - noise * (quadrant(1, 1) - quadrant(-1, -1)))
     assert abs(F.closed("perceptron", th, noise).ay - float(want)) < 1e-12
-    saved = dict(F._PLANT)
-    try:
-        F._PLANT["norm"] = math.sqrt(math.pi)
+    good_opt = F.closed("optimal", th, noise, 0.05)
+    with planted(F, norm=math.sqrt(math.pi)):
         bad = F.closed("perceptron", th, noise)
         assert abs(bad.ay - F.quadrature(_g("perceptron", th), th, noise).ay) > 1e-2, bad
-    finally:
-        F._PLANT.clear()
-        F._PLANT.update(saved)
-    assert F._PLANT == saved
+        bad = F.closed("optimal", th, noise, 0.05)
+        q = F.quadrature(_g("optimal", th, 0.05), th, noise, n_r=96, n_phi=64)
+        assert all(abs(x - y) > 1e-3 for x, y in zip(bad, q)), (bad, q)
+    assert F.closed("optimal", th, noise, 0.05) == good_opt
 
 
 # ---- Hebb: the ODE against its closed form --------------------------------------------------
@@ -111,10 +125,12 @@ def test_hebb_closed_form():
     big = 1e12
     _, _, e = O.hebb_closed_form(big)
     assert check(BANK["hebb_eps_constant"], e * math.sqrt(big), label="hebb").ok
-    # positive control: a closed form with the eta^2 alpha (diffusion) term dropped is far off
-    tr = O.integrate(O.perceptron_flow("hebb"), 7.0, (0.0, 1.0))
-    R = math.sqrt(2 / math.pi) * 7.0
-    assert abs(math.acos(R / math.sqrt(1 + 2 / math.pi * 49)) / math.pi - tr.eps[-1]) > 0.05
+    # positive control through the code: the ODE with its eta^2 <F^2> term dropped
+    # (odes._PLANT) misses the closed form by far
+    _, _, ce = O.hebb_closed_form(7.0)
+    with planted(O, eta2=0.0):
+        bad = O.integrate(O.perceptron_flow("hebb"), 7.0, (0.0, 1.0), alphas=(7.0,)).eps[-1]
+    assert abs(bad - ce) > 0.05, (bad, ce)
 
 
 # ---- learning curves vs the banked asymptotes -----------------------------------------------
@@ -142,17 +158,31 @@ def test_rules_learning_curves_vs_banked():
 def test_optimal_versus_batch_bayes_teacher_student():
     """Comparison only (never an input): the online optimal rule is slower than the batch
     Bayes-optimal student of the teacher_student entry (Opper-Haussler), its asymptotic constant
-    about twice Bayes', and below the batch curve nowhere on a grid."""
+    about twice Bayes', and above the batch curve at alpha = 2, 5, 20."""
     from replicant.families.teacher_student import asymptotic_constant, teacher_student_error
     c_on = OPT.asymptotic_constant(0)
     c_bayes = float(asymptotic_constant("bayes"))
     assert 1.9 < c_on / c_bayes < 2.1, (c_on, c_bayes)
-    tr = O.integrate(O.perceptron_flow("optimal"), 20.0, (0.01, 1.0), alphas=(20.0,))
+    tr = O.integrate(O.perceptron_flow("optimal"), 20.0, (0.01, 1.0), alphas=(2.0, 5.0, 20.0))
     for a, eps in zip(tr.alpha, tr.eps):
         assert eps > float(teacher_student_error(a, "bayes")), (a, eps)
     assert "modulated" in OPT.OPTIMALITY_CLASS and "rho" in OPT.OPTIMALITY_CLASS
     f = OPT.optimal_modulation(0.8, noise=0.1)
     assert f.optimality_class == OPT.OPTIMALITY_CLASS and f.rho == 0.8 and f.noise == 0.1
+
+
+def test_misestimated_optimal_rule_has_no_formula_constant():
+    """The 2 / I(noise) limit belongs to the matched optimal rule only: with noise_estimate !=
+    noise the entry reports the measured constant, no eps_constant_formula, and a note that the rule
+    is outside OPTIMALITY_CLASS (fix round 1)."""
+    e = catalog()["online_perceptron"]
+    res = compose(e.spec, "online").run(rule="optimal", R0="0.01", noise_estimate="0.1")
+    assert "eps_constant_formula" not in res.values
+    assert abs(res.values["eps_constant"] - OPT.asymptotic_constant(0)) > 0.1, res.values
+    assert any("OUTSIDE OPTIMALITY_CLASS" in n for n in res.notes), res.notes
+    ok = compose(e.spec, "online").run(rule="optimal", R0="0.01")
+    assert abs(ok.values["eps_constant_formula"] - OPT.asymptotic_constant(0)) < 1e-12
+    assert not any("OUTSIDE" in n for n in ok.notes)
 
 
 def test_optimal_asymptote_matches_its_formula_with_noise():

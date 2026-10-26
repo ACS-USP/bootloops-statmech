@@ -28,8 +28,8 @@ from .online import simulate as SIM
 from .spec import ModelSpec
 
 BR = "Biehl & Riegler, Europhys. Lett. 28, 525 (1994) (preprint read, author's page)"
-VKC = ("Vicente, Kinouchi & Caticha, Machine Learning 32, 179 (1998), arXiv:cond-mat/9801297; "
-       "Kinouchi & Caticha, J. Phys. A 25, 6243 (1992) (not fetched)")
+VKC = "Vicente, Kinouchi & Caticha, Machine Learning 32, 179 (1998), arXiv:cond-mat/9801297"
+KC92 = "Kinouchi & Caticha, J. Phys. A 25, 6243 (1992) (not fetched)"
 CEKBSRC = ("Copelli, Eichhorn, Kinouchi, Biehl, Simonetti, Riegler & Caticha, Europhys. Lett. 37, "
            "427 (1997) (preprint WUE-ITP-96-022 read, author's page)")
 CAVEAT = ("online route: the N -> oo order-parameter ODEs of online learning (Biehl-Riegler 1994 "
@@ -83,9 +83,14 @@ def _state(p):
     if p.get("N") is None and "seeds" in p:
         raise Refusal("precondition:known-parameter", "seeds is a finite-N parameter: need N")
     R0, Q0 = _init(p)
+    notes = ()
+    if f.rule == "optimal" and f.noise_est != f.noise:
+        notes = (f"optimal rule built on noise_estimate {f.noise_est} != noise {f.noise}: a mis-estimated "
+                 "modulation, OUTSIDE OPTIMALITY_CLASS (Copelli et al. 1997's robustness setting), not an "
+                 "optimum",)
     return Out({"rule": f.rule, "eta": f.eta, "noise": f.noise, "noise_estimate": f.noise_est,
                 "R0": R0, "Q0": Q0}, f"rule {f.rule}, eta {f.eta}, noise {f.noise} "
-               f"(estimate {f.noise_est}), (R0, Q0) = ({R0}, {Q0}) (BR Eqs. (1)-(3))")
+               f"(estimate {f.noise_est}), (R0, Q0) = ({R0}, {Q0}) (BR Eqs. (1)-(3))", notes=notes)
 
 
 def _curve(p):
@@ -109,10 +114,15 @@ def _asymptote(p):
     slope, c = O.asymptote(f, _init(p), ALPHA_BIG)
     vals = {"eps_exponent": slope, "eps_constant": c, "alpha_big": ALPHA_BIG,
             "eps_exponent_derived": O.EXPONENT[f.rule]}
-    if f.rule == "optimal":
+    notes = ()
+    if f.rule == "optimal" and f.noise_est == f.noise:
         vals["eps_constant_formula"] = OPT.asymptotic_constant(f.noise)
+    elif f.rule == "optimal":
+        notes = (f"noise_estimate {f.noise_est} != noise {f.noise}: the mis-estimated rule is OUTSIDE "
+                 "OPTIMALITY_CLASS (it is not the optimum of this flow), and 2 / I(noise) is the limit of "
+                 "the matched rule only: eps_constant_formula not reported",)
     return Out(vals, f"log-slope {slope:.5f} (derived {O.EXPONENT[f.rule]:.4f}) and "
-               f"alpha^p eps = {c:.6g} at alpha = {ALPHA_BIG:g}")
+               f"alpha^p eps = {c:.6g} at alpha = {ALPHA_BIG:g}", notes=notes)
 
 
 def _robust(p):
@@ -132,7 +142,8 @@ def _finite(p):
     f, a = _flow(p), _num(p, "alpha")
     seeds = _checks.seeds(p.get("seeds", _SEEDS))
     sim = SIM.simulate_perceptron(f.rule, n, a, seeds, eta=f.eta, noise=f.noise,
-                                  noise_estimate=f.noise_est, init=_init(p))
+                                  noise_estimate=f.noise_est if f.rule == "optimal" else None,
+                                  init=_init(p))
     b = sim.band
     return Out({"eps_sim": b.mean, "eps_sim_halfwidth99": b.half_width, "N": n, "seeds": list(seeds)},
                f"eps over seeds {list(seeds)} at N = {n}, alpha = {a:g}: {b.mean:.6g} +- "
@@ -144,7 +155,7 @@ def _finite(p):
 
 def online_perceptron():
     steps = [fstep("online-state-point", f"{BR}, Eqs. (1)-(3); {CEKBSRC}, Eq. (7)", _state),
-             fstep("online-asymptote", f"{BR}, Eqs. (7), (8), (15); {VKC}, Tables I-II", _asymptote,
+             fstep("online-asymptote", f"{BR}, Eqs. (7), (8), (15); {VKC}, Tables I-II; {KC92}", _asymptote,
                    when=_asym_when, skip="noise > 0 with a rule other than Hebb: no power law is "
                    "claimed (the optimal rule's 2 / I(noise) is checked in the tests)"),
              fstep("online-learning-curve", f"{BR}, Eqs. (4)-(6)", _curve, when=has("alpha"),
@@ -170,10 +181,10 @@ def online_perceptron():
                              lambda v: v["robust_boundary"], route="online",
                              params={"rule": "optimal", "noise": lam, "R0": "0.01"}))
     ode = Stability("not-computed", "online-ode", BR, _ODE_NOTE)
-    asym = Stability("not-computed", "online-ode", f"{BR}; {VKC}",
+    asym = Stability("not-computed", "online-ode", f"{BR}; {VKC}, Tables I-II; {KC92}",
                      f"measured on the integrated ODE at alpha = {ALPHA_BIG:g} (log-slope over a factor "
                      f"2; constant alpha^p eps with the derived p); {_ODE_NOTE}")
-    formula = Stability("not-computed", "online-ode", VKC,
+    formula = Stability("not-computed", "online-ode", f"{VKC}, Eqs. (10), (13)-(17), (25)",
                         "2 / I(noise), the rho -> 1 limit of the optimal flow derived here (Copelli et "
                         "al. Eq. (8) up to the Gaussian weight; see online/optimal.py); " + _ODE_NOTE)
     rob = Stability("not-computed", "online-ode", CEKBSRC,
@@ -189,7 +200,7 @@ def online_perceptron():
             "eps_exponent_derived", "hebb_closed_form_gap", "robust_boundary_error",
             "eps_sim_halfwidth99", "N", "seeds")
     spec = ModelSpec("online_perceptron", "spherical", "gaussian", constraint="online", prior="teacher")
-    return entry("online_perceptron", spec, f"{BR}; {VKC}; {CEKBSRC}", {"online": steps}, refs,
+    return entry("online_perceptron", spec, f"{BR}; {VKC}; {KC92}; {CEKBSRC}", {"online": steps}, refs,
                  {"online": CAVEAT}, "online perceptron learning of a perceptron teacher: Hebb, "
                  "perceptron, AdaTron and the variationally optimal rule; output noise and its "
                  "robustness diagram", default_route="online", finality=fin, meta=meta,

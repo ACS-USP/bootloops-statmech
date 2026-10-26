@@ -1213,7 +1213,10 @@ KNOWN HAZARDS:
   read): |B| = 1, inputs i.i.d. N(0, 1), J <- J + (eta / N) F(h, b, Q) b xi, R = J . B, Q = J . J (BR's
   Q is |J|), alpha = examples / N, eps = arccos(R / sqrt Q) / pi against the TRUE teacher (the
   prediction error on noisy labels is not reported); output noise flips the label with probability
-  lam (Copelli et al. Eq. (7)); VKC 1998 use normalised fields and a modulation W = F / |J|. The N -> oo
+  lam (Copelli et al. Eq. (7)); VKC 1998 use normalised fields and a modulation W = F / |J|, and their
+  noise chi is the flip probability in their Eq. (1) but chi/2 in their Eqs. (20), (25): replicant follows
+  (20)/(25), noise = chi/2. A mis-estimated optimal rule (noise_estimate != noise) is outside
+  OPTIMALITY_CLASS: the entry then reports no `eps_constant_formula` and says so in a note. The N -> oo
   ODEs assume self-averaging (no concentration theorem fetched): every ODE value is `not-computed`.
   The flow is integrated in (theta = arccos rho, ln Q) with the averages' `drive` <F b (y - rho x)>
   computed without cancellation; the perceptron rule is stiff at large alpha (its theta relaxes on a

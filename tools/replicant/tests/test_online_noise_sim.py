@@ -10,6 +10,7 @@ import ast
 import math
 import os
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -36,17 +37,25 @@ def _ode_eps(rule, alpha, init, **kw):
     return O.integrate(O.perceptron_flow(rule, **kw), alpha, init).eps[-1]
 
 
+@contextmanager
+def planted(module, **changes):
+    """Set module._PLANT entries for the block; restore the SAME dict object (identity asserted)."""
+    hook = module._PLANT
+    saved = dict(hook)
+    try:
+        hook.update(changes)
+        yield
+    finally:
+        hook.clear()
+        hook.update(saved)
+        assert module._PLANT is hook and hook == saved
+
+
 def _planted_eps(rule, alpha, init, factor=0.0, **kw):
     """The ODE with the eta^2 <F^2> term of dQ/dalpha scaled by `factor` (odes._PLANT hook;
     0 drops it)."""
-    saved = dict(O._PLANT)
-    try:
-        O._PLANT["eta2"] = factor
+    with planted(O, eta2=factor):
         return _ode_eps(rule, alpha, init, **kw)
-    finally:
-        O._PLANT.clear()
-        O._PLANT.update(saved)
-        assert O._PLANT == saved
 
 
 def test_simulator_shares_no_code_with_the_ode():
@@ -101,6 +110,14 @@ def test_simulation_refusals():
     _refuses(lambda: SIM.simulate_perceptron("oja", 50, 1.0, range(4)), "unsupported:rule")
     _refuses(lambda: SIM.simulate_perceptron("hebb", 50, 1.0, range(4), eta=0), "precondition:eta")
     _refuses(lambda: SIM.simulate_perceptron("hebb", 50, 1.0, [3]), "precondition:two-samples")
+    # mirrored from the ODE (fix round 1)
+    _refuses(lambda: SIM.simulate_perceptron("hebb", 50, 1.0, range(4), noise_estimate=0.1),
+             "precondition:known-parameter")
+    _refuses(lambda: SIM.simulate_perceptron("optimal", 50, 1.0, range(4), eta=0.5, init=(0.5, 1.0)),
+             "precondition:optimal-eta")
+    for bad in (None, (1.0,), ("x", 1.0)):
+        _refuses(lambda: SIM.simulate_perceptron("hebb", 50, 1.0, range(4), init=bad),
+                 "precondition:state-point")
     # the optimal rule from rho0 = 0.01 at N = 200: some seeds cross rho = 0 (measured: 4 of 20)
     _refuses(lambda: SIM.simulate_perceptron("optimal", 200, 5.0, range(20), noise=0.2,
                                              init=(0.01, 1.0)), "undetermined:rho-sign")
@@ -134,14 +151,8 @@ def test_noise_robustness():
     # below the dashed line rho = 0 attracts and is reached at finite alpha (W* ~ 1/rho)
     _refuses(lambda: run(nl - 0.03), "no-solution:rho-zero")
     # positive control: with the eta^2 term dropped drho/dalpha > 0 for every estimate: no line
-    saved = dict(O._PLANT)
-    try:
-        O._PLANT["eta2"] = 0.0
+    with planted(O, eta2=0.0):
         assert OPT.noise_boundaries(0.4)[:2] == (None, None)
-    finally:
-        O._PLANT.clear()
-        O._PLANT.update(saved)
-    assert O._PLANT == saved
     # the matched optimum is C = 2 / I(lam) (their Eq. (8), with the corrected Gaussian weight)
     assert OPT.asymptotic_constant(0.1) > OPT.asymptotic_constant(0.0)
     assert math.isfinite(OPT.asymptotic_constant(0.45))

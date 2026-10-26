@@ -23,7 +23,8 @@ quadrature(f, theta, noise)             any f(x, b) (vectorised): polar Gauss-Le
   dependent f jumps) and the label summed explicitly.  It shares no formula with closed().
 
 _PLANT: private planted-error hook (tests only): "norm" is the sqrt(2 pi) of the Gaussian
-normalisation in the elementary closed forms.
+normalisation, in the elementary closed forms and in the optimal rule's panel integral (both its
+phi(u) and its 1/(2 pi) weight).
 """
 import math
 from collections import namedtuple
@@ -109,7 +110,7 @@ def _panels_k(k):
     a, b = np.array(edges[:-1]), np.array(edges[1:])
     mid, half = (a + b) / 2, (a - b) / 2
     z = (mid[:, None] - half[:, None] * x[None, :]).ravel()
-    return z, (half[:, None] * w[None, :]).ravel() / (2 * math.pi)
+    return z, (half[:, None] * w[None, :]).ravel()
 
 
 def _optimal(theta, lam, est):
@@ -123,9 +124,10 @@ def _optimal(theta, lam, est):
     if s == 0:
         return Averages(0.0, 0.0, 0.0, 0.0)
     z, w = _panels(s, est < lam)
+    w = w / _PLANT["norm"] ** 2                      # e^{-z^2/2} / (2 pi): the 2 pi
     u = rho * z
     lgauss = -z * z / 2                              # the e^{-z^2/2}, kept in the exponents
-    lphi = -u * u / 2 - 0.5 * math.log(2 * math.pi)
+    lphi = -u * u / 2 - math.log(_PLANT["norm"])
     g_lam, g_est = log_ghat(u, lam), log_ghat(u, est)
     k = 2 * s ** 3 / rho * (1 - 2 * est)
     if est == lam:      # matched: p(Delta) W* is even in Delta, so ax = 0 and drive = rho a2
