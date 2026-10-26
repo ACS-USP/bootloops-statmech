@@ -17,8 +17,10 @@ Finality is per value: each entry declares, for every physical value key, a Stab
 (stable / unstable / not-computed / exact-by-literature, with the ansatz and a cite), or a
 callable reading the run's computed values["stable"]; compose.Result reports it per key
 and refuses require_final when any value is not final.  Honest labels: every route is physics-level (replica n -> 0 and
-RS/1RSB ansaetze, or the cavity clustering assumptions); population-dynamics numbers are
-statistical (value +- stderr over independent runs), never certified.
+RS/1RSB ansaetze, or the cavity clustering assumptions) unless the entry declares it "certified"
+(CatalogEntry.rigor: the lattice entries, whose values are ball enclosures with their radii in
+errors); population-dynamics numbers are statistical (value +- stderr over independent runs),
+never certified.
 
 Each entry also exposes derivation(route): the equations a LaTeX document displays
 (latex.py), kept next to the family code in latex_entries.py / latex_cavity.py.
@@ -28,7 +30,8 @@ compose.py; the entries themselves in catalog_entries.py, catalog_sparse.py and
 catalog_csp.py (constraint satisfaction) and catalog_inference.py (codes, inference; the
 spiked Wigner and block-model entries in catalog_spiked_sbm.py) and catalog_learning.py
 (high-dimensional learning: ridge) and catalog_series.py (exact series: series_ising2d, route
-"series").
+"series") and catalog_lattice.py (solvable lattice models, certified: ising2d, ising1d, route
+"exact"; bethe_ising, route "cavity").
 """
 import math
 from dataclasses import dataclass, field
@@ -130,6 +133,9 @@ class CatalogEntry:
     # route -> frozenset of the run-parameter names that route's steps read (the composer
     # refuses any other name: precondition:known-parameter, never silently ignored)
     parameters: dict = field(default_factory=dict)
+    # route -> rigor label of its Result ("physics-level" unless declared): "certified" for a
+    # route whose every physical value is a ball enclosure with its radius in errors (lattice/)
+    rigor: dict = field(default_factory=dict)
 
     def finality_of(self, values):
         """{key: Stability} for the physical values of one run; a key with no
@@ -192,7 +198,7 @@ def fstep(name, cite, compute, *, when=None, skip=""):
 
 
 def entry(name, spec, cite, route_steps, refs, caveats, description, default_route="replica",
-          finality=None, meta=(), parameters=None):
+          finality=None, meta=(), parameters=None, rigor=None):
     holder = {}
     if set(parameters or {}) != set(route_steps):
         raise ValueError(f"catalog entry {name!r}: declare the run parameters of every route "
@@ -204,7 +210,7 @@ def entry(name, spec, cite, route_steps, refs, caveats, description, default_rou
     e = CatalogEntry(name, spec, route_steps[default_route], cite, set(route_steps), refs, run,
                      route_steps, caveats, description, default_route, dict(finality or {}),
                      frozenset(meta) | {"ansatz", "stable"},
-                     {r: frozenset(v) for r, v in (parameters or {}).items()})
+                     {r: frozenset(v) for r, v in (parameters or {}).items()}, dict(rigor or {}))
     holder["e"] = e
     return e
 
@@ -328,11 +334,12 @@ def catalog() -> dict:
         from .catalog_csp import csp_entries
         from .catalog_entries import dense_entries
         from .catalog_inference import inference_entries
+        from .catalog_lattice import lattice_entries
         from .catalog_learning import learning_entries
         from .catalog_series import series_entries
         from .catalog_sparse import sparse_entries
         for e in (dense_entries() + sparse_entries() + csp_entries() + inference_entries()
-                  + learning_entries() + series_entries()):
+                  + learning_entries() + series_entries() + lattice_entries()):
             _CATALOG[e.name] = e
     return dict(_CATALOG)
 

@@ -41,7 +41,9 @@ ansatz="1rsb": the level-(a) 1RSB route for any spec with level-(a) hooks (compo
 report relative to the spec's own RS derivation; values not-computed); any other ansatz is
 refused missing-step:ansatz:<a>.
 
-Results.  Result.rigor is always "physics-level".  Finality is per value
+Results.  Result.rigor is "physics-level", except for a catalog route its entry declares
+"certified" (CatalogEntry.rigor): there every physical value must carry its ball radius in errors,
+else the run is refused precondition:certified-radius.  Finality is per value
 (Result.finality: key -> catalog.Stability): catalog values carry their entry's
 declaration; composed values the solver's computed flag (True -> stable, False ->
 unstable, None -> not-computed), with a note naming the derived replicon and its rules
@@ -65,7 +67,7 @@ from .core import Refusal, State, Step, Trace, run_pipeline
 from .solve_derived import lift_numeric_beta, solve_derived_rs
 from .spec import ModelSpec
 
-ROUTES = ("replica", "cavity", "amp", "series")
+ROUTES = ("replica", "cavity", "amp", "series", "exact")
 FIELDS = ("family", "variables", "disorder", "constraint", "prior")
 LEVEL_A_STEPS = ("replicate", "average-disorder", "introduce-order-parameters", "rs-ansatz",
                  "replica-limit", "rs-stationarity", "solve-derived")
@@ -171,7 +173,13 @@ class ComposedCalculation:
                           f"read {', '.join(unknown)}; accepted: {', '.join(sorted(accepted))}")
         state, trace = self.entry.execute(self.route, **p)
         values = state["values"]
-        res = Result(dict(values), trace, errors=dict(state["errors"]),
+        rigor = self.entry.rigor.get(self.route, "physics-level")
+        if rigor == "certified":
+            bare = sorted(k for k in values if k not in self.entry.meta and k not in state["errors"])
+            if bare:
+                raise Refusal("precondition:certified-radius", f"{self.entry.name}: certified route "
+                              f"{self.route!r} returned {', '.join(bare)} without a radius in errors")
+        res = Result(dict(values), trace, rigor=rigor, errors=dict(state["errors"]),
                      notes=[self.entry.caveats[self.route], *state["notes"]], route=self.route,
                      statistical=tuple(state["statistical"]), report=self.report, params=p,
                      entry=self.entry, spec=self.spec)

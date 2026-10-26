@@ -27,6 +27,8 @@ def _solution(res, bib):
         val = escape(_num(v))
         if k in stat:
             val += f" $\\pm$ {escape(_num(res.errors.get(k)))} (statistical)"
+        elif res.rigor == "certified" and k in res.errors:
+            val += f" $\\pm$ {escape(_num(res.errors[k]))} (certified ball)"
         rows.append(f"{escape(k)} & {val} & {escape(st.state)} ({escape(st.ansatz)}) "
                     f"{bib.cite(st.cite)} & {'yes' if st.final else 'no'} \\\\")
     meta = [f"{prose(k)} = {prose(_num(v))}" for k, v in res.values.items()

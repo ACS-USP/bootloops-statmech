@@ -66,8 +66,14 @@ compile the derivation.
   `tools/annihilator` (`recognize.py`), exact local exponents (`local.py`), the elliptic operator
   identity (`elliptic.py`), the banked susceptibility series (`susceptibility.py`); catalog entry
   `series_ising2d` (route `series`) (`catalog_series.py`, `latex_series.py`).
+- `lattice/` (E9): solvable lattice models certified in ball arithmetic (python-flint arb through
+  `tools/baller`: `ball.py`): Onsager's free energy and Yang's magnetization (`onsager.py`), Kaufman's
+  finite torus and its integer polynomial recovered from balls (`kaufman.py`), the exact integer
+  transfer matrix and the 1D ring (`transfer.py`), every BP fixed point of the Bethe-lattice
+  ferromagnet (`bethe.py`); catalog entries `ising2d`, `ising1d` (route `exact`) and `bethe_ising`
+  (route `cavity`), rigor "certified" (`catalog_lattice.py`, `latex_lattice.py`).
 - `catalog*.py`, `compose.py` (+ `compose_result.py`: `Result` and the finality rule), `cli.py`,
-  `__main__.py`: the 15-entry catalog (`catalog_ts.py` holds the teacher-student entry,
+  `__main__.py`: the 18-entry catalog (`catalog_ts.py` holds the teacher-student entry,
   `catalog_pspin.py` the two p-spin entries; LaTeX in `latex_pspin.py`), the composer,
   the command line.
 - `latex*.py`, `tex*.py`, `derive_tex.py`: the LaTeX derivation writer.

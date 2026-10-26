@@ -367,6 +367,9 @@ def derivation(name, route):
     if name == "series_ising2d":
         from .latex_series import series_ising2d
         return series_ising2d(route)
+    if name in ("ising2d", "ising1d", "bethe_ising"):
+        from . import latex_lattice
+        return getattr(latex_lattice, name)(route)
     if name == "ridge":
         from .latex_learning import ridge
         return ridge(route)

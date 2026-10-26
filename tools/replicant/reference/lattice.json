@@ -1,0 +1,32 @@
+{
+  "onsager_critical_minus_beta_f": {
+    "value": "0.929695398341610214985384973666",
+    "tol": "1e-29",
+    "cite": "-beta f = ln Z / N of the square-lattice Ising model at beta_c J = (1/2) ln(1 + sqrt 2), zero field: (1/2) ln 2 + 2G/pi, G Catalan's constant. OEIS A242743 (page read: 'Decimal expansion of an Ising constant', formula log(2)/2 + 2*G/Pi, 105 digits 0.929695398341610214985384973665878121765882375151802..., comment: the negated ratio of free energy per node to the temperature at the critical point; references Onsager, Phys. Rev. 65, 117 (1944), Eq. (121) (not fetched) and Finch, Mathematical Constants (2003), Sec. 5.22 (not fetched)). Concordant: Caselle & Hasenbusch, arXiv:hep-th/9911216 (search-engine excerpt only, f_b = 2G/pi + (1/2) log 2 = 0.9296953982...; PDF not read). Value: the OEIS digits rounded to 30 places; tol 1e-29 (one unit of the 30th place, the rounding)",
+    "independent_route": "replicant's certified ball of the closed form (lattice/onsager.py, python-flint arb through baller.solve / baller.run, radius < 1e-30), checked against an mpmath tanh-sinh quadrature at 50 digits of the Onsager double integral (Duminil-Copin, arXiv:2208.00864, Eq. (3.6)) with the inner angle integrated in closed form (tests/test_lattice.py::test_onsager_certified_value_matches_bank); the exact finite-torus partition function (Kaufman's formula, lattice/kaufman.py) approaches it as L grows (slow tier)"
+  },
+  "beta_c_square": {
+    "value": "0.440686793509771512616304662490",
+    "tol": "1e-29",
+    "cite": "critical point of the square-lattice Ising model with J = 1, beta_c = (1/2) ln(1 + sqrt 2): Kramers & Wannier, Phys. Rev. 60, 252 (1941) and Onsager, Phys. Rev. 65, 117 (1944) (both not fetched); read from Duminil-Copin, '100 years of the (critical) Ising model on the hypercubic lattice', arXiv:2208.00864v1 (2022), PDF read: Sec. 3.1, after Eq. (3.3) ('beta_c must be equal to (1/2) ln(1 + sqrt 2)'). Value: (1/2) ln(1 + sqrt 2) evaluated by mpmath at 50 digits, rounded to 30 places; tol 1e-29",
+    "independent_route": "replicant's certified ball (1/2) log(1 + sqrt 2) in arb (lattice/onsager.critical_beta); the transition is also where sinh(2 beta) = 1, the edge of Yang's formula (Duminil-Copin Eq. (3.7)), checked by the refusal of yang_magnetization just below it (tests/test_lattice.py)"
+  },
+  "yang_exponent": {
+    "value": "0.125",
+    "tol": "1e-5",
+    "cite": "spontaneous magnetization of the square-lattice Ising model, m*(beta) = (1 - sinh(2 beta)^-4)^(1/8) for beta >= beta_c (J = 1): Yang, Phys. Rev. 85, 808 (1952) (not fetched); read from Duminil-Copin, arXiv:2208.00864v1 (2022), PDF read: Sec. 3.2, Eq. (3.7). The exponent beta = 1/8 of m* ~ (beta - beta_c)^(1/8). tol 1e-5: the band of the finite-difference log-log slope at beta - beta_c = 1e-6, 1e-8 (the O(beta - beta_c) correction is below 2e-7, the band excludes 1/4 and 1/16)",
+    "independent_route": "none independent of the cited formula: the log-log slope of replicant's certified balls of Eq. (3.7) at two distances from beta_c (lattice/onsager.yang_loglog_slope), a consistency check of the implementation, not a derivation of the exponent"
+  },
+  "bethe_beta_c_k3": {
+    "value": "0.549306144334054845697622618461",
+    "tol": "1e-29",
+    "cite": "ferromagnetic Ising model on the random 3-regular graph / Bethe lattice of coordination 3: the critical point rho tanh beta_c = 1 with rho = k - 1 = 2 the branching factor, i.e. beta_c = atanh(1/2): Dembo & Montanari, 'Ising models on locally tree-like graphs', Ann. Appl. Probab. 20 (2010) 565, doi:10.1214/09-AAP627, arXiv:0804.4726v3, PDF read: Sec. 2.2, Eq. (2.5) (stated there as the statistical-physics prediction; the paragraph 'Random regular graphs' gives rho = k - 1 for degree k). Value: atanh(1/2) = (1/2) ln 3 by mpmath at 50 digits, rounded to 30 places; tol 1e-29",
+    "independent_route": "replicant's certified count of the BP fixed points (lattice/bethe.py): one fixed point at beta = 0.54, three at beta = 0.56 (interval Newton in arb on each monotone interval of the cavity equation), and the certified BP Jacobian (k - 1) xi'(0) = 2 tanh beta crossing 1 (tests/test_lattice.py)"
+  },
+  "ising1d_minus_beta_f_beta1_h0": {
+    "value": "1.12692801104297249644372680636",
+    "tol": "1e-29",
+    "cite": "one-dimensional Ising model, J = 1: f(beta, h) = -(1/beta) ln(e^{beta J} cosh(beta h) + sqrt(e^{2 beta J} sinh^2(beta h) + e^{-2 beta J})), read from Wikipedia, 'Ising model', Sec. 'One dimension' (page read 2026-10-25; a secondary source; Ising, Z. Phys. 31, 253 (1925) and the transfer-matrix solution of Kramers & Wannier (1941) not fetched). At beta = 1, h = 0: -beta f = ln(e + e^-1) = ln(2 cosh 1), a formula evaluation at a chosen point (mpmath, 50 digits, rounded to 30 places); tol 1e-29",
+    "independent_route": "the exact identity Z_N = Tr T^N = lambda_+^N + lambda_-^N on rings of N = 2 .. 10 spins at rational e^K, e^{beta h}: brute-force enumeration of the 2^N configurations, the exact rational transfer-matrix trace and the closed form in Q(sqrt D) (lattice/transfer.ising1d_ring_identity), and replicant's certified ball of ln lambda_+ (tests/test_lattice.py)"
+  }
+}

@@ -271,7 +271,11 @@ def test_pdflatex_argv_disables_shell_escape_and_guards_the_path():
 def test_statistical_and_physics_labels_present():
     for name, route in _routes():
         doc = _doc(name, route)
-        assert "physics-level" in doc and f"Route: \\textbf{{{route}}}" in doc, (name, route)
+        rigor = catalog()[name].rigor.get(route, "physics-level")      # lattice/: "certified"
+        assert f"Rigor: \\textbf{{{rigor}}}" in doc and f"Route: \\textbf{{{route}}}" in doc, \
+            (name, route)
+        if rigor == "certified":
+            assert "(certified ball)" in doc, (name, route)
     vb = compose(catalog()["viana_bray"].spec, "cavity").run(
         beta="0.8", pop=200, sweeps=4, burn_in=4, runs=2, seed=3)
     doc = render_latex(vb)

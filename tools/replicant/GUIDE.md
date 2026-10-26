@@ -12,8 +12,8 @@ citation; a missing precondition is a named refusal, never a silent fallback; ev
 reader can follow to the paper, a per-value finality label, and a comparison with banked, cited reference
 values. Two levels: (a) a symbolic derivation (replicate, average the disorder, introduce order
 parameters, RS ansatz, n -> 0, stationarity, solve) that works for models you describe, and (b) the
-published pipelines of a catalog of 15 entries, each with a replica route and/or a cavity route (and an
-`amp` route for `sk` and `teacher_student`; the constraint-satisfaction entries `xorsat` and `ksat`, the code entry `ldpc_bec` and the block model `sbm` are cavity-only; the spiked Wigner model `spiked_wigner` is amp-only; the ridge-regression entry `ridge` is replica-only, its RS saddle point a cited closed form, not a level-(a) derivation; the 2D Ising entry `series_ising2d` has the route `series` only: an exact series and its holonomic operator, no replica or cavity step). A composer
+published pipelines of a catalog of 18 entries, each with a replica route and/or a cavity route (and an
+`amp` route for `sk` and `teacher_student`; the constraint-satisfaction entries `xorsat` and `ksat`, the code entry `ldpc_bec` and the block model `sbm` are cavity-only; the spiked Wigner model `spiked_wigner` is amp-only; the ridge-regression entry `ridge` is replica-only, its RS saddle point a cited closed form, not a level-(a) derivation; the 2D Ising entry `series_ising2d` has the route `series` only: an exact series and its holonomic operator, no replica or cavity step; the solvable lattice entries `ising2d` and `ising1d` have the route `exact` and `bethe_ising` the route `cavity`, all three certified in ball arithmetic, `rigor` "certified"). A composer
 matches a model description against the catalog, reuses what applies, adapts what it can through
 registered hooks, and says what it reused, adapted, or could not do. A LaTeX writer turns any run into a
 derivation document. For theoretical physicists and agents who need a published statistical-mechanics
@@ -140,6 +140,23 @@ CLI (from `tools/`):
   within the bounds), so `final` is false. `--param max_order=2` is refused
   `no-operator-within-bounds` (53 equations, 30 unknowns, full column rank mod both primes); without
   `--route series` the run is refused `missing-step:route:replica`.
+- Worked example, solvable lattice models, certified (`ising2d`, `ising1d` route `exact`; `bethe_ising`
+  route `cavity`; python-flint balls through `tools/baller`; `rigor` "certified", every value's radius
+  bound in `errors`): `python3 -m replicant run ising2d --route exact` (0.8 s) -> `beta_c`
+  0.440687, `minus_beta_f` 0.929695 (the closed form (1/2) ln 2 + 2G/pi at beta_c, error bound
+  6e-43), `yang_exponent_loglog` 0.1249998 (the log-log slope of Yang's formula at beta - beta_c =
+  1e-6, 1e-8; `not-computed`, a consistency check, so `final` is false), the 4 x 4 torus
+  `torus_minus_beta_f` 0.970120 from Kaufman's formula and `torus_minus_beta_f_tm` from the transfer
+  matrix, with `torus_coefficients` (2, 0, 0, 0, 32, ..., 20524 at x^16, ...) the integer polynomial
+  both give (Kaufman's recovered from balls, `kaufman_max_radius` 9e-28 < 1/4). `--param beta=0.6`
+  adds `magnetization` 0.973609 (Yang) and `minus_beta_f` 1.210132 (the certified single integral);
+  at or below beta_c the Yang step is skipped. `python3 -m replicant run ising1d --route exact`
+  -> `minus_beta_f` 1.126928 = ln(2 cosh 1) and `ring_Z` (N = 8). `python3 -m replicant run
+  bethe_ising --route cavity` (k = 3, beta = 1, h = 0) -> three fixed points `lower`, `middle`
+  (cavity field 0, `jacobian_middle` 1.523: unstable), `upper` (`magnetization_upper` 0.991757,
+  `jacobian_upper` 0.313: stable), `phi` 1.503159 (Dembo-Montanari's phi(beta, 0), the common value
+  of lower and upper); no `magnetization` at h = 0 (pass `--param branch=upper`); `--param h=0.02`
+  selects `upper`.
 - Worked example, amp route (`sk`, `teacher_student`; under 1 s each, measured):
   `python3 -m replicant run sk --route amp --param beta=1.5` -> `q_se` 0.352602 (the SE fixed point,
   `exact-by-literature`: Bayati-Montanari Thm 4 proves SE for AMP on Gaussian J; it is the AMP limit,
@@ -315,6 +332,25 @@ kind, exponents)`] (kind `singular` / `apparent` / `irregular` / `not-analysed`)
 integer_exponents, other_exponents, log_exponents)`; `critical_exponent(op, x0)` -> mpf;
 `susceptibility_series(n)` (OEIS A002906, n <= 420). Example: `ising2d_free_energy_series(10)` ->
 [0, 0, 0, 0, 1, 0, 2, 0, 9/2, 0, 12]; `critical_exponent(op, QuadNumber(3, -2, 2))` -> 2.0.
+`from replicant.lattice import ...` (E9; needs python-flint and `tools/baller`; J = 1 unless given, K =
+beta J; beta an int / Fraction / decimal string, or `BETA_C` = "beta_c" for K_c = (1/2) ln(1 + sqrt 2);
+values -beta f): `onsager_free_energy(beta, J=1)` -> `Ball` (the closed form at `BETA_C`, else the
+single integral by `acb.integral`); `critical_beta(J=1)`; `yang_magnetization(beta, J=1)` (beta >
+beta_c only); `onsager.onsager_free_energy_mp(beta, dps=50, method="single" | "trapezoid")` (mpmath, the
+independent route); `onsager.yang_loglog_slope(d1, d2)`; `kaufman_partition_function(Lx, Ly, beta)` (Z),
+`kaufman_free_energy(Lx, Ly, beta)`, `kaufman_polynomial(Lx, Ly)` -> `Recovery(coefficients, max_radius,
+prec)` (sides <= 12), `beta_of_x(x)` (beta through x = e^{-2K}); `torus_partition_polynomial(Lx, Ly)` ->
+the exact integers c_0 .. c_2N (Ly <= 7, Lx <= 16), `ising_transfer_matrix_free_energy(L, beta, Lx=None)`;
+`ising1d_free_energy(beta, h, J=1)`, `transfer.ising1d_ring_identity(N, a, b)` (exact, a = e^K, b =
+e^{beta h} rational), `transfer.ising1d_ring_balls(N, beta, h)`; `bethe_critical_beta(k)`,
+`bethe_ising_fixed_points(k, beta, h)` -> `BetheFixedPoint(branch, cavity_field, magnetization, phi,
+phi_dm, jacobian, stable)` ("unique", or "lower" < "middle" < "upper"), `bethe_ising_free_energy(k, beta,
+h, branch=None)` -> `BetheResult(..., fixed_points, selected, phi)` (`.magnetization` refuses
+`ambiguous:branch` at h = 0 below T_c). `Ball`: `.mid()`, `.rad()`, `.value_and_error(dps)`,
+`.contains(x)`, `.overlaps(other)`, `.render(digits)` (baller's fail-closed digits). Planted-error
+hooks: `onsager._HOOKS["catalan_coefficient"]`, `kaufman._HOOKS["gamma0"]`, `transfer._HOOKS["d_sign"]`,
+`bethe._HOOKS["link_weight"]`. Example: `onsager_free_energy(BETA_C).render(30)` ->
+0.929695398341610214985384973666.
 `from replicant.latex import render_latex, write_latex` (`write_latex(result, path, pdf=False)`; a
 `Refusal` is also accepted and writes its partial derivation).
 
@@ -353,7 +389,10 @@ check `n` (an int >= 10; p = round(gamma n); lam defaults to 0 there) and `seeds
 `n`); `series_ising2d` (series): `order` (even, >= 20, default 200: the v-order, i.e. u-terms 0 ..
 100), `fit_terms` (default 62; fewer than the u-terms, the rest are held out), `max_order` (default
 3), `max_degree` (default 9; fit_terms >= (max_degree + 1)(max_order + 1) + 5 + max_degree), `L`
-(the torus, 3 .. 8, default 7). Without `beta` an entry returns its T = 0 / critical headline values. A composed spec
+(the torus, 3 .. 8, default 7); `ising2d` (exact): `beta` (default "beta_c"), `L` (torus side, 2 .. 6,
+default 4), `Ly` (default L); `ising1d` (exact): `beta` (default 1), `h` (default 0), `N` (ring, default
+8); `bethe_ising` (cavity): `k` (coordination, default 3), `beta` (default 1), `h` (default 0), `branch`.
+Without `beta` an entry returns its T = 0 / critical headline values. A composed spec
 (not a catalog entry) does not refuse an unknown name: its notes list "unused parameters [...]".
 
 OUTPUTS: the `Result` object (`values`, `errors`, `rigor`, `route`, `stable`, `final`, `finality`,
@@ -390,6 +429,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `precondition:degree-parameters`, `unsupported:q`, `unsupported:disassortative`, `no-transition:ks-line`, `:size`, `:edge-probability`, `:sbm-graph`, `:positive-iters`, `:damping`, `:named-seeds` | block model (`inference/sbm.py`): a, b not finite numbers >= 0 or a + b = 0; q != 2; BP with a < b (the field equation is not monotone; BP did not converge at a = 0.5, b = 5.5); `sbm_ks_line(c)` with c <= 1 (tau <= c on the line); N not an int >= 10; a/N or b/N > 1; `sbm_bp` given something other than an `SBMGraph`; iters < 1; damping outside [0, 1); malformed seeds |
 | `precondition:gamma`, `:lambda`, `:sigma2`, `:signal`, `:gamma-not-one`, `:size`, `:named-seeds`, `:two-samples`, `:two-sizes`, `no-solution:bracket` | ridge (`learning/`): gamma not a finite number > 0; lam, sigma2 or signal not a finite number >= 0 (bools refused; the RS saddle point needs lam > 0; `optimal_lambda` needs signal > 0); the ridgeless limit at gamma = 1 (it diverges for sigma2 > 0, and HMRT state it for gamma != 1 only); n or p not an int >= 10; malformed seeds as for XORSAT; a band from fewer than two seeds; a 1/n extrapolation from one size; `argmin_lambda` with its minimum at an end of the search interval |
 | `precondition:order`, `:torus-size`, `:series-length`, `:fit-terms`, `:bounds`, `:exact-series`, `:two-primes`, `:prime`, `unsupported:variable`, `no-operator-within-bounds`, `no-solution:held-out`, `:prime-disagreement`, `:exact-reconstruction`, `:inconsistent-scan`, `:torus-disagreement`, `:critical-point`, `:analytic-point`, `unsupported:irregular-singularity`, `missing-tool:annihilator` | exact series (`series/`): order not an int in range (or odd / < 20 in the entry); torus L outside 3 .. 8; the fit window too short for the maximal ansatz, or no held-out terms; bounds not ints >= 1; a coefficient not int / Fraction; fewer than two primes, or a denominator divisible by one; no operator of theta-order <= max_order and degree <= max_degree on the fit window (the `Certificate`: full column rank mod both primes; a bound, never a proof of non-D-finiteness); the fitted recurrence fails on a held-out term; the two primes pin different (degree, order); the exact Q step fails; the scan and the maximal-ansatz rank disagree; the torus window is not the expected one; no positive singular point; every local solution analytic at the point; Fuchs fails; `tools/annihilator` not importable |
+| `precondition:beta`, `:J`, `:h`, `:size`, `:coordination`, `:branch`, `:ordered-phase`, `:certified-radius`, `ambiguous:branch`, `undetermined:spinodal`, `no-solution:certification`, `:not-an-integer-polynomial`, `:torus-disagreement`, `:ring-identity`, `:audit`, `unsupported:python-flint`, `:baller-integrity` | lattice (`lattice/`): beta not a rational > 0 (bools, nan refused); J <= 0 (ferromagnet only; `beta_c` needs J = 1); h not rational; a torus side outside its range; k not an int >= 2; a branch not among the fixed points; Yang at or below beta_c (m* = 0 there); a certified route returning a value without its radius; the magnetization at h = 0 below T_c without a branch; a fixed-point count or stability sign undecided at 4096 bits; baller.solve could not certify the digits; Kaufman's coefficient balls (radius < 1/4) containing no integer; Kaufman's polynomial differing from the transfer matrix's; the 1D ring balls not overlapping; the two Bethe free-energy forms disagreeing; python-flint missing (use the project venv, INSTALL.md); `baller.verify()` failing |
 | `unstable:<ansatz>` | `require_final` or `require_stable`: a computed stability is negative (RS replicon or cavity lambda < 0); `unstable:1rsb` also from `pspin_gardner_temperature` when the spherical scan is negative everywhere |
 | `unknown-stability:rs` | `require_final`: an RS value whose stability is not computed |
 | `not-final:<ansatz>` | `require_final`: a non-RS value that is not final |
@@ -420,6 +460,9 @@ CATALOG (v1; `list` shows the live table; values at the default / banked state p
 | `spiked_wigner` rank-one spiked Wigner | amp | `lambda_c` 1; at `snr`: SE `gamma_se`, `q_se`, `overlap_se`, `mmse_se`, `matrix_mmse_se` (snr = 2: 0.75, 0.866025, 0.25, 0.4375); with `N`: Bayes AMP `q_amp`, `overlap_amp`, `mmse_amp`, `matrix_mmse_amp` | `lambda_c` gaussian and rademacher (LM 2019 Sec. 2.3; DAM Thm 4.3 with Lemma 3.3); gaussian `q`, `matrix_mmse` at lambda = 0.8, 1.5, 2, 3 (LM Eq. (10)); the N = 2000 AMP bands against the bank are tests (slow), not catalog checks | `lambda_c` exact-by-literature; `gamma_se`, `q_se`, `matrix_mmse_se` exact-by-literature (LM Thm 1) when the run finds the SE root to be the RS potential's global minimum; `overlap_se`, `mmse_se` exact-by-literature (MV Thm 2) for lambda > 1; finite-N values not-computed (statistical) |
 | `sbm` two-group block model | cavity | at `c`: the KS point `a_ks`, `b_ks`, `inverse_eps_ks` (c = 3: 3.732051); at `a`, `b`: `ks_margin` tau; with `N`: BP `bp_overlap` | `inverse_eps_ks` at q = 2, c = 3 (DKMZ 2011 Fig. 1: 3.73); the q = 4, c = 16 value 2.33 banked but UNCLAIMED (q = 2 only) | `ks_margin` exact-by-literature (MNS 2015 Thm 2.1 for tau <= 1 with a + b > 2; Massoulie 2014, MNS 2018 for tau > 1 with a > b), not-computed for a + b <= 2 below the line and for a < b above it; KS point exact-by-literature; `bp_overlap` not-computed (statistical) |
 | `ridge` ridge / ridgeless least squares (isotropic Gaussian design) | replica | at `gamma`: `risk_ridgeless` (+ `bias_ridgeless`, `variance_ridgeless`, `test_mse_ridgeless`; not at gamma = 1), `lambda_opt`, `risk_opt`, `test_mse_opt`; with `lam`: `risk`, `bias`, `variance`, `test_mse`, RS `risk_rs`, `rs_V`, `rs_q`, `rs_m`; with `n`: `risk_sim` | ridgeless at gamma = 0.5, 0.9, 1.1, 2, 4 (HMRT Eq. (8)); ridge at three (gamma, lam) points (HMRT Eq. (43), also through `risk_rs`); optimal test MSE at four points (Dobriban-Wager Eq. (8)); lam* at two (HMRT Cor. 5): formula evaluations at chosen points (sympy exact), the papers print formulas, not numbers | closed forms exact-by-literature (HMRT Prop. 2 / Thm 1 / Cor. 5, Thm 6 for the split; DW Thm 2.1); RS values exact-by-literature (Loureiro et al. 2022 Thm 1, specialised here with the label noise); `risk_sim` not-computed (statistical) |
+| `ising2d` 2D Ising, exact solution, certified | exact | `beta_c` 0.440687, `minus_beta_f` 0.929695 at beta_c (at `beta`: the certified integral, and `magnetization` above beta_c), `yang_exponent_loglog` 0.1249998, `torus_minus_beta_f` (Kaufman) = `torus_minus_beta_f_tm` (transfer matrix) on the 4 x 4 torus | `onsager_critical_minus_beta_f` ((1/2) ln 2 + 2G/pi, OEIS A242743), `beta_c_square` (Kramers-Wannier via Duminil-Copin), `yang_exponent` 1/8 (Yang via Duminil-Copin; band 1e-5) | `beta_c`, `minus_beta_f`, `magnetization`, torus values exact-by-literature (Kramers-Wannier, Onsager, Yang, Kaufman); `yang_exponent_loglog` not-computed (a consistency check) |
+| `ising1d` 1D Ising in a field, certified | exact | `minus_beta_f` 1.126928 (beta = 1, h = 0), `ring_Z` | `ising1d_minus_beta_f_beta1_h0` (ln 2 cosh 1, the Wikipedia formula at a chosen point) | exact-by-literature |
+| `bethe_ising` ferromagnet on the Bethe lattice / random k-regular graph, certified | cavity | `beta_c` 0.549306 (k = 3); per fixed point `cavity_field_*`, `magnetization_*`, `phi_*`, `jacobian_*`; `phi` 1.503159 (k = 3, beta = 1, h = 0) | `bethe_beta_c_k3` (atanh(1/2), Dembo-Montanari Eq. (2.5)) | per fixed point stable / unstable by the computed BP Jacobian; `phi`, `magnetization` those of the selected fixed point (Dembo-Montanari Thm 2.4) |
 | `series_ising2d` 2D Ising (Onsager) free energy, exact series | series | `a4` 1 .. `a20` 8174.2 (v = tanh K); `operator_order` 3, `operator_degree` 8, `elliptic_factor_order` 2; `u_c` 3 - 2 sqrt 2, `v_c` 0.414214, `critical_exponent` 2, `alpha` 0 | `a4`, `a6`, `a8`, `a10` (Finch's table; independently the exact 7 x 7 torus), `v_c` (Kramers-Wannier / Onsager via Duminil-Copin), `alpha` (Onsager via Duminil-Copin, Baxter) | coefficients exact-by-literature (the cited integral, expanded exactly); operator values not-computed (L g = P proved exactly; minimal within bounds only); `u_c`, `v_c`, `alpha` exact-by-literature |
 | `viana_bray` sparse +-J | cavity | `beta_c` (3-regular) 0.881374; T = 0 RS `p0` 1/3, `e0` -23/18; factorized 1RSB -1.27231, mu* 0.4174 | those, plus slow/statistical population-dynamics RS and 1RSB at k = 5, T = 0.8 | `beta_c` stable; the rest not-computed |
 
@@ -859,14 +902,49 @@ KNOWN HAZARDS:
   chi(v, v') at fixed v'); the check is a bound only. Partitions p(n) (natural boundary,
   Flajolet-Gerhold-Salvy 2005, Theorem 1 and the list after it) are refused at (order 3, degree 9)
   on 70 terms, and the Onsager series with one corrupted coefficient on its 62-term fit window.
+- Solvable lattice models (E9, `lattice/`, entries `ising2d`, `ising1d`, `bethe_ising`). Certified
+  values are python-flint arb balls through `tools/baller`'s front door (`baller.solve` over
+  `baller.run`, 40 digits by default; multi-output routines under `baller.hygiene.ctx_guard`), after
+  one fail-closed `baller.verify()`. The entries report a 40-digit midpoint and in `errors` an upper
+  bound of |value - x| over the ball; `CatalogEntry.rigor` marks the route "certified" and compose
+  refuses a certified run whose value lacks a radius (`precondition:certified-radius`); every other
+  entry stays "physics-level". Onsager (Duminil-Copin Eq. (3.6)): off beta_c the inner angle is
+  integrated in closed form and the single integral is enclosed by Arb's rigorous integrator
+  (`acb.integral`, analytic flags passed: a - S >= (1 - S)^2 > 0 off beta_c); at beta_c the closed form
+  (1/2) ln 2 + 2G/pi. Independent: mpmath tanh-sinh on the single integral (default tier, 45-50 digits)
+  and the periodic trapezoid on the double integral itself (160 nodes per axis: 1e-25 at beta = 0.3);
+  Kaufman's L x L torus approaches the bulk (gaps 2e-4, 4e-7, 1.4e-9 at L = 8, 16, 24, beta = 0.3).
+  Yang (Duminil-Copin Eq. (3.7)): refused at and below beta_c by a certified sinh(2K) > 1 test. The
+  log-log slope at beta - beta_c = 1e-6, 1e-8 is 1/8 - 1.71e-7: M^8 = c d (1 - 6.36 d + ...) gives
+  1/8 - (6.36/8)(d1 - d2)/ln(d1/d2) = 1/8 - 1.71e-7; the band 1e-5 excludes 1/4 and 1/16. It checks
+  the implemented formula, it does not derive the exponent. Kaufman (Izmailian & Hu Eqs. (10)-(16),
+  Kastner Eq. (8b) for the signed gamma_0 = 2K + ln tanh K): the exact comparison is route (b): balls
+  at the 2N + 1 nodes x_i = i/(2N + 2), a rigorous Vandermonde solve, radius < 1/4, one integer per
+  ball; equal to the transfer matrix's integers (Kronecker substitution x = 2^(N+1) in exact Python
+  integers) for 2 x 2 .. 4 x 4 (default) and 5 x 5, 6 x 5, 6 x 6 (slow); held-out rationals (1/7,
+  29/70 near x_c, 9/10) agree within the balls; the unsigned |gamma_0| (planted) is caught. Since
+  Kaufman's expression is a polynomial of degree <= 2N in x (his theorem), agreement at 2N + 1 nodes is
+  an identity of the two routes. 1D: Z_N = Tr T^N = lambda_+^N + lambda_-^N exactly in rationals
+  (brute force, matrix trace, Q(sqrt D)) for N = 2 .. 10. Bethe (Dembo-Montanari): coordination k
+  (viana_bray's k is the excess degree k - 1); all fixed points of x = B + (k - 1) atanh(t tanh x),
+  located on the monotone intervals of the cavity equation and certified by interval Newton (Moore's
+  test in arb; baller.certify's engines are model-specific or need a symmetric block-arrow system, so
+  they do not apply), stability (k - 1) xi'(x) < 1 certified; two free-energy forms (the link/site
+  Bethe form and DM Eq. (2.9)) must overlap. Comparison targets (statistical, 99% Student-t bands): the
+  viana_bray population dynamics in its paramagnet (beta = 0.4, k_vb = 2: every run collapses to h = 0,
+  and above both transitions the +-J and the ferromagnetic Bethe free energies coincide) and BP
+  (cavity/sparse.bp_fixed_point) on sampled ferromagnetic 3-regular graphs (n = 200, seeds 101-104,
+  beta = 1, h = 0.1): BP converges to the homogeneous fixed point on every instance, so the spread is
+  at float rounding and the comparison checks the sparse code's float implementation against the ball.
 - Banked values often come from secondary open sources where the original is paywalled; each bank
   entry names the source its digits were read from (`reference/*.json`, field `cite`), and where the
   cite says the original was not fetched the digits come from the secondary source named there. Check
   the originals by hand before quoting a digit.
 
 RELATED: `tools/annihilator` (used by `series/` through its documented surface: `pf_from_series`,
-`nullspace_mod_fast`, `rec_to_theta`; python-flint is not needed). Arbitrary precision is plain
-mpmath (no ball enclosures; `baller` is not used).
+`nullspace_mod_fast`, `rec_to_theta`); `tools/baller` (used by `lattice/` through its documented front
+door: `verify`, `solve`, `run`, `render`, `certified_digits`, `hygiene.ctx_guard`; needs python-flint).
+Elsewhere arbitrary precision is plain mpmath (no ball enclosures).
 
 CREDIT: the replica method, the Parisi ansatz and the cavity method are due to others; the package
 reproduces their published calculations and credits them by key (bracketed keys resolve in
@@ -882,7 +960,7 @@ RSB analysis of [SK94]; the Viana-Bray model [VB85], the sparse cavity and popul
 [Ple82], universality [BLM15] [CL20] and TAP complexity [BM80]; GAMP and its state evolution follow
 [Ran11] [BKMMZ19] with [JM13], the binary teacher-student thresholds [Gyo90] [BKMMZ19] [LHZH22]. Random K-XORSAT (`csp/`): the cavity / leaf-removal solution [MRZ03] [CDMM03], the proofs of the threshold [DM02] [PS16] and of the 2-core [Mol05], the textbook treatment [MM09] and the solution geometry [IKKM15] [AM15]. Random K-SAT: BP and survey propagation [BMZ05] [MPZ02] [MZ02],
 the SP population dynamics and thresholds [MMZ06] [LM19], the clustering / condensation thresholds
-[KMRSZ07], the first-moment bound [FP83] and the proof for large K [DSS22]. LDPC codes on the BEC (`inference/`): density evolution and the peeling decoder [LMSS01] [MM09], the Maxwell construction and the MAP threshold [MMU08] [KRU10] [RU08], tabulated thresholds [KRU12] [Pfi15]. The universality of the SK free energy used in the held-out test is [CH04]. Reference digits are read
+[KMRSZ07], the first-moment bound [FP83] and the proof for large K [DSS22]. LDPC codes on the BEC (`inference/`): density evolution and the peeling decoder [LMSS01] [MM09], the Maxwell construction and the MAP threshold [MMU08] [KRU10] [RU08], tabulated thresholds [KRU12] [Pfi15]. The universality of the SK free energy used in the held-out test is [CH04]. Solvable lattice models (`lattice/`): Onsager's free energy [Ons44] and Yang's magnetization [Yan52] as printed by [DC22], the critical constant [A242743], Kaufman's torus [Kau49] as printed by [IH02] [Kas06], the Bethe-lattice ferromagnet [DM10]; ball arithmetic is Arb [Joh17] through tools/baller. Reference digits are read
 from [Sto25] [OSS07] [CRT03] [SY17] [DM15] [FP16] [Gyo01] [PRGE20] [Cov65] [Bar97] as stated in the bank
 cites. The typed-step architecture, the symbolic level (a), the composer, the refusal and
 finality discipline and the LaTeX writer are ours. Each bank entry names the source its digits were

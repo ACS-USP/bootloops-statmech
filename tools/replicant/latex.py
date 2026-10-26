@@ -60,7 +60,9 @@ ROUTES = {"replica": "replica method: replicated partition function Z^n, disorde
                  "N -> oo law of the iterates)",
           "series": "exact series: an exact expansion in rational arithmetic, an independent exact "
                     "finite-lattice route, operator guessing with held-out terms, an exact operator "
-                    "identity, and the local exponents of the operator"}
+                    "identity, and the local exponents of the operator",
+          "exact": "exact solution: the cited closed forms evaluated in ball arithmetic (certified "
+                   "enclosures, radii in errors) and checked against an independent exact route"}
 
 
 def _block(b: TexBlock, bib):
@@ -156,7 +158,8 @@ def _derivation(res):
         rows.append((None, rep_title, rep))
     rows.append((None, {"replica": "Equations implemented by the family code",
                         "amp": "AMP and state evolution (amp/)",
-                        "series": "Series and operator (series/)"}.get(res.route,
+                        "series": "Series and operator (series/)",
+                        "exact": "Exact solution (lattice/)"}.get(res.route,
                                                                   "The cavity argument"),
                  res.entry.derivation(res.route)))
     return rows, LEVEL_A_CITE, why
@@ -220,6 +223,9 @@ def _result_body(res, bib, extra, slow):
         intro = ("The expansion, the finite-lattice route and the operator identity as series/ "
                  "implements them; each formula in sympy form is checked against that code by "
                  "tests/test_latex.py, the theorems used are cited.")
+    elif res.route == "exact":
+        intro = ("The exact solution as lattice/ implements it; each formula in sympy form is checked "
+                 "against that code by tests/test_latex.py, the theorems used are cited.")
     elif res.route == "cavity":
         intro = ("The cavity equations as the cavity code implements them (cavity/*.py): for "
                  "the dense models in the order of its four steps (remove a site, the cavity-"
