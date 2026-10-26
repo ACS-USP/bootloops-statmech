@@ -61,6 +61,17 @@ def exact(x, name):
     return rational(x, name, positive=False)
 
 
+_DIGITS_MAX = 200
+
+
+def check_digits(digits):
+    """An int 1 .. 200 (certified decimal digits), else Refusal precondition:digits."""
+    if isinstance(digits, bool) or not isinstance(digits, int) or not 1 <= digits <= _DIGITS_MAX:
+        raise Refusal("precondition:digits", f"digits = {digits!r}: need an int 1 .. {_DIGITS_MAX} "
+                      "(certified decimal digits)")
+    return digits
+
+
 def order_parameter(qs, ms):
     qs = tuple(exact(q, "order-parameter") for q in qs)
     ms = tuple(exact(m, "order-parameter") for m in ms)
@@ -204,7 +215,7 @@ def guerra_krsb_bound(beta, qs, ms, h=0, digits=20) -> Ball:
     b = rational(beta, "beta")
     hq = exact(h, "h")
     qs, ms = order_parameter(qs, ms)
-    return _cached(b, hq, qs, ms, int(digits), Fraction(_HOOKS["inner_exponent_scale"]))
+    return _cached(b, hq, qs, ms, check_digits(digits), Fraction(_HOOKS["inner_exponent_scale"]))
 
 
 @lru_cache(maxsize=128)
@@ -217,5 +228,5 @@ def guerra_1rsb_bound(beta, q0, q1, m, h=0, digits=20) -> Ball:
     return guerra_krsb_bound(beta, (q0, q1), (m,), h=h, digits=digits)
 
 
-__all__ = ["exact", "guerra_1rsb_bound", "guerra_krsb_bound", "krsb_pressure_arb",
+__all__ = ["check_digits", "exact", "guerra_1rsb_bound", "guerra_krsb_bound", "krsb_pressure_arb",
            "order_parameter", "quadratic_term"]

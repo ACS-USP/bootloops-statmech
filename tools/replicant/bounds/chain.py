@@ -10,7 +10,8 @@ outputs is not a theorem: it holds when each solver reached its class infimum.  
 package defect.  So check_bound_chain reports
   per level   the certified bound at the package's parameters, and whether the package's reported
               pressure equals it within radius + the solver's stated tolerance ("functional": ok |
-              mismatch; "not-computed" for levels not certified);
+              mismatch; "not-computed" for levels not certified); it catches only functional
+              errors larger than the solver's stated accuracy, smaller ones pass by design;
   per link    lower <= upper decided with enclosures: "ok" (certainly below), "violation"
               (certainly above), "undecided" (the enclosures overlap).
 Inputs (package_values) are package outputs, not banked targets: families/sk.py sk_rs (q to ~1e-12,
@@ -31,7 +32,7 @@ import mpmath as mp
 from ..core import Refusal
 from ..lattice.ball import Ball, baller, rational
 from .guerra import guerra_rs_bound
-from .krsb import exact, guerra_krsb_bound
+from .krsb import check_digits, exact, guerra_krsb_bound
 
 _K_MAX = 5
 
@@ -158,6 +159,7 @@ def _enclosure(lv):
 
 def check_bound_chain(beta, h=0, K=1, *, digits=20, certified_max=2, package=None) -> ChainReport:
     _check_K(K)
+    check_digits(digits)
     hq = exact(h, "h")
     if K >= 2 and hq != 0:
         raise Refusal("unsupported:field", f"h = {h}: the K >= 2 staircases are for h = 0 only")

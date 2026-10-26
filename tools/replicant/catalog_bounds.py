@@ -58,7 +58,8 @@ def _rs(p):
     v, e = _put(rs_bound=best, rs_q=best.q)
     sv, sve = best.second_variation.value_and_error(20)
     meta = {"rs_stationary": [f"{s.kind} at q = {s.q.render(12)}" for s in best.stationary],
-            "rs_second_variation": f"{sv} +- {sve}", "rs_minimiser_stable": best.stable}
+            "rs_second_variation": f"{sv} +- {sve}", "rs_minimiser_stable": best.stable,
+            "rs_certificate": best.certificate}
     return Out({**v, **meta}, f"{len(best.stationary)} stationary point(s) of P_RS(q) on [0, 1]; "
                f"minimum at q = {best.q.render(15)}", errors=e)
 
@@ -99,7 +100,8 @@ def sk_bounds():
              fstep("guerra-bound-chain", f"{GUERRA}; {TALAGRAND}", _chain)]
     refs = [RefCheck("guerra", "annealed_pressure_beta_half", lambda v: v["rs_bound"],
                      params={"beta": "1/2"}, route="bound")]
-    meta = ("rs_stationary", "rs_second_variation", "rs_minimiser_stable", "chain_verdict",
+    meta = ("rs_stationary", "rs_second_variation", "rs_minimiser_stable", "rs_certificate",
+            "chain_verdict",
             "chain_links", "chain_violations") + tuple(
         f"{n}_{s}" for n in ("rs", "1rsb", "2rsb") for s in ("reported", "functional"))
     spec = ModelSpec("sk_bounds", "ising", "gaussian", constraint="Guerra's RSB upper bounds")

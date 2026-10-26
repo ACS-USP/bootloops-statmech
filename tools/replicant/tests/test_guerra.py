@@ -48,15 +48,26 @@ def test_rs_bound_certified_and_minimised_at_rs_q():
     q_pkg, p_pkg = _pkg_rs(2)
     assert abs(best.q.mid() - q_pkg) < mp.mpf("1e-12")            # sk_rs: q to ~1e-12 (dps 15)
     assert abs(best.mid() - p_pkg) < best.rad() + mp.mpf("1e-12")  # the package's RS pressure
-    # independent: mpmath tanh-sinh at 40 digits (no arb), stationary q by findroot
-    q_mp = rs_stationary_q_mp(2, 0, dps=40)
-    assert best.q.contains(q_mp) or abs(best.q.mid() - q_mp) < mp.mpf("1e-35")
-    assert abs(rs_bound_mp(2, 0, q_mp, dps=40) - best.mid()) < mp.mpf("1e-35")
+    # independent: mpmath tanh-sinh (no arb), stationary q by the secant method; 25 digits here,
+    # 40 in the slow tier (test_rs_bound_mpmath_forty_digits)
+    q_mp = rs_stationary_q_mp(2, 0, dps=25)
+    assert abs(best.q.mid() - q_mp) < mp.mpf("1e-22")
+    assert abs(rs_bound_mp(2, 0, q_mp, dps=25) - best.mid()) < mp.mpf("1e-22")
+    assert "G' < 0 certified" in best.certificate and "Lipschitz exclusion" in best.certificate
     # the bound at any other admissible q is larger (certified comparison)
     for q in ("0.3", "0.8", 1):
         other = guerra_rs_bound(2, 0, q)
         assert other.arb > best.arb, q
     assert mp.mp.dps == dps
+
+
+@slow
+def test_rs_bound_mpmath_forty_digits():
+    from replicant.bounds import guerra_rs_best_bound, rs_bound_mp, rs_stationary_q_mp
+    best = guerra_rs_best_bound(2, 0)
+    q_mp = rs_stationary_q_mp(2, 0, dps=40)
+    assert best.q.contains(q_mp) or abs(best.q.mid() - q_mp) < mp.mpf("1e-35")
+    assert abs(rs_bound_mp(2, 0, q_mp, dps=40) - best.mid()) < mp.mpf("1e-35")
 
 
 @slow
@@ -78,15 +89,29 @@ def test_high_temperature_bound_is_tight():
     from flint import arb
     from replicant.bounds import guerra_rs_best_bound
     from replicant.lattice.ball import baller
-    for beta in ("1/2", "9/10", 1):
+    for beta in ("1/2", "9/10", "99/100", 1):
         best = guerra_rs_best_bound(beta, 0)
         assert [s.kind for s in best.stationary] == ["min"]
+        # beta < 1: G' > 0 certified on a cover of [0, 1]; beta = 1 only: the stated lemma
+        assert ("lemma" in best.certificate) == (beta == 1), best.certificate
+        assert ("G' > 0 certified" in best.certificate) == (beta != 1), best.certificate
         assert best.q.arb.is_zero()                      # the minimiser is q = 0, exactly
         b = Fraction(beta)
         with baller().hygiene.ctx_guard(prec=300):        # ln 2 + beta^2/4, built independently
             target = arb(2).log() + arb(b.numerator) ** 2 / (4 * arb(b.denominator) ** 2)
             assert best.arb.overlaps(target) and best.digits >= 40, beta
         assert best.stable == (b < 1)                    # P''(0) = (beta^2/2)(1 - beta^2)
+    # the certification can fail: a planted shift of G' by -1 in the cover is refused, not passed
+    from replicant.bounds import guerra
+    reg = guerra._HOOKS
+    old = reg["dG_shift"]
+    reg["dG_shift"] = -1
+    try:
+        _refuses(lambda: guerra_rs_best_bound("1/2", 0), "undetermined:stationary-points")
+        _refuses(lambda: guerra_rs_best_bound("9/10", 0), "undetermined:stationary-points")
+    finally:
+        reg["dG_shift"] = old
+        assert guerra._HOOKS is reg and reg["dG_shift"] is old
     ref = load("guerra")["annealed_pressure_beta_half"]
     with mp.workdps(40):
         assert abs(guerra_rs_best_bound("1/2", 0).mid() - mp.mpf(ref.value)) < mp.mpf(ref.tol)
@@ -181,6 +206,10 @@ def test_bound_refusals():
     _refuses(lambda: guerra_krsb_bound(2, ("0.1", "0.4"), ("0.2", "0.3")), "precondition:levels")
     _refuses(lambda: check_bound_chain(2, h="0.1", K=2), "unsupported:field")
     _refuses(lambda: check_bound_chain(2, K=0), "precondition:K")
+    for d in (0, -5, "x", True, 1.5):
+        _refuses(lambda: guerra_1rsb_bound(2, "0.2", "0.5", "0.3", digits=d), "precondition:digits")
+        _refuses(lambda: guerra_rs_bound(2, 0, "0.5", digits=d), "precondition:digits")
+        _refuses(lambda: check_bound_chain(2, digits=d), "precondition:digits")
 
 
 def test_sk_bounds_entry_certified_and_labelled():
@@ -188,18 +217,21 @@ def test_sk_bounds_entry_certified_and_labelled():
     from replicant.compose import compose
     e = catalog()["sk_bounds"]
     assert e.rigor == {"bound": "certified"} and e.default_route == "bound"
-    res = compose(e.spec, "bound").run(beta="1/2")
-    assert res.rigor == "certified"
-    assert float(res.values["rs_bound"]) == float(mp.log(2) + mp.mpf(1) / 16)
-    assert "rs_bound" in res.errors and "rs_q" in res.errors
-    st = res.finality["rs_bound"]
-    assert st.state == "exact-by-literature" and "Guerra" in st.cite and "Theorem 3" in st.cite
-    assert res.values["chain_verdict"] == "rs-only"     # beta <= 1: 1RSB collapses to RS
     res2 = compose(e.spec, "bound").run(beta=2, digits=8)
+    assert res2.rigor == "certified"
+    assert all(k in res2.errors for k in ("rs_bound", "rs_q", "rsb1_bound"))
+    st = res2.finality["rs_bound"]
+    assert st.state == "exact-by-literature" and "Guerra" in st.cite and "Theorem 3" in st.cite
     assert res2.values["chain_verdict"] == "consistent", res2.values
     assert res2.finality["rsb1_bound"].state == "exact-by-literature"
     assert res2.finality["rs_q"].state == "stable"
     _refuses(lambda: compose(e.spec, "bound").run(beta=2, K=3), "precondition:K")
+    for d in (0, -5, "x"):
+        _refuses(lambda: compose(e.spec, "bound").run(beta=2, digits=d), "precondition:digits")
+    # rs-only (the package's sk_1rsb collapses to RS where RS is stable): a one-level chain
+    from replicant.bounds import check_bound_chain, package_values
+    rep = check_bound_chain(2, K=1, digits=8, package=package_values(2, K=1)[:1])
+    assert rep.ok and [lv.name for lv in rep.levels] == ["rs"] and rep.links == () and rep.notes
 
 
 @slow

@@ -162,18 +162,24 @@ CLI (from `tools/`):
   selects `upper`.
 - Worked example, Guerra's bounds on the SK pressure, certified (`sk_bounds`, route `bound`; python-flint
   balls through `tools/baller`; `rigor` "certified"): `python3 -m replicant run sk_bounds --route bound`
-  (beta = 2, h = 0; 1.6 s) -> `rs_bound` 1.584785890269395881736457469249912060700 (+- 1.2e-40: the
-  certified minimum over q of Guerra's RS bound, equal to the package's RS pressure -beta f_RS), `rs_q`
-  0.530368392050794632593716... (the certified minimiser, `stable`: P_RS''(q*) = 1.338 > 0 certified),
-  `rs_stationary` ["max at q = 0", "min at q = 0.530368392051"] (every stationary point), `rsb1_bound`
-  1.58241768475843140266193356 (+- 1.5e-26: Guerra's bound at the package's own 1RSB optimiser output
-  `sk_1rsb(2)`), `chain_verdict` "consistent" (`chain_links` ["1rsb <= rs: ok"]), `1rsb_reported`
-  1.5824176847584313 +- 2e-11 and `1rsb_functional` "ok" (the package's float64 functional equals the
-  certified one within radius + its stated tolerance). Both bounds are `exact-by-literature` (Guerra 2003,
-  Theorem 3: an upper bound on lim (1/N) E ln Z_N for any admissible parameters); the chain verdict is a
-  consistency check of the optimisers (the theorem orders the infima, not the package's outputs).
-  `--param beta=1/2` -> `rs_bound` 0.755647... = ln 2 + 1/16 at `rs_q` 0 exactly (the high-temperature
-  identity, Guerra 1992 Theorem 3), `chain_verdict` "rs-only" (sk_1rsb collapses to RS there).
+  (beta = 2, h = 0; 1.6-2.1 s measured) -> `rs_bound` "1.584785890269395881736457469249912060700"
+  (`errors` 1.20e-40: the certified minimum over q of Guerra's RS bound, equal to the package's RS
+  pressure -beta f_RS), `rs_q` "0.5303683920507946325937163727372733258213" (`errors` 2.97e-41: the
+  certified minimiser, `stable`: `rs_second_variation` "1.3380657020581225064 +- 6.99e-21" > 0),
+  `rs_stationary` ["max at q = 0", "min at q = 0.530368392051"] (every stationary point), `rs_certificate`
+  "G' < 0 certified on 4 cell(s) covering [0, 1/8]; [1/8, 1]: Lipschitz exclusion, 1 root(s) on monotone
+  runs", `rsb1_bound` "1.582417684758431402661933566110169094513" (`errors` 1.45e-26: Guerra's bound at
+  the package's own 1RSB optimiser output `sk_1rsb(2)`), `chain_verdict` "consistent" (`chain_links`
+  ["1rsb <= rs: ok"]), `rs_reported` "1.5847858902693959 +- 1.0e-12", `1rsb_reported` "1.5824176847584295
+  +- 2.0e-11", `rs_functional` and `1rsb_functional` "ok" (the package's numbers equal the certified
+  functionals within radius + the solver's stated tolerance). Both bounds are `exact-by-literature`
+  (Guerra 2003, Theorem 3: an upper bound on lim (1/N) E ln Z_N for any admissible parameters); the chain
+  verdict is a consistency check of the optimisers (the theorem orders the infima, not the package's
+  outputs). `--param beta=1/2` -> `rs_bound` "0.7556471805599453094172321214581765680755" (= ln 2 + 1/16,
+  `errors` 1.35e-43) at `rs_q` "0" exactly, `rs_stationary` ["min at q = 0"], `rs_certificate` "G' > 0
+  certified on 1 cell(s) covering [0, 1]" (the high-temperature identity, Guerra 1992 Theorem 3),
+  `chain_verdict` "rs-only" (sk_1rsb collapses to RS there). `--param digits=0` (or -5, x) is refused
+  `precondition:digits`.
   `--param K=2` (h = 0, 1 < beta <= 3) adds `rsb2_bound` at the package's 2-step staircase: the package's
   own K = 1, 2 staircase solves (~5 s) and the triple nested integral (measured 37 s at `--param
   digits=12`, 116 s at the default 20 digits);
@@ -378,14 +384,15 @@ families/sk.py, P = -beta f; parameters are taken as the exact rationals they de
 exact binary value): `guerra_rs_bound(beta, h, q, digits=40)` -> `Ball`; `guerra_rs_best_bound(beta, h=0,
 digits=40)` -> `BestBound` (a `Ball`, the minimum over q in [0, 1], with `.q` the certified minimiser,
 `.second_variation`, `.stable`, `.stationary` = every stationary point as `Stationary(q, value,
-second_variation, kind)`); `guerra_1rsb_bound(beta, q0, q1, m, h=0, digits=20)`, `guerra_krsb_bound(beta,
+second_variation, kind)`, `.certificate` = how that list was shown complete; memoised); `guerra_1rsb_bound(beta, q0, q1, m, h=0, digits=20)`, `guerra_krsb_bound(beta,
 qs, ms, h=0, digits=20)` (qs = q_0 .. q_K nondecreasing in [0, 1], ms = m_1 .. m_K nondecreasing in (0, 1];
-else `precondition:order-parameter` / `precondition:levels`); `rs_bound_mp`, `rs_stationary_q_mp`
+else `precondition:order-parameter` / `precondition:levels`; `digits` an int 1 .. 200, else
+`precondition:digits`); `rs_bound_mp`, `rs_stationary_q_mp`
 (independent mpmath); `package_values(beta, h=0, K=1)` -> `PackageValue(level, qs, ms, pressure, tol,
 source)` (sk_rs, sk_1rsb, families/parisi.py levels); `check_bound_chain(beta, h=0, K=1, *, digits=20,
 certified_max=2, package=None)` -> `ChainReport(levels, links, violations, undecided, notes)` with `.ok`
-(K = 1 .. 5, else `precondition:K`; K >= 2 with h != 0 `unsupported:field`). Planted-error hook:
-`bounds.krsb._HOOKS["inner_exponent_scale"]`. Example: `guerra_rs_best_bound("1/2", 0).render(30)` ->
+(K = 1 .. 5, else `precondition:K`; K >= 2 with h != 0 `unsupported:field`). Planted-error hooks:
+`bounds.krsb._HOOKS["inner_exponent_scale"]`, `bounds.guerra._HOOKS["dG_shift"]`. Example: `guerra_rs_best_bound("1/2", 0).render(30)` ->
 0.755647180559945309417232121458.
 `from replicant.latex import render_latex, write_latex` (`write_latex(result, path, pdf=False)`; a
 `Refusal` is also accepted and writes its partial derivation).
@@ -429,7 +436,8 @@ check `n` (an int >= 10; p = round(gamma n); lam defaults to 0 there) and `seeds
 default 4), `Ly` (default L); `ising1d` (exact): `beta` (default 1), `h` (default 0), `N` (ring, default
 8); `bethe_ising` (cavity): `k` (coordination, default 3), `beta` (default 1), `h` (default 0), `branch`;
 `sk_bounds` (bound): `beta` (rational > 0, default 2), `h` (default 0), `K` (1 or 2, default 1), `digits`
-(certified digits of the K-step balls, default 20; the RS values always 40).
+(an int 1 .. 200: certified digits of the K-step balls, default 20, else `precondition:digits`; the RS values
+always 40).
 Without `beta` an entry returns its T = 0 / critical headline values. A composed spec
 (not a catalog entry) does not refuse an unknown name: its notes list "unused parameters [...]".
 
@@ -468,6 +476,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `precondition:gamma`, `:lambda`, `:sigma2`, `:signal`, `:gamma-not-one`, `:size`, `:named-seeds`, `:two-samples`, `:two-sizes`, `no-solution:bracket` | ridge (`learning/`): gamma not a finite number > 0; lam, sigma2 or signal not a finite number >= 0 (bools refused; the RS saddle point needs lam > 0; `optimal_lambda` needs signal > 0); the ridgeless limit at gamma = 1 (it diverges for sigma2 > 0, and HMRT state it for gamma != 1 only); n or p not an int >= 10; malformed seeds as for XORSAT; a band from fewer than two seeds; a 1/n extrapolation from one size; `argmin_lambda` with its minimum at an end of the search interval |
 | `precondition:order`, `:torus-size`, `:series-length`, `:fit-terms`, `:bounds`, `:exact-series`, `:two-primes`, `:prime`, `unsupported:variable`, `no-operator-within-bounds`, `no-solution:held-out`, `:prime-disagreement`, `:exact-reconstruction`, `:inconsistent-scan`, `:torus-disagreement`, `:critical-point`, `:analytic-point`, `unsupported:irregular-singularity`, `missing-tool:annihilator` | exact series (`series/`): order not an int in range (or odd / < 20 in the entry); torus L outside 3 .. 8; the fit window too short for the maximal ansatz, or no held-out terms; bounds not ints >= 1; a coefficient not int / Fraction; fewer than two primes, or a denominator divisible by one; no operator of theta-order <= max_order and degree <= max_degree on the fit window (the `Certificate`: full column rank mod both primes; a bound, never a proof of non-D-finiteness); the fitted recurrence fails on a held-out term; the two primes pin different (degree, order); the exact Q step fails; the scan and the maximal-ansatz rank disagree; the torus window is not the expected one; no positive singular point; every local solution analytic at the point; Fuchs fails; `tools/annihilator` not importable |
 | `precondition:beta`, `:J`, `:h`, `:size`, `:coordination`, `:branch`, `:ordered-phase`, `:certified-radius`, `ambiguous:branch`, `undetermined:spinodal`, `no-solution:certification`, `:radius-stall`, `:not-an-integer-polynomial`, `:torus-disagreement`, `:ring-identity`, `:audit`, `unsupported:python-flint`, `:baller-integrity` | lattice (`lattice/`): beta not a rational > 0 (bools, nan refused); J <= 0 (ferromagnet only; `beta_c` needs J = 1); h not rational; a torus side outside its range; k not an int >= 2; a branch not among the fixed points; Yang at or below beta_c (m* = 0 there); a certified route returning a value without its radius; the magnetization at h = 0 below T_c without a branch; a fixed-point count or stability sign undecided at 4096 bits; baller.solve could not certify the digits; a radius that does not halve when the precision doubles; Kaufman's coefficient balls (radius < 1/4) containing no integer; Kaufman's polynomial differing from the transfer matrix's; the 1D ring balls not overlapping; the two Bethe free-energy forms disagreeing; python-flint missing (use the project venv, INSTALL.md); `baller.verify()` failing |
+| `precondition:order-parameter`, `:levels`, `:digits`, `:K`, `:temperature-range`, `unsupported:field`, `undetermined:stationary-points`, `ambiguous:minimiser`, `no-solution:certification`, `:radius-stall` | bounds (`bounds/`, `sk_bounds`): q or m outside Guerra's admissible set (q nondecreasing in [0, 1], m nondecreasing in (0, 1]); overlap / Parisi-parameter counts that do not match; digits not an int 1 .. 200; K outside 1 .. 5 (catalog: 1 or 2); K-step staircases outside 1 < beta <= 3 or with h != 0; the stationary points of P_RS not certified complete (a cover or monotone run undecided); two local minima with overlapping values; interval Newton or the precision escalation failing |
 | `unstable:<ansatz>` | `require_final` or `require_stable`: a computed stability is negative (RS replicon or cavity lambda < 0); `unstable:1rsb` also from `pspin_gardner_temperature` when the spherical scan is negative everywhere |
 | `unknown-stability:rs` | `require_final`: an RS value whose stability is not computed |
 | `not-final:<ansatz>` | `require_final`: a non-RS value that is not final |
@@ -998,14 +1007,28 @@ KNOWN HAZARDS:
   (cos v + i tanh x sin v); a positive average of points in the cone |arg| <= m v < pi/2 stays in it, so
   Z_k(x + iv) = Z_k(x) zeta with |arg zeta| <= v, c_k <= |zeta| <= 1), which also proves analyticity on
   the strip |Im| < pi/2. Measured at beta = 2: RS 40 digits in < 0.01 s; 1RSB 8 / 12 / 20 / 40 digits
-  0.10 / 0.26 / 0.54 / 3.3 s; 2RSB 12 / 20 digits 37 / 116 s; K >= 3 is not certified (the cost grows as nodes^(K+1);
-  nested mpmath quadrature at 40 digits was not attempted (~nodes^(K+1) evaluations), so higher levels enter the chain as the package's value +-
-  its own error terms, labelled numerical). Minimum of the RS bound: P_RS'(q) = (beta^2/2)(q - E
-  tanh^2); at h = 0 R(q) = E tanh^2 / q decreases strictly from beta^2 (tanh(x)/x decreases), so for beta
-  <= 1 the minimiser is q = 0 and the minimum ln 2 + beta^2/4 (computed: P_RS(0) as a ball, compared with
-  ln 2 + beta^2/4 built separately); at h != 0 the roots are located by Lipschitz exclusion (|G'| <= 1 +
-  beta^2) and each cluster certified by a sign change and G' != 0; each root by interval Newton; several
-  local minima are compared by certified values (`ambiguous:minimiser`). Measured chain at beta = 2, K = 5
+  0.10 / 0.26 / 0.54 / 3.3 s; 2RSB 12 / 20 digits 37 / 116 s; K >= 3 is not certified (the cost grows
+  as nodes^(K+1); nested mpmath quadrature at 40 digits was not attempted, for the same reason), so
+  higher levels enter the chain as the package's value +-
+  its own error terms, labelled numerical). Minimum of the RS bound: P_RS'(q) = (beta^2/2) G(q), G(q) =
+  q - E tanh^2. At h = 0, G(0) = 0. For beta < 1, G' > 0 is certified on an adaptive cover of [0, 1] (G'
+  enclosed on a cell [a, c] through the argument beta * hull(sqrt a, sqrt c); 1, 4, 8 cells at beta =
+  1/2, 9/10, 99/100), so G > 0 on (0, 1] and q = 0 is the unique minimiser; the minimum ln 2 + beta^2/4
+  is P_RS(0) as a ball, compared with ln 2 + beta^2/4 built separately. For beta > 1, G' < 0 is certified
+  on [0, a] (a = 1/2, 1/4, ...), and [a, 1] is treated as at h != 0. Only beta = 1 exactly (G'(0) = 0) rests
+  on a stated lemma, not a computation: tanh^2 x < x^2, so E tanh^2(sqrt(q) z) < q (the Latala-Guerra
+  lemma of Talagrand's Vol. I, Sec. 1.3 was not fetched and is not used). At h != 0 (and on [a, 1]) the
+  roots are located by Lipschitz exclusion (|G'| <= 1 + beta^2), each surviving cluster split into runs of
+  certified sign of G' (a tiny cell around a zero of G' is dropped only when Lipschitz exclusion shows G
+  has no root on it) and a run holds one root when G changes sign across it; each root by interval Newton,
+  inside its bracket; several local minima are compared by certified values (`ambiguous:minimiser`).
+  `BestBound.certificate` (catalog `rs_certificate`) says which argument was used; a planted shift of G' by
+  -1 (`guerra._HOOKS["dG_shift"]`) is refused `undetermined:stationary-points`. The functional check
+  catches only functional errors above the solver's stated accuracy (1e-12 for sk_rs, 2e-11 for sk_1rsb at
+  beta = 2); smaller discrepancies pass by design. Normalisation: Guerra 1992 sums over ordered pairs i !=
+  j with sqrt(N - 1) (his (2.3)); his log 2 + beta^2/4 with the critical point at beta = 1 is the package's
+  unordered-pair convention (J_ij ~ N(0, 1/N) over i < j), as the annealed computation (2.17) shows.
+  Measured chain at beta = 2, K = 5
   (slow test, about 100 s with the package's own staircase solves): rs 1.5847858902693959 (functional
   gap 1.2e-17), 1rsb 1.5824176847584295 (gap 1.9e-15, tol 2e-11), 2rsb 1.5823642818021404 (certified
   1.58236428180213960 +- 2.7e-18: gap 8e-16, tol 5e-15, i.e. parisi.py's trapezoid h-grid agrees with
@@ -1013,10 +1036,16 @@ KNOWN HAZARDS:
   (numerical, +- 1.0e-10, 9.9e-11, 4.2e-14); every link "ok". Controls: a planted optimiser output (q0 =
   0, m = 1: its functional is ln 2 + beta^2/4 > P_RS) is reported `ordering:1rsb>rs`; a reported value
   off by 1e-6 `functional:1rsb`; the evaluator's innermost exponent planted at 1.01 m `functional:1rsb`
-  (against an independent mpmath value). Finding: the package's float64 1RSB functional (sk.py
-  `_rsb_phi_e`, 80 x 80 Gauss-Hermite) is accurate to ~2e-15 at its own optimum but only to 6.6e-10 at
-  the off-optimum point (q0 = 0, q1 = 3/5, m = 1/2) (1.5962745995322627 vs 1.596274598870465316814...,
-  certified and mpmath agree), beyond its stated 1e-11; the chain uses it only at the optimum.
+  (against an independent mpmath value).
+- families/sk.py's float64 1RSB functional (`_rsb_phi_e`, 80 x 80 Gauss-Hermite; v1 code, unchanged) is
+  inaccurate in the q0 = 0 / large q1 - q0 sector, where the branch points of cosh^m (zeros of cosh at
+  Im = pi/2) are not smoothed by an outer Gaussian average. Against the certified balls of bounds/krsb.py:
+  at the solver's own q0 = 0 candidate (the h = 0 seed of `_rsb`, sk.py:224) the error is 2.8e-9 at beta
+  = 2, 2.8e-7 at beta = 2.5 and 3.8e-6 at beta = 3, and 6.6e-10 at (q0 = 0, q1 = 3/5, m = 1/2, beta = 2)
+  (1.5962745995322627 vs 1.596274598870465316814...). No v1 result is affected: that candidate loses the
+  largest-f selection by 1.9e-4, 6.2e-4, 1.3e-3 in -beta f at beta = 2, 2.5, 3, far above those errors.
+  sk.py's docstring claim "validated against 160 x 160 nodes" (to ~1e-11 at beta = 2) holds at the
+  selected optimum (where the certified ball agrees to 1.9e-15), not in that sector. (A v1 follow-up.)
 - Banked values often come from secondary open sources where the original is paywalled; each bank
   entry names the source its digits were read from (`reference/*.json`, field `cite`), and where the
   cite says the original was not fetched the digits come from the secondary source named there. Check
