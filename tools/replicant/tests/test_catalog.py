@@ -23,7 +23,7 @@ BANK = Path(__file__).resolve().parent.parent / "reference"
 
 ROUTES = {"rem": {"replica"}, "sk": {"replica", "cavity", "amp"}, "pspin": {"replica"},
           "ising_pspin": {"replica"}, "xorsat": {"cavity"}, "ksat": {"cavity"}, "ldpc_bec": {"cavity"},
-          "spiked_wigner": {"amp"}, "sbm": {"cavity"}, "ridge": {"replica"},
+          "spiked_wigner": {"amp"}, "sbm": {"cavity"}, "ridge": {"replica"}, "series_ising2d": {"series"},
           "perceptron": {"replica", "cavity"}, "teacher_student": {"replica", "amp"},
           "hopfield": {"replica", "cavity"}, "viana_bray": {"cavity"}}
 

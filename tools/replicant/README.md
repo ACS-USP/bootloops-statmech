@@ -61,8 +61,13 @@ compile the derivation.
   `ridge_rs.py`: the RS saddle point of the linear student, a cited closed form solved here;
   `ridge_sim.py`: SVD fits over named seeds, extrapolated in 1/n); catalog entry `ridge` (replica)
   (`catalog_learning.py`, `latex_learning.py`).
+- `series/` (E8): the exact high-temperature series of the 2D Ising free energy from the Onsager
+  integral (`ising2d.py`, with the independent L x L torus route), holonomic recognition through
+  `tools/annihilator` (`recognize.py`), exact local exponents (`local.py`), the elliptic operator
+  identity (`elliptic.py`), the banked susceptibility series (`susceptibility.py`); catalog entry
+  `series_ising2d` (route `series`) (`catalog_series.py`, `latex_series.py`).
 - `catalog*.py`, `compose.py` (+ `compose_result.py`: `Result` and the finality rule), `cli.py`,
-  `__main__.py`: the 14-entry catalog (`catalog_ts.py` holds the teacher-student entry,
+  `__main__.py`: the 15-entry catalog (`catalog_ts.py` holds the teacher-student entry,
   `catalog_pspin.py` the two p-spin entries; LaTeX in `latex_pspin.py`), the composer,
   the command line.
 - `latex*.py`, `tex*.py`, `derive_tex.py`: the LaTeX derivation writer.

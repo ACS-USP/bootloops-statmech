@@ -57,7 +57,10 @@ ROUTES = {"replica": "replica method: replicated partition function Z^n, disorde
                     "population dynamics for the law of the cavity fields",
           "amp": "approximate message passing: AMP / GAMP iterations with the Onsager term on "
                  "sampled instances (finite N, statistical) and their state evolution (the "
-                 "N -> oo law of the iterates)"}
+                 "N -> oo law of the iterates)",
+          "series": "exact series: an exact expansion in rational arithmetic, an independent exact "
+                    "finite-lattice route, operator guessing with held-out terms, an exact operator "
+                    "identity, and the local exponents of the operator"}
 
 
 def _block(b: TexBlock, bib):
@@ -152,7 +155,8 @@ def _derivation(res):
     if rep:
         rows.append((None, rep_title, rep))
     rows.append((None, {"replica": "Equations implemented by the family code",
-                        "amp": "AMP and state evolution (amp/)"}.get(res.route,
+                        "amp": "AMP and state evolution (amp/)",
+                        "series": "Series and operator (series/)"}.get(res.route,
                                                                   "The cavity argument"),
                  res.entry.derivation(res.route)))
     return rows, LEVEL_A_CITE, why
@@ -212,6 +216,10 @@ def _result_body(res, bib, extra, slow):
         intro = ("The iterations and state-evolution maps as amp/ implements them; each map in "
                  "sympy form is checked against that code by tests/test_latex.py, the "
                  "iterations are cited.")
+    elif res.route == "series":
+        intro = ("The expansion, the finite-lattice route and the operator identity as series/ "
+                 "implements them; each formula in sympy form is checked against that code by "
+                 "tests/test_latex.py, the theorems used are cited.")
     elif res.route == "cavity":
         intro = ("The cavity equations as the cavity code implements them (cavity/*.py): for "
                  "the dense models in the order of its four steps (remove a site, the cavity-"

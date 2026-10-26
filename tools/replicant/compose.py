@@ -65,7 +65,7 @@ from .core import Refusal, State, Step, Trace, run_pipeline
 from .solve_derived import lift_numeric_beta, solve_derived_rs
 from .spec import ModelSpec
 
-ROUTES = ("replica", "cavity", "amp")
+ROUTES = ("replica", "cavity", "amp", "series")
 FIELDS = ("family", "variables", "disorder", "constraint", "prior")
 LEVEL_A_STEPS = ("replicate", "average-disorder", "introduce-order-parameters", "rs-ansatz",
                  "replica-limit", "rs-stationarity", "solve-derived")

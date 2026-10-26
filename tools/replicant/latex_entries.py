@@ -364,6 +364,9 @@ def derivation(name, route):
     if name == "ldpc_bec":
         from .latex_inference import ldpc_bec
         return ldpc_bec(route)
+    if name == "series_ising2d":
+        from .latex_series import series_ising2d
+        return series_ising2d(route)
     if name == "ridge":
         from .latex_learning import ridge
         return ridge(route)
