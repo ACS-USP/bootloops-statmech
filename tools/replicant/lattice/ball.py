@@ -10,7 +10,7 @@ decimal digits are certified (baller's 1-ulp display criterion).  Multi-output c
 
   Ball(arb, digits)  .mid() / .rad() (mpf), .value_and_error(), .contains(x), .overlaps(other),
                      .render(digits), -ball;  rad() is an upper bound of the radius
-  certify(thunk, digits=DIGITS) -> Ball
+  certify(thunk, digits=DIGITS, start_dps=None) -> Ball
   rational(x, name) -> Fraction   (int, Fraction, decimal string; refuses bool / non-finite)
   arb_q(Fraction) -> arb          (exact)
 
@@ -147,8 +147,9 @@ def ball_of(a):
     return Ball(a, DIGITS + 100 if math.isinf(d) else int(d))
 
 
-def certify(thunk, digits=DIGITS):
-    """Ball of thunk() with `digits` certified digits (baller.solve over baller.run).  Fail fast:
+def certify(thunk, digits=DIGITS, start_dps=None):
+    """Ball of thunk() with `digits` certified digits (baller.solve over baller.run; `start_dps`, if
+    given, is baller.solve's first working precision, default max(digits + 10, 30)).  Fail fast:
     when doubling the precision does not at least halve the radius (an integrator at its limits, a
     cancellation that precision cannot cure), the refusal no-solution:radius-stall names the two
     radii instead of escalating to baller's 4096-digit cap."""
@@ -165,7 +166,7 @@ def certify(thunk, digits=DIGITS):
         seen.append((dps, rad))
         return r
     try:
-        res = b.solve(attempt, digits)
+        res = b.solve(attempt, digits, start_dps=start_dps)
     except b.SolveRefused as exc:
         raise Refusal("no-solution:certification", f"baller.solve could not certify {digits} "
                       f"digits: {exc}")

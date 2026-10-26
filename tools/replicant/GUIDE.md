@@ -14,8 +14,8 @@ citation; a missing precondition is a named refusal, never a silent fallback; ev
 reader can follow to the paper, a per-value finality label, and a comparison with banked, cited reference
 values. Two levels: (a) a symbolic derivation (replicate, average the disorder, introduce order
 parameters, RS ansatz, n -> 0, stationarity, solve) that works for models you describe, and (b) the
-published pipelines of a catalog of 18 entries, each with a replica route and/or a cavity route (and an
-`amp` route for `sk` and `teacher_student`; the constraint-satisfaction entries `xorsat` and `ksat`, the code entry `ldpc_bec` and the block model `sbm` are cavity-only; the spiked Wigner model `spiked_wigner` is amp-only; the ridge-regression entry `ridge` is replica-only, its RS saddle point a cited closed form, not a level-(a) derivation; the 2D Ising entry `series_ising2d` has the route `series` only: an exact series and its holonomic operator, no replica or cavity step; the solvable lattice entries `ising2d` and `ising1d` have the route `exact` and `bethe_ising` the route `cavity`, all three certified in ball arithmetic, `rigor` "certified"). A composer
+published pipelines of a catalog of 19 entries, each with a replica route and/or a cavity route (and an
+`amp` route for `sk` and `teacher_student`; the constraint-satisfaction entries `xorsat` and `ksat`, the code entry `ldpc_bec` and the block model `sbm` are cavity-only; the spiked Wigner model `spiked_wigner` is amp-only; the ridge-regression entry `ridge` is replica-only, its RS saddle point a cited closed form, not a level-(a) derivation; the 2D Ising entry `series_ising2d` has the route `series` only: an exact series and its holonomic operator, no replica or cavity step; the solvable lattice entries `ising2d` and `ising1d` have the route `exact` and `bethe_ising` the route `cavity`, all three certified in ball arithmetic, `rigor` "certified"; the bound entry `sk_bounds` has the route `bound` only: Guerra's rigorous upper bounds on the SK pressure, certified, and a consistency check of the package's own RS / 1RSB / K-RSB optimisers against them). A composer
 matches a model description against the catalog, reuses what applies, adapts what it can through
 registered hooks, and says what it reused, adapted, or could not do. A LaTeX writer turns any run into a
 derivation document. For theoretical physicists and agents who need a published statistical-mechanics
@@ -160,6 +160,25 @@ CLI (from `tools/`):
   `jacobian_upper` 0.313: stable), `phi` 1.503159 (Dembo-Montanari's phi(beta, 0), the common value
   of lower and upper); no `magnetization` at h = 0 (pass `--param branch=upper`); `--param h=0.02`
   selects `upper`.
+- Worked example, Guerra's bounds on the SK pressure, certified (`sk_bounds`, route `bound`; python-flint
+  balls through `tools/baller`; `rigor` "certified"): `python3 -m replicant run sk_bounds --route bound`
+  (beta = 2, h = 0; 1.6 s) -> `rs_bound` 1.584785890269395881736457469249912060700 (+- 1.2e-40: the
+  certified minimum over q of Guerra's RS bound, equal to the package's RS pressure -beta f_RS), `rs_q`
+  0.530368392050794632593716... (the certified minimiser, `stable`: P_RS''(q*) = 1.338 > 0 certified),
+  `rs_stationary` ["max at q = 0", "min at q = 0.530368392051"] (every stationary point), `rsb1_bound`
+  1.58241768475843140266193356 (+- 1.5e-26: Guerra's bound at the package's own 1RSB optimiser output
+  `sk_1rsb(2)`), `chain_verdict` "consistent" (`chain_links` ["1rsb <= rs: ok"]), `1rsb_reported`
+  1.5824176847584313 +- 2e-11 and `1rsb_functional` "ok" (the package's float64 functional equals the
+  certified one within radius + its stated tolerance). Both bounds are `exact-by-literature` (Guerra 2003,
+  Theorem 3: an upper bound on lim (1/N) E ln Z_N for any admissible parameters); the chain verdict is a
+  consistency check of the optimisers (the theorem orders the infima, not the package's outputs).
+  `--param beta=1/2` -> `rs_bound` 0.755647... = ln 2 + 1/16 at `rs_q` 0 exactly (the high-temperature
+  identity, Guerra 1992 Theorem 3), `chain_verdict` "rs-only" (sk_1rsb collapses to RS there).
+  `--param K=2` (h = 0, 1 < beta <= 3) adds `rsb2_bound` at the package's 2-step staircase: the package's
+  own K = 1, 2 staircase solves (~5 s) and the triple nested integral (measured 37 s at `--param
+  digits=12`, 116 s at the default 20 digits);
+  `--param K=3` is refused `precondition:K` (bounds.check_bound_chain takes K <= 5, levels above 2
+  numerical).
 - Worked example, amp route (`sk`, `teacher_student`; under 1 s each, measured):
   `python3 -m replicant run sk --route amp --param beta=1.5` -> `q_se` 0.352602 (the SE fixed point,
   `exact-by-literature`: Bayati-Montanari Thm 4 proves SE for AMP on Gaussian J; it is the AMP limit,
@@ -354,6 +373,20 @@ h, branch=None)` -> `BetheResult(..., fixed_points, selected, phi)` (`.magnetiza
 hooks: `onsager._HOOKS["catalan_coefficient"]`, `kaufman._HOOKS["gamma0"]`, `transfer._HOOKS["d_sign"]`,
 `bethe._HOOKS["link_weight"]`. Example: `onsager_free_energy(BETA_C).render(30)` ->
 0.929695398341610214985384973666.
+`from replicant.bounds import ...` (E10; needs python-flint and `tools/baller`; SK conventions of
+families/sk.py, P = -beta f; parameters are taken as the exact rationals they denote, an mpf or float its
+exact binary value): `guerra_rs_bound(beta, h, q, digits=40)` -> `Ball`; `guerra_rs_best_bound(beta, h=0,
+digits=40)` -> `BestBound` (a `Ball`, the minimum over q in [0, 1], with `.q` the certified minimiser,
+`.second_variation`, `.stable`, `.stationary` = every stationary point as `Stationary(q, value,
+second_variation, kind)`); `guerra_1rsb_bound(beta, q0, q1, m, h=0, digits=20)`, `guerra_krsb_bound(beta,
+qs, ms, h=0, digits=20)` (qs = q_0 .. q_K nondecreasing in [0, 1], ms = m_1 .. m_K nondecreasing in (0, 1];
+else `precondition:order-parameter` / `precondition:levels`); `rs_bound_mp`, `rs_stationary_q_mp`
+(independent mpmath); `package_values(beta, h=0, K=1)` -> `PackageValue(level, qs, ms, pressure, tol,
+source)` (sk_rs, sk_1rsb, families/parisi.py levels); `check_bound_chain(beta, h=0, K=1, *, digits=20,
+certified_max=2, package=None)` -> `ChainReport(levels, links, violations, undecided, notes)` with `.ok`
+(K = 1 .. 5, else `precondition:K`; K >= 2 with h != 0 `unsupported:field`). Planted-error hook:
+`bounds.krsb._HOOKS["inner_exponent_scale"]`. Example: `guerra_rs_best_bound("1/2", 0).render(30)` ->
+0.755647180559945309417232121458.
 `from replicant.latex import render_latex, write_latex` (`write_latex(result, path, pdf=False)`; a
 `Refusal` is also accepted and writes its partial derivation).
 
@@ -394,7 +427,9 @@ check `n` (an int >= 10; p = round(gamma n); lam defaults to 0 there) and `seeds
 3), `max_degree` (default 9; fit_terms >= (max_degree + 1)(max_order + 1) + 5 + max_degree), `L`
 (the torus, 3 .. 8, default 7); `ising2d` (exact): `beta` (default "beta_c"), `L` (torus side, 2 .. 6,
 default 4), `Ly` (default L); `ising1d` (exact): `beta` (default 1), `h` (default 0), `N` (ring, default
-8); `bethe_ising` (cavity): `k` (coordination, default 3), `beta` (default 1), `h` (default 0), `branch`.
+8); `bethe_ising` (cavity): `k` (coordination, default 3), `beta` (default 1), `h` (default 0), `branch`;
+`sk_bounds` (bound): `beta` (rational > 0, default 2), `h` (default 0), `K` (1 or 2, default 1), `digits`
+(certified digits of the K-step balls, default 20; the RS values always 40).
 Without `beta` an entry returns its T = 0 / critical headline values. A composed spec
 (not a catalog entry) does not refuse an unknown name: its notes list "unused parameters [...]".
 
@@ -467,6 +502,7 @@ CATALOG (v1; `list` shows the live table; values at the default / banked state p
 | `ising1d` 1D Ising in a field, certified | exact | `minus_beta_f` 1.126928 (beta = 1, h = 0), `ring_Z` | `ising1d_minus_beta_f_beta1_h0` (ln 2 cosh 1: the formula of Wang, Diaz-Mendez & Capdevila, arXiv:1907.11701, at a chosen point) | exact-by-literature |
 | `bethe_ising` ferromagnet on the Bethe lattice / random k-regular graph, certified | cavity | `beta_c` 0.549306 (k = 3); per fixed point `cavity_field_*`, `magnetization_*`, `phi_*`, `jacobian_*`; `phi` 1.503159 (k = 3, beta = 1, h = 0) | `bethe_beta_c_k3` (atanh(1/2), Dembo-Montanari Eq. (2.5)) | `beta_c` not-computed (a closed-form threshold, DM's physics prediction); per fixed point stable / unstable by the computed BP Jacobian; `phi`, `magnetization` those of the selected fixed point (Dembo-Montanari Thm 2.4) |
 | `series_ising2d` 2D Ising (Onsager) free energy, exact series | series | `a4` 1 .. `a20` 8174.2 (v = tanh K); `operator_order` 3, `operator_degree` 8, `elliptic_factor_order` 2; `u_c` 3 - 2 sqrt 2, `v_c` 0.414214, `critical_exponent` 2, `alpha` 0 | `a4`, `a6`, `a8`, `a10` (Finch's table; independently the exact 7 x 7 torus), `v_c` (Kramers-Wannier / Onsager via Duminil-Copin), `alpha` (Onsager via Duminil-Copin, Baxter) | coefficients exact-by-literature (the cited integral, expanded exactly); operator values not-computed (L g = P proved exactly; minimal within bounds only); `u_c`, `v_c`, `alpha` exact-by-literature |
+| `sk_bounds` SK pressure: Guerra's RS and K-step RSB upper bounds, certified | bound | `rs_bound` 1.584786 (beta = 2: min over q of P_RS), `rs_q` 0.530368 and every stationary point; `rsb1_bound` 1.582418 at the package's 1RSB optimiser (`K=2`: `rsb2_bound`); `chain_verdict` | `annealed_pressure_beta_half` (ln 2 + 1/16: Guerra 1992 Thm 3, the annealed value for beta <= 1) | bounds exact-by-literature (Guerra 2003 Thm 3), certified radii; `rs_q` stable iff P_RS''(q*) > 0 certified; the chain verdict is a consistency check (meta), not a theorem |
 | `viana_bray` sparse +-J | cavity | `beta_c` (3-regular) 0.881374; T = 0 RS `p0` 1/3, `e0` -23/18; factorized 1RSB -1.27231, mu* 0.4174 | those, plus slow/statistical population-dynamics RS and 1RSB at k = 5, T = 0.8 | `beta_c` stable; the rest not-computed |
 
 HELD-OUT EVIDENCE (the test of REUSE; `tests/test_heldout.py`). Two models that are not catalog entries
@@ -945,6 +981,42 @@ KNOWN HAZARDS:
   beta = 1, h = 0.1): BP converges to the homogeneous fixed point on every instance (spread at float
   rounding), so both comparisons check the sparse code's float implementation against the ball, with
   tolerances 1e-12 (the collapsed population) and 1e-9 (BP), not sampling bands.
+- Guerra's bounds on the SK pressure (E10, `bounds/`, entry `sk_bounds`). Conventions are families/sk.py's
+  (J_ij ~ N(0, 1/N), P = -beta f); Guerra's Hamiltonian (1) with unit Gaussian couplings over sqrt N is
+  the same, and his Eq. (14) with identity (26) gives the package's bracket (1 - q_K)^2 - sum m_k (q_k^2 -
+  q_{k-1}^2) (a sympy test: equal to families/sk.py's quadratic_term for RS and 1RSB); the brief's
+  P_RS(q) = ln 2 + beta^2 (1 - q)^2/4 + E ln cosh(beta sqrt(q) z + beta h) matches. What is proved:
+  Guerra 2003 Theorem 3, (1/N) E ln Z_N <= P_K(q, m) for every N and every admissible (q, m), so each
+  certified P_K at any parameters is a certified upper bound (labelled exact-by-literature, with its
+  radius); Talagrand 2006 (not fetched) proves the infimum is the limit. What is checked: the chain
+  P_K(params_K) <= ... <= P_RS(q_RS) at the package's own optimiser outputs (not a theorem: the theorem
+  orders the infima; a violation is a solver defect), and that each package-reported pressure equals its
+  certified functional within radius + the solver's stated tolerance. Certified Gaussian expectations:
+  `acb.integral` on |z| <= Z (Z grows with the precision) plus an analytic tail bound as radius (ln cosh x
+  <= |x|, tanh^2 in [0, 1], (tanh^2)'' in [-2/3, 2]). K-step levels are nested `acb.integral`s: real
+  nodes get the accurate inner integral, complex boxes a cheap rigorous enclosure (cosh(x + iv) = cosh x
+  (cos v + i tanh x sin v); a positive average of points in the cone |arg| <= m v < pi/2 stays in it, so
+  Z_k(x + iv) = Z_k(x) zeta with |arg zeta| <= v, c_k <= |zeta| <= 1), which also proves analyticity on
+  the strip |Im| < pi/2. Measured at beta = 2: RS 40 digits in < 0.01 s; 1RSB 8 / 12 / 20 / 40 digits
+  0.10 / 0.26 / 0.54 / 3.3 s; 2RSB 12 / 20 digits 37 / 116 s; K >= 3 is not certified (the cost grows as nodes^(K+1);
+  nested mpmath quadrature at 40 digits was not attempted (~nodes^(K+1) evaluations), so higher levels enter the chain as the package's value +-
+  its own error terms, labelled numerical). Minimum of the RS bound: P_RS'(q) = (beta^2/2)(q - E
+  tanh^2); at h = 0 R(q) = E tanh^2 / q decreases strictly from beta^2 (tanh(x)/x decreases), so for beta
+  <= 1 the minimiser is q = 0 and the minimum ln 2 + beta^2/4 (computed: P_RS(0) as a ball, compared with
+  ln 2 + beta^2/4 built separately); at h != 0 the roots are located by Lipschitz exclusion (|G'| <= 1 +
+  beta^2) and each cluster certified by a sign change and G' != 0; each root by interval Newton; several
+  local minima are compared by certified values (`ambiguous:minimiser`). Measured chain at beta = 2, K = 5
+  (slow test, about 100 s with the package's own staircase solves): rs 1.5847858902693959 (functional
+  gap 1.2e-17), 1rsb 1.5824176847584295 (gap 1.9e-15, tol 2e-11), 2rsb 1.5823642818021404 (certified
+  1.58236428180213960 +- 2.7e-18: gap 8e-16, tol 5e-15, i.e. parisi.py's trapezoid h-grid agrees with
+  the nested balls), 3rsb 1.5823576213517763, 4rsb 1.582356070022068, 5rsb 1.5823555659659725
+  (numerical, +- 1.0e-10, 9.9e-11, 4.2e-14); every link "ok". Controls: a planted optimiser output (q0 =
+  0, m = 1: its functional is ln 2 + beta^2/4 > P_RS) is reported `ordering:1rsb>rs`; a reported value
+  off by 1e-6 `functional:1rsb`; the evaluator's innermost exponent planted at 1.01 m `functional:1rsb`
+  (against an independent mpmath value). Finding: the package's float64 1RSB functional (sk.py
+  `_rsb_phi_e`, 80 x 80 Gauss-Hermite) is accurate to ~2e-15 at its own optimum but only to 6.6e-10 at
+  the off-optimum point (q0 = 0, q1 = 3/5, m = 1/2) (1.5962745995322627 vs 1.596274598870465316814...,
+  certified and mpmath agree), beyond its stated 1e-11; the chain uses it only at the optimum.
 - Banked values often come from secondary open sources where the original is paywalled; each bank
   entry names the source its digits were read from (`reference/*.json`, field `cite`), and where the
   cite says the original was not fetched the digits come from the secondary source named there. Check
@@ -952,7 +1024,8 @@ KNOWN HAZARDS:
 
 RELATED: `tools/annihilator` (used by `series/` through its documented surface: `pf_from_series`,
 `nullspace_mod_fast`, `rec_to_theta`); `tools/baller` (used by `lattice/` through its documented front
-door: `verify`, `solve`, `run`, `render`, `certified_digits`, `hygiene.ctx_guard`; needs python-flint).
+door: `verify`, `solve`, `run`, `render`, `certified_digits`, `hygiene.ctx_guard`; needs python-flint), and by `bounds/` the same way (`solve` over `run`, with
+`start_dps`, and `hygiene.ctx_guard`).
 Elsewhere arbitrary precision is plain mpmath (no ball enclosures).
 
 CREDIT: the replica method, the Parisi ansatz and the cavity method are due to others; the package
@@ -969,7 +1042,8 @@ RSB analysis of [SK94]; the Viana-Bray model [VB85], the sparse cavity and popul
 [Ple82], universality [BLM15] [CL20] and TAP complexity [BM80]; GAMP and its state evolution follow
 [Ran11] [BKMMZ19] with [JM13], the binary teacher-student thresholds [Gyo90] [BKMMZ19] [LHZH22]. Random K-XORSAT (`csp/`): the cavity / leaf-removal solution [MRZ03] [CDMM03], the proofs of the threshold [DM02] [PS16] and of the 2-core [Mol05], the textbook treatment [MM09] and the solution geometry [IKKM15] [AM15]. Random K-SAT: BP and survey propagation [BMZ05] [MPZ02] [MZ02],
 the SP population dynamics and thresholds [MMZ06] [LM19], the clustering / condensation thresholds
-[KMRSZ07], the first-moment bound [FP83] and the proof for large K [DSS22]. LDPC codes on the BEC (`inference/`): density evolution and the peeling decoder [LMSS01] [MM09], the Maxwell construction and the MAP threshold [MMU08] [KRU10] [RU08], tabulated thresholds [KRU12] [Pfi15]. The universality of the SK free energy used in the held-out test is [CH04]. Solvable lattice models (`lattice/`): Onsager's free energy [Ons44] and Yang's magnetization [Yan52] as printed by [DC22], the critical constant [A242743], Kaufman's torus [Kau49] as printed by [IH02] [Kas06], the Bethe-lattice ferromagnet [DM10], the 1D transfer matrix [WDC19]; ball arithmetic is Arb [Joh17] through tools/baller. Reference digits are read
+[KMRSZ07], the first-moment bound [FP83] and the proof for large K [DSS22]. LDPC codes on the BEC (`inference/`): density evolution and the peeling decoder [LMSS01] [MM09], the Maxwell construction and the MAP threshold [MMU08] [KRU10] [RU08], tabulated thresholds [KRU12] [Pfi15]. The universality of the SK free energy used in the held-out test is [CH04]. Solvable lattice models (`lattice/`): Onsager's free energy [Ons44] and Yang's magnetization [Yan52] as printed by [DC22], the critical constant [A242743], Kaufman's torus [Kau49] as printed by [IH02] [Kas06], the Bethe-lattice ferromagnet [DM10], the 1D transfer matrix [WDC19]; ball arithmetic is Arb [Joh17] through tools/baller. Bounds on the SK
+pressure (`bounds/`): the broken-replica bound [Gue03], the high-temperature identity [Gue92] [ALR87]. Reference digits are read
 from [Sto25] [OSS07] [CRT03] [SY17] [DM15] [FP16] [Gyo01] [PRGE20] [Cov65] [Bar97] as stated in the bank
 cites. The typed-step architecture, the symbolic level (a), the composer, the refusal and
 finality discipline and the LaTeX writer are ours. Each bank entry names the source its digits were

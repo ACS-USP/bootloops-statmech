@@ -18,7 +18,7 @@ Finality is per value: each entry declares, for every physical value key, a Stab
 callable reading the run's computed values["stable"]; compose.Result reports it per key
 and refuses require_final when any value is not final.  Honest labels: every route is physics-level (replica n -> 0 and
 RS/1RSB ansaetze, or the cavity clustering assumptions) unless the entry declares it "certified"
-(CatalogEntry.rigor: the lattice entries, whose values are ball enclosures with their radii in
+(CatalogEntry.rigor: the lattice and bound entries, whose values are ball enclosures with their radii in
 errors); population-dynamics numbers are statistical (value +- stderr over independent runs),
 never certified.
 
@@ -31,7 +31,8 @@ catalog_csp.py (constraint satisfaction) and catalog_inference.py (codes, infere
 spiked Wigner and block-model entries in catalog_spiked_sbm.py) and catalog_learning.py
 (high-dimensional learning: ridge) and catalog_series.py (exact series: series_ising2d, route
 "series") and catalog_lattice.py (solvable lattice models, certified: ising2d, ising1d, route
-"exact"; bethe_ising, route "cavity").
+"exact"; bethe_ising, route "cavity") and catalog_bounds.py (Guerra's certified upper bounds on the SK
+pressure: sk_bounds, route "bound").
 """
 import math
 from dataclasses import dataclass, field
@@ -331,6 +332,7 @@ _CATALOG = {}
 
 def catalog() -> dict:
     if not _CATALOG:
+        from .catalog_bounds import bounds_entries
         from .catalog_csp import csp_entries
         from .catalog_entries import dense_entries
         from .catalog_inference import inference_entries
@@ -339,7 +341,7 @@ def catalog() -> dict:
         from .catalog_series import series_entries
         from .catalog_sparse import sparse_entries
         for e in (dense_entries() + sparse_entries() + csp_entries() + inference_entries()
-                  + learning_entries() + series_entries() + lattice_entries()):
+                  + learning_entries() + series_entries() + lattice_entries() + bounds_entries()):
             _CATALOG[e.name] = e
     return dict(_CATALOG)
 

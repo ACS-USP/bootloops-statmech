@@ -287,6 +287,7 @@ _DOCUMENTED = {
     ("ising2d", "exact"): {"beta", "L", "Ly"},
     ("ising1d", "exact"): {"beta", "h", "N"},
     ("bethe_ising", "cavity"): {"k", "beta", "h", "branch"},
+    ("sk_bounds", "bound"): {"beta", "h", "K", "digits"},
     ("viana_bray", "cavity"): {"graph", "k", "c", "J", "beta", "ansatz", "m", "ys", "pop",
                                "inner", "sweeps", "burn_in", "runs", "seed",
                                "require_equilibrated"},

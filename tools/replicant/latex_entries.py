@@ -361,19 +361,12 @@ def derivation(name, route):
     if name in ("xorsat", "ksat"):
         from . import latex_csp
         return getattr(latex_csp, name)(route)
-    if name == "ldpc_bec":
-        from .latex_inference import ldpc_bec
-        return ldpc_bec(route)
-    if name == "series_ising2d":
-        from .latex_series import series_ising2d
-        return series_ising2d(route)
-    if name == "ridge":
-        from .latex_learning import ridge
-        return ridge(route)
-    if name in ("spiked_wigner", "sbm", "ising2d", "ising1d", "bethe_ising"):
+    mod = {"ldpc_bec": "inference", "series_ising2d": "series", "ridge": "learning",
+           "spiked_wigner": "spiked_sbm", "sbm": "spiked_sbm", "ising2d": "lattice", "ising1d": "lattice",
+           "bethe_ising": "lattice", "sk_bounds": "bounds"}.get(name)
+    if mod is not None:
         from importlib import import_module
-        mod = "latex_spiked_sbm" if name in ("spiked_wigner", "sbm") else "latex_lattice"
-        return getattr(import_module(f".{mod}", __package__), name)(route)
+        return getattr(import_module(f".latex_{mod}", __package__), name)(route)
     if name not in _ENTRIES:
         raise Refusal(f"missing-step:derivation:{name}", "no displayed derivation for "
                       f"catalog entry {name!r} (latex_entries.py)")

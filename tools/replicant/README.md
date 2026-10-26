@@ -72,8 +72,14 @@ compile the derivation.
   transfer matrix and the 1D ring (`transfer.py`), every BP fixed point of the Bethe-lattice
   ferromagnet (`bethe.py`); catalog entries `ising2d`, `ising1d` (route `exact`) and `bethe_ising`
   (route `cavity`), rigor "certified" (`catalog_lattice.py`, `latex_lattice.py`).
+- `bounds/` (E10): Guerra's rigorous upper bounds on the SK pressure, certified in ball arithmetic
+  (python-flint arb through `tools/baller`): certified Gaussian expectations (`gauss.py`), the K-step
+  broken-replica bound by nested `acb.integral` (`krsb.py`), the RS bound with all its stationary points
+  and its certified minimum (`guerra.py`), the chain check of the package's own RS / 1RSB / K-RSB
+  optimisers (`chain.py`); catalog entry `sk_bounds` (route `bound`), rigor "certified"
+  (`catalog_bounds.py`, `latex_bounds.py`).
 - `catalog*.py`, `compose.py` (+ `compose_result.py`: `Result` and the finality rule), `cli.py`,
-  `__main__.py`: the 18-entry catalog (`catalog_ts.py` holds the teacher-student entry,
+  `__main__.py`: the 19-entry catalog (`catalog_ts.py` holds the teacher-student entry,
   `catalog_pspin.py` the two p-spin entries; LaTeX in `latex_pspin.py`), the composer,
   the command line.
 - `latex*.py`, `tex*.py`, `derive_tex.py`: the LaTeX derivation writer.

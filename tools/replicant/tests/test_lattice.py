@@ -344,8 +344,10 @@ def test_lattice_entries_are_certified_with_radii_and_others_unchanged():
         phys = [k for k in res.values if k not in e.meta]
         assert phys and all(k in res.errors for k in phys), (name, set(phys) - set(res.errors))
         assert all(mp.mpf(res.errors[k]) < mp.mpf("1e-25") for k in phys), (name, res.errors)
-    # v1 behaviour unchanged: no other entry declares a rigor, and a run stays physics-level
-    assert all(not e.rigor for n, e in cat.items() if n not in ("ising2d", "ising1d", "bethe_ising"))
+    # v1 behaviour unchanged: no other entry declares a rigor (E10's sk_bounds is certified too:
+    # tests/test_guerra.py), and a run stays physics-level
+    assert all(not e.rigor for n, e in cat.items()
+               if n not in ("ising2d", "ising1d", "bethe_ising", "sk_bounds"))
     assert compose(cat["rem"].spec).run().rigor == "physics-level"
     # a certified route that returns a value without its radius is refused
     from replicant.catalog import Out, entry, fstep
