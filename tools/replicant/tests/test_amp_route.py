@@ -73,9 +73,9 @@ def test_amp_route_in_catalog_and_cli():
     assert code == 2 and "precondition:known-parameter" in err and "fullrsb" in err, err
     code, _, err = _cli("run", "sk", "--route", "amp", "--param", "beta=1.5", "--param",
                         "ansatz=1rsb")
-    # `ansatz` is the composer's switch (cli.build_result passes it to compose), so it is
-    # refused by the composer, naming the route, before the entry's parameter check
-    assert code == 2 and "missing-step:route:amp" in err and "no ansatz switch" in err, err
+    # for a catalog entry `ansatz` is an entry parameter (v1; final review I1): the sk amp route
+    # does not read it, so the entry refuses it by name
+    assert code == 2 and "precondition:known-parameter" in err and "ansatz" in err, err
     code, _, err = _cli("run", "teacher_student", "--route", "amp", "--param", "alpha=2",
                         "--param", "prior=ising")
     assert code == 2 and "precondition:known-parameter" in err, err

@@ -145,4 +145,4 @@ reports. Commits 3f149c4 (this design) .. 288f133 (E11), then the documentation 
   refusal, not a TypeError; the LDPC MAP cite and DE note; the spherical no-transition detail tied to
   its scan; an exact ball no longer counts as a radius stall; stronger enclosure, cache and planted
   tests); the rest are documented in the GUIDE hazards.
-- **Time standard.** The default battery takes about 22 s (424 tests, measured 21.6 s; v1 was about 16 s, so the extension added about 5.6 s against the 8 s bound); the slow tier (`--full`, 555 tests) about 18 minutes (measured 18 min 2 s).
+- **Time standard.** The default battery takes about 22 s (425 tests, measured 21.4 s; v1 was about 16 s, so the extension added about 5.4 s against the 8 s bound); the slow tier (`--full`, 557 tests) about 18 minutes (measured 18 min 11 s).

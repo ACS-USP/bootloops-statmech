@@ -98,13 +98,11 @@ def test_cli_unexpected_error_prints_ERROR_and_exits_1():
 def test_cli_unknown_parameter_is_refused_with_exit_2():
     """Final review, Important 1: a typo'd or undeclared parameter is REFUSED, not
     ignored (the reproduction ran RS at kappa = 0 and reported final: true)."""
-    # (ansatz is no longer an unknown name since E2: --param ansatz=1rsb selects the level-(a)
-    # 1RSB route, test_cli_ansatz_param_selects_the_1rsb_route; "variant" takes its place)
     code, out, err = _main(["run", "perceptron", "--param", "alpha=1.5", "--param",
-                            "variant=1rsb", "--param", "kapa=0.3"])
+                            "ansatz=1rsb", "--param", "kapa=0.3"])
     assert code == 2 and out == "", (code, out)
     assert err.startswith("REFUSED: precondition:known-parameter: "), err
-    assert "kapa, variant" in err and "accepted: alpha, kappa" in err, err
+    assert "ansatz, kapa" in err and "accepted: alpha, kappa" in err, err
 
 
 @slow
@@ -124,17 +122,48 @@ def test_cli_1rsb_route_refuses_unknown_parameters():
         os.unlink(f.name)
     assert code == 2 and err.startswith("REFUSED: precondition:known-parameter"), err
     assert "kapa" in err and "accepted: kappa" in err, err
-    code, out, err = _main(["run", "sk", "--param", "ansatz=1rsb", "--param", "beta=2",
+    code, out, err = _main(["run", "sk", "--param", "level_a_ansatz=1rsb", "--param", "beta=2",
                             "--param", "h=0", "--param", "hh=5"])
     assert code == 2 and err.startswith("REFUSED: precondition:known-parameter"), err
     assert "hh" in err and "accepted: beta, h" in err, err
 
 
 def test_cli_ansatz_param_selects_the_1rsb_route():
-    code, out, err = _main(["run", "sk", "--param", "ansatz=2rsb"])
+    """level_a_ansatz=1rsb sends any spec, a catalog spec included, to the level-(a) 1RSB
+    composer (the catalog sk pipeline would not refuse a missing h)."""
+    code, out, err = _main(["run", "sk", "--param", "level_a_ansatz=2rsb"])
     assert code == 2 and err.startswith("REFUSED: missing-step:ansatz:2rsb"), err
-    code, out, err = _main(["run", "sk", "--param", "ansatz=1rsb", "--param", "beta=2"])
+    code, out, err = _main(["run", "sk", "--param", "level_a_ansatz=1rsb", "--param", "beta=2"])
     assert code == 2 and err.startswith("REFUSED: precondition:complete-point"), err
+
+
+def test_cli_ansatz_is_the_v1_entry_parameter_for_catalog_entries():
+    """Final review I1: for a catalog entry `--param ansatz` keeps its v1 meaning (an entry
+    parameter), so `sk --param ansatz=1rsb --param beta=2` runs the family 1RSB pipeline with
+    its banked RefChecks, and viana_bray's cavity route reads `ansatz` (the full v1 GUIDE
+    population-of-populations example is the slow test below)."""
+    code, out, err = _main(["run", "sk", "--param", "ansatz=1rsb", "--param", "beta=2"])
+    assert code == 0, err
+    res = json.loads(out)
+    v = res["values"]
+    assert abs(float(v["q0"]) - 0.2146) < 1e-4 and abs(float(v["m"]) - 0.2818) < 1e-4, v
+    assert abs(float(v["f"]) + 0.7912) < 1e-4 and v["ansatz"] == "1rsb", v
+    assert res["references"] and all(r["ok"] for r in res["references"]), res["references"]
+    assert "sk-1rsb-saddle" in err and "skipped: no beta, or ansatz != 1rsb" not in err, err
+    code, out, err = _main(["run", "viana_bray", "--route", "cavity", "--param", "ansatz=rs"])
+    assert code == 0 and "does not read ansatz" not in err, err
+    assert json.loads(out)["route"] == "cavity"
+
+
+@slow
+def test_cli_viana_bray_1rsb_population_guide_example():
+    """The v1 GUIDE example: the 1RSB population of populations at k = 5, beta = 1.25, m = 0.24
+    (about 15 s)."""
+    code, out, err = _main(["run", "viana_bray", "--route", "cavity", "--param", "beta=1.25",
+                            "--param", "k=5", "--param", "ansatz=1rsb", "--param", "m=0.24"])
+    assert code == 0, err
+    v = json.loads(out)["values"]
+    assert v["ansatz"] == "1rsb" and float(v["q1"]) > float(v["q0"]) > 0, v
 
 
 def test_selftest_summary_line_states_the_full_tier_cost():

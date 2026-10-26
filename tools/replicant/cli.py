@@ -16,9 +16,12 @@ comma list (a trailing comma makes a 1-list: ys=0.3,) -> tuple of those; anythin
 stays a string (e.g. learning=bayes).  spec.json: {"family", "variables",
 "disorder", "constraint", "prior", "params"}; a param given as null is left symbolic
 (beta, h, alpha, kappa: the derivation's own symbols); numbers are run parameters.
---param ansatz=1rsb selects the level-(a) 1RSB route (compose.compose(..., ansatz="1rsb");
-its knobs frozen=true, zero_temperature=true, solve_for=<parameter>, branch=... are also
---params).  `build_result(...)` returns the Result object, so writers (e.g. LaTeX) can be added.
+--param ansatz=... is an entry parameter for catalog entries (v1: sk replica `ansatz=1rsb`
+runs the family 1RSB pipeline, viana_bray cavity the 1RSB population); for a spec that is not
+a catalog entry `ansatz=1rsb` selects the level-(a) 1RSB route (compose.compose(...,
+ansatz="1rsb")), and --param level_a_ansatz=1rsb selects it for any spec, catalog specs
+included; its knobs frozen=true, zero_temperature=true, solve_for=<parameter>, branch=... are
+also --params.  `build_result(...)` returns the Result object, so writers (e.g. LaTeX) can be added.
 --latex PATH writes the derivation document (latex.write_latex: the steps with their
 equations, citations, the check table and the labels); --pdf also compiles it (tectonic
 or pdflatex; refused precondition:tex-engine when neither is on PATH).  A refused run
@@ -125,11 +128,33 @@ def jsonable(x):
         return str(x)
 
 
+LEVEL_A_ANSATZ = "level_a_ansatz"
+
+
 def build_result(target, route, params):
+    """`ansatz` keeps its v1 meaning for a catalog entry: it is an entry parameter (sk replica,
+    viana_bray cavity), passed through like any other, and refused by name where the entry does
+    not read it.  For a spec that is not a catalog entry, `ansatz=1rsb` selects the level-(a)
+    1RSB composer.  `level_a_ansatz=1rsb` selects that composer for any spec, catalog specs
+    included (their own pipelines are then not used)."""
     name, spec = load_spec(target)
     params = dict(params)
-    ansatz = params.pop("ansatz", "rs")
+    if LEVEL_A_ANSATZ in params:
+        ansatz = params.pop(LEVEL_A_ANSATZ)
+        if ansatz != "1rsb":
+            raise Refusal(f"missing-step:ansatz:{ansatz}",
+                          f"{LEVEL_A_ANSATZ} selects the level-(a) 1RSB composer: only '1rsb'")
+    elif _catalog_key(spec):
+        ansatz = "rs"                 # an entry parameter: the entry reads or refuses it
+    else:
+        ansatz = params.pop("ansatz", "rs")
     return spec, compose(spec, route, ansatz).run(**params)
+
+
+def _catalog_key(spec):
+    from .compose import FIELDS
+    key = tuple(getattr(spec, f) for f in FIELDS)
+    return any(tuple(getattr(e.spec, f) for f in FIELDS) == key for e in catalog().values())
 
 
 def result_json(target, spec, res):

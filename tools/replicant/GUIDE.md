@@ -76,7 +76,7 @@ CLI (from `tools/`):
   T = 0 RS and factorized 1RSB for the 3-regular +-J graph, under 1 s); population dynamics,
   `python3 -m replicant run viana_bray --route cavity --param beta=1.25 --param k=5 --param runs=8`
   (RS; under 1 s measured at the default sizes) or `... --route cavity --param beta=1.25 --param k=5
-  --param ansatz=1rsb --param m=0.24` (1RSB population of populations; about 13 s measured), are
+  --param ansatz=1rsb --param m=0.24` (1RSB population of populations; about 15 s measured), are
   STATISTICAL (value +- stderr); reference-size runs are slower (minutes).
 - Worked example, random K-XORSAT (`xorsat`, cavity-only like `viana_bray`; under 1 s each,
   measured): `python3 -m replicant run xorsat --route cavity` -> `alpha_d` 0.818469 (2-core / clustering
@@ -217,15 +217,23 @@ CLI (from `tools/`):
   step, what was REUSED and what was ADAPTED relative to the nearest entry, e.g.
   `disorder: gaussian -> pm_one; hook disorder:pm_one`. Cavity is available for catalog entries only
   (`missing-step:route:cavity` otherwise).
-- Level-(a) 1RSB (`--param ansatz=1rsb`, any spec with level-(a) hooks, catalog specs included: their
-  own pipelines are not used): the 1RSB functional derived by rules (`derive_rsb.py`) and solved
+- Level-(a) 1RSB: `--param ansatz=1rsb` for a spec that is NOT a catalog entry (composed / held-out
+  models), or `--param level_a_ansatz=1rsb` for any spec with level-(a) hooks, catalog specs included
+  (their own pipelines are then not used; `level_a_ansatz` takes only `1rsb`, else
+  `missing-step:ansatz:<a>`). For a catalog entry `ansatz` keeps its v1 meaning, an entry parameter:
+  `run sk --param ansatz=1rsb --param beta=2` runs the family 1RSB pipeline (`q0` 0.214631, `m`
+  0.281843, `f` -0.791209, with its banked RefChecks), `viana_bray --route cavity --param ansatz=1rsb`
+  the 1RSB population, and an entry that does not read it refuses `precondition:known-parameter`.
+  `run sk --param level_a_ansatz=1rsb --param beta=2 --param h=0 --param branch=max-f` is the derived
+  1RSB solve (`phi` 1.582418, about 5.5 s). The 1RSB functional derived by rules (`derive_rsb.py`) and solved
   (`solve_derived_rsb.py`); the report lists replicate / average-disorder / introduce-order-parameters
   as REUSED and the RS ansatz, n -> 0, stationarity and solve steps as ADAPTED, relative to the RS
   level-(a) derivation of the same spec. Knobs (also `--param`s): `frozen=true` (q1 = 1; discrete
   variables with a counting measure), `solve_for=<parameter>` (frozen threshold: x fixed to 1, the
   parameter solved for), `zero_temperature=true` (SK-type energies only), `branch`
   (`nontrivial-k` or `max-f`), `audit` (`independent` default, or `quadrature`). An unread parameter
-  name is refused `precondition:known-parameter` on this route, composed and catalog specs alike. The frozen Ising-perceptron capacity:
+  name is refused `precondition:known-parameter` on this route (reached through `ansatz` or
+  `level_a_ansatz`). The frozen Ising-perceptron capacity (a composed spec, so `ansatz`):
   `python3 -m replicant run spec.json --param ansatz=1rsb --param frozen=true --param solve_for=alpha
   --param kappa=0` with spec.json `{"family": "perceptron", "variables": "ising", "disorder":
   "gaussian", "constraint": "margin kappa", "params": {"alpha": null}}` -> `alpha` 0.83307859974
@@ -437,13 +445,16 @@ INPUTS: a catalog entry name or a spec.json (above); run parameters by entry (ex
 route reads, `CatalogEntry.parameters[route]`; any other name, e.g. a typo `kapa`, is refused
 `precondition:known-parameter` with the accepted names, never ignored):
 `rem`: `beta`, `N_scale` (default 1/2, Derrida's normalization); `sk` replica: `beta`, `h`, `ansatz`
-(`rs`|`1rsb`, at a `beta`), `fullrsb` (flag, slow tier); `sk` cavity: `beta`, `h`, `require_stable`;
-`sk` amp: `beta`, `h`, and for finite-N AMP `N`, `seeds` (default 0-5), `iters` (default 100), `law`
+(`rs`|`1rsb`, at a `beta`: the family pipelines; `level_a_ansatz=1rsb` instead sends the spec to the
+level-(a) 1RSB solver), `fullrsb` (flag, slow tier); `sk` cavity: `beta`, `h`, `require_stable`;
+`sk` amp: `beta`, `h`, and for finite-N AMP `N`, `seeds` (default 0-5; a non-empty list of
+non-negative integers, else `precondition:named-seeds`, e.g. `--param seeds=1`), `iters` (default 100), `law`
 (`gaussian`|`pm_one`; with `pm_one` every SE value is `not-computed`: SE is proved for Gaussian J only);
 a finite-N parameter without `N` is refused `precondition:known-parameter` ("need N"); `pspin` and `ising_pspin`: `p` (default 3), `beta`; `perceptron` replica: `alpha`, `kappa` (default 0); `perceptron`
 cavity: `alpha`, `kappa`, `variables` (`spherical`; `ising` is refused `not-implemented:cavity-ising`);
 `teacher_student`: `alpha`, `learning` (`gibbs`|`bayes`); `teacher_student` amp: `alpha`, `learning`
-(default `bayes`), and for finite-N GAMP `N`, `seeds` (default 0-5), `iters` (default 30; `seeds` and
+(default `bayes`), and for finite-N GAMP `N`, `seeds` (default 0-5; malformed seeds refused
+`precondition:named-seeds` as for `sk` amp), `iters` (default 30; `seeds` and
 `iters` without `N` are refused likewise); `hopfield` (both routes): `alpha`, `beta`,
 `branch`; `viana_bray`: `graph` (`regular` with excess degree `k`, or `poisson` with mean degree `c`),
 `J`, `beta`, `ansatz` (`rs`|`1rsb`), `m`, `ys`, and the sampling knobs `pop`, `inner`, `sweeps`,
@@ -500,7 +511,8 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 |---|---|
 | `missing-step:family:<f>`, `:site:<v>`, `:disorder:<d>`, `:constraint:<c>`, `:prior:<p>` | composer: the level-(a) hook the spec needs does not exist (the detail names what exists and the nearest catalog entry) |
 | `missing-step:route:<r>` | unknown route, entry without that route, or cavity / amp for a spec outside the catalog (no generic cavity or AMP composer) |
-| `missing-step:ansatz:<a>` | composer: an ansatz other than `rs`, `1rsb` |
+| `missing-step:ansatz:<a>` | composer: an ansatz other than `rs`, `1rsb` (CLI: `ansatz` on a spec that is not a catalog entry, or `level_a_ansatz` other than `1rsb`) |
+| `precondition:named-seeds` | amp route of `sk` and `teacher_student` (finite N): `seeds` not a non-empty list of non-negative integers (`--param seeds=1`, an empty list, a negative or non-integer seed) |
 | `precondition:counting-measure-for-frozen`, `:discrete-variables-for-frozen` | frozen 1RSB asked for an energy that is not an indicator pattern average, or continuous variables |
 | `precondition:polynomial-energy-for-t0` | T = 0 1RSB asked for a Gaussian-integral energy (Hopfield, perceptron: needs q1 = 1 - C/beta, not implemented) |
 | `no-solution:not-a-local-maximum` | `branch="max-f"`: the largest-f 1RSB root is not a local maximum of f (Schur complement over the conjugates) |
@@ -618,7 +630,7 @@ banked in `reference/perceptron.json` as independent targets. Honest limits:
   (default tier): time averages at N = 8 equal the exact spectrum means within 99% bands at four betas,
   and the planted acceptance rule (x0.8) and the reversed exchange sign are detected at every beta.
 
-ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 424 tests, about 22 s on a laptop, measured 21.6 s wall; also `python3
+ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 425 tests, about 22 s on a laptop, measured 21.4 s wall; also `python3
 run_selftests.py replicant`, which runs the `python3` on PATH; run both from the activated project venv,
 which has python-flint) covers the core and
 refusal paths, the symbolic derivation against independent expressions, level agreement (a)=(b) for
@@ -629,13 +641,13 @@ replicon and the Gardner transition (E4), K-XORSAT and K-SAT (closed forms, smal
 trees, the SP-rule audit, small SP populations), LDPC density evolution and small peeling runs, the
 spiked-Wigner and SBM state evolution / KS line, the ridge closed forms and small simulations, the exact
 series and its operator, the certified lattice values and Guerra bounds, and the PT detailed-balance gate
-and exact enumeration (E11). `--full` adds 131 `@slow` tests (full-RSB Parisi up to K = 9,
+and exact enumeration (E11). `--full` adds 132 `@slow` tests (full-RSB Parisi up to K = 9,
 population dynamics at reference sizes, the XORSAT GF(2) crossing at N = 400-2000 and leaf removal at
 N = 100000, the K-SAT SP-population crossing and BP window, the LDPC crossing at N = 20000, the spiked
 AMP and SBM bands at reference sizes, the ridge 1/n bands at n = 400, 1000, the 2RSB certified bound and
 the K = 5 chain, the E11 Monte Carlo / enumeration held-out routes (about 4.6 min), the Hopfield replicon
 scans, the p-spin T -> 0 energy, solver-based composed and LaTeX checks, a PDF compile when a TeX engine
-is present) and takes about 18 minutes on a laptop (measured 18 min 2 s, 555 tests); run it before merging a change to a family. The `@slow` marker is
+is present) and takes about 18 minutes on a laptop (measured 18 min 11 s, 557 tests); run it before merging a change to a family. The `@slow` marker is
 honoured by `selftest.py` only: pytest ignores it and would run everything. Level agreement between the
 derivation and the pipelines is a consistency check, not new evidence for the ansatz; the cavity route reproducing
 the replica RS equations is an independent derivation but NOT independent evidence for the RS ansatz.

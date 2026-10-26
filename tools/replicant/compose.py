@@ -294,8 +294,8 @@ def _compose_rsb(spec, route):
     if route != "replica":
         raise Refusal(f"missing-step:route:{route}",
                       f"ansatz 1rsb is a level-(a) replica route; route {route!r} has no "
-                      "ansatz switch (the CLI passes --param ansatz to the composer, which "
-                      "refuses it here before any entry parameter check)")
+                      "ansatz switch (the CLI sends --param ansatz here only for specs that are "
+                      "not catalog entries, and --param level_a_ansatz for any spec)")
     _check_hooks(spec, nearest_entry(spec))
     return ComposedCalculation(spec, route, level_a_rsb_steps(spec), rsb_report(spec),
                                ansatz="1rsb")

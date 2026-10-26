@@ -99,12 +99,12 @@ series` for `series_ising2d`, `--route bound` for `sk_bounds`, and `--pdf` (with
 
 ## Test tiers
 
-- Default: `python3 tools/replicant/selftest.py` (424 tests, about 22 s; measured 21.6 s). Also
+- Default: `python3 tools/replicant/selftest.py` (425 tests, about 22 s; measured 21.4 s). Also
   `python3 run_selftests.py replicant` from the repository root, with the venv activated (it runs
   the `python3` on PATH; without python-flint the lattice and bounds tests fail, 31 of them).
-- Full: `python3 tools/replicant/selftest.py --full` adds the 131 `@slow` tests (full RSB,
+- Full: `python3 tools/replicant/selftest.py --full` adds the 132 `@slow` tests (full RSB,
   population dynamics at reference sizes, the K-SAT and LDPC crossings, Monte Carlo and enumeration
-  held-out routes, solver-based checks); about 18 minutes on a laptop (measured 18 min 2 s, 555 tests).
+  held-out routes, solver-based checks); about 18 minutes on a laptop (measured 18 min 11 s, 557 tests).
 - The held-out tests are `tests/test_heldout*.py` (helpers `tests/heldout_common.py`, `tests/heldout_mc.py`).
 - `@slow` is a plain function attribute honoured by `selftest.py` only. pytest ignores the
   marker and would run every test, slow ones included.

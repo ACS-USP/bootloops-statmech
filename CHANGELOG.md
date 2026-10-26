@@ -106,10 +106,15 @@ All notable changes to BootLoops are recorded here. The format follows
   Hopfield (E1), the p-spin 1RSB values (E4). `tests/test_heldout.py` split by model
   (`test_heldout_sk.py`, `test_heldout_perceptron.py`, `test_heldout_mc.py`, helpers in
   `heldout_common.py`); no assertion changed. Default battery `python3 tools/replicant/selftest.py`
-  424 tests, about 22 s (measured 21.6 s); `--full` 555 tests, about 18 minutes (measured 18 min 2 s). GUIDE, README, REFERENCES and the extension spec's
+  425 tests, about 22 s (measured 21.4 s); `--full` 557 tests, about 18 minutes (measured 18 min 11 s). GUIDE, README, REFERENCES and the extension spec's
   as-built notes updated.
 
 ### Fixed
+- `replicant` (CLI regression from E2): `--param ansatz` was taken by the level-(a) 1RSB composer for
+  every spec, so the v1 `run sk --param ansatz=1rsb --param beta=2` no longer reached the family 1RSB
+  pipeline and `run viana_bray --route cavity ... --param ansatz=1rsb` was refused. For a catalog
+  entry `ansatz` is again the entry's own parameter; the composer switch is `ansatz` for specs that
+  are not catalog entries and `--param level_a_ansatz=1rsb` for any spec.
 - `replicant`: `run sk|teacher_student --route amp --param N=... --param seeds=1` ended in
   `ERROR: TypeError` (exit 1), and an empty seed list fell back to the default; both are now refused
   `precondition:named-seeds`. `lattice.ball.certify` no longer treats an exact ball (radius 0 at two
