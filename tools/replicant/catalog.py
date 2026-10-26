@@ -297,8 +297,10 @@ UNCLAIMED[("online_linear", "online_eq20_rho_a2")] = (
     "KC95 Eq. (20) is a time-dependent rule (a callable F(b, h, Q, R, alpha)), not a named catalog rule: "
     "tests/test_online_linear.py test_kc_eq20_time_dependent_rule integrates it and checks this key")
 UNCLAIMED.update({("online_drift", k): (
-    "VKC p. 15's delta = 5, 8 for the perceptron at a fixed rate; replicant's ODE (|J| at its stationary value) "
-    "gives the derived 1/delta = 1/3, 1/4 (online/drift.py drift_exponent), checked against this key's failure in "
+    "VKC p. 15's delta = 5, 8 for the perceptron at a fixed rate apply Eq. (34) outside its derivation: the "
+    "decoupled form (35) needs W independent of J (KC93 p. 6), and the free-norm perceptron's |J| self-tunes; "
+    "replicant's ODE gives 1/delta = 1/3, 1/4 with eps_inf = (4D)^(1/3)/pi, 2^(5/4)/pi D^(1/4) (online/drift.py "
+    "drift_exponent), and delta = 3 violates VKC's inequality (42); checked against this key's failure in "
     "tests/test_online_drift.py") for k in ("random_perceptron_exponent", "det_perceptron_exponent")})
 
 def _freeze(p):

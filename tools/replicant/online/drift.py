@@ -255,9 +255,14 @@ def drift_exponent(rule, kind):
     perceptron at a fixed rate (Q free) derived here: at the stationary |J|, sqrt(Q*) = -eta <F^2> /
     (2 <F b x>) ~ eta sqrt(2 pi) / (pi theta), the flow becomes dtheta/dalpha = -theta^2 / 4 + drift
     (noiseless, theta -> 0), so theta^3 = 4D (random) and theta^2 = 4 sqrt(2D) (deterministic):
-    delta = 3 and 4, NOT VKC's 5 and 8 (p. 15, obtained from beta = 1/3 through Eq. (34), which
-    assumes the Q-independent form (35)); the coefficients are then 4^(1/3)/pi and 2^(5/4)/pi, those
-    of VKC's step rule (Tables I-II), independent of eta."""
+    delta = 3 and 4, NOT VKC's 5 and 8 (p. 15, obtained from beta = 1/3 through Eq. (34)).  Eq. (34)
+    rests on the decoupled form (35), and KC93 p. 6 state that the rho and J equations decouple only
+    when W does not depend on J; the fixed-rate free-norm perceptron has W = eta / |J|, so they stay
+    coupled and |J| self-tunes.  delta = 3 (random) also violates VKC's own inequality (42), delta >
+    1/beta + 2 = 5, which is derived for the decoupled form: the relation is outside its derivation
+    here.  Self-tuned perceptron (noiseless, D -> 0): eps_inf = (4D)^(1/3)/pi and 2^(5/4)/pi D^(1/4),
+    checked against the ODE's stationary states (0.50528545 and 0.75707276 at D = 1e-12, eta = 1 and 3,
+    against 0.50528545 and 0.75707276), the coefficients of VKC's step rule (Tables I-II), independent of eta."""
     if rule == "perceptron":
         return 1 / 3 if kind == "random" else 1 / 4
     b = BETA[rule]

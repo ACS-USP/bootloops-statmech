@@ -763,7 +763,7 @@ and exact enumeration (E11), and the online-learning ODEs, Gaussian averages and
 band (O1), the linear perceptron's ODEs, closed forms, offline geometry, ridge route and small online and
 offline simulation bands (O2), the drift flow, the VKC modulations and their class maximisation, VKC's
 drift-independence claim, the KC93 bound for every rule, stationary states and small-drift laws against
-the bank and a small drifting-teacher simulation band (O3). `--full` adds 137 `@slow` tests (full-RSB Parisi up to K = 9,
+the bank and a small drifting-teacher simulation band (O3). `--full` adds 138 `@slow` tests (full-RSB Parisi up to K = 9,
 population dynamics at reference sizes, the XORSAT GF(2) crossing at N = 400-2000 and leaf removal at
 N = 100000, the K-SAT SP-population crossing and BP window, the LDPC crossing at N = 20000, the spiked
 AMP and SBM bands at reference sizes, the ridge 1/n bands at n = 400, 1000, the online ODE-vs-simulation
@@ -1337,9 +1337,11 @@ KNOWN HAZARDS:
 - Drifting rules (O3, `online/drift.py`, `drift_rules.py`, `simulate_drift.py`, entry `online_drift`).
   Papers read: Vicente, Kinouchi & Caticha 1998 (arXiv:cond-mat/9801297) and Kinouchi & Caticha 1993 (J.
   Phys. A 26, 6161; the preprint IFUSP/P-1044, March 1993, scanned, read page by page). Biehl & Schwarze
-  (Europhys. Lett. 20, 733 (1992); J. Phys. A 26, 2651 (1993), doi:10.1088/0305-4470/26/11/014) were NOT
-  fetched (IOP bot check, no preprint found); their drift models are used as VKC and KC93 restate them and
-  nothing is banked from them. Conventions: random drift B <- (B + sqrt(2D)/N u)/|.| (VKC's <eta_i eta_j> =
+  (Europhys. Lett. 20, 733 (1992); J. Phys. A 26, 2651 (1993), doi:10.1088/0305-4470/26/11/014): the
+  full texts were NOT read (IOP bot check on the PDFs, no preprint found); the existence and scope of the
+  EPL paper were confirmed from its IOP landing page (abstract only) by the O3 reviewer (the
+  implementer's own fetch met the bot check), the J. Phys. A paper from the Groningen portal; their drift models are used as VKC and KC93 restate them and nothing is banked from
+  them. Conventions: random drift B <- (B + sqrt(2D)/N u)/|.| (VKC's <eta_i eta_j> =
   2D, KC93's T = D: B . B' = 1 - D/N per example); deterministic drift turns B away from J by
   arccos(1 - D/N^2); noise = VKC's chi / 2 (O1). VKC's "Hebb" is the annealed Hebb W_AH (their Eq. (22)),
   not plain Hebb, which under drift does not track (eps -> 1/2). Each VKC rule is optimal only in its
@@ -1350,9 +1352,14 @@ KNOWN HAZARDS:
   with the engine's <W*^2>/2; the printed form diverges for lambda >= 1) and keeps their Eq. (25) constant
   0.447, unaffected. VKC Table II's deterministic optimal formula (8D/A^2)^(1/4) does not give its printed
   0.63 (A is not defined in the arXiv text; (8D/(pi^2 A^4))^(1/4), derived, does). VKC p. 15's perceptron
-  delta = 5 (random), 8 (deterministic) rest on Eq. (34); with |J| free the perceptron's |J| settles
-  under drift and replicant's ODE gives delta = 3, 4 with the step rule's coefficients (derived in
-  `drift.drift_exponent`): banked, UNCLAIMED, recorded as a discrepancy.
+  delta = 5 (random), 8 (deterministic) apply Eq. (34) outside its derivation: Eq. (34) rests on the
+  decoupled form (35), and KC93 p. 6 state that the rho and |J| equations decouple only when W does not
+  depend on J. The fixed-rate free-norm perceptron's |J| self-tunes under drift, and replicant's ODE
+  gives delta = 3, 4 with eps_inf = (4D)^(1/3)/pi and 2^(5/4)/pi D^(1/4) (the step rule's coefficients;
+  derived in `drift.drift_exponent`, checked against the stationary ODE); delta = 3 also violates VKC's
+  inequality (42), delta > 1/beta + 2 = 5. VKC's values are banked, UNCLAIMED, recorded as a
+  discrepancy. VKC p. 15 also prints "beta = 1 for the Hebb algorithm", which should read beta = 1/2
+  (their Table I, annealed Hebb 0.40 alpha^-1/2).
 - families/sk.py's float64 1RSB functional (`_rsb_phi_e`, 80 x 80 Gauss-Hermite; v1 code, unchanged) is
   inaccurate in the q0 = 0 / large q1 - q0 sector, where the branch points of cosh^m (zeros of cosh at
   Im = pi/2) are not smoothed by an outer Gaussian average. Against the certified balls of bounds/krsb.py:

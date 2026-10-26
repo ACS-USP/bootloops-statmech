@@ -64,7 +64,9 @@ def online_drift(route):
               r"\frac{d\rho}{d\alpha} = \rho\,(I(\lambda) - T),\quad I(\lambda) = \frac{\lambda^3}{2\pi}\int Du\,"
               r"\frac{e^{-(1+\lambda^2)u^2/2}}{H(u)}", _KC93),
         cited("Results compared (VKC Tables I-II, Figs. 4, 6, Eq. (34); KC93 Eqs. (24)-(25)); the KC93 bound: "
-              "e_G^{opt}(\\alpha) \\le e_G^{W}(\\alpha) for every modulated Hebbian W from the same rho0",
+              "e_G^{opt}(\\alpha) \\le e_G^{W}(\\alpha) for every modulated Hebbian W from the same rho0. "
+              "The delta relation holds only for the decoupled rules (W independent of |J|, KC93 p. 6); the "
+              "fixed-rate free-norm perceptron gives delta = 3, 4 (not VKC p. 15's 5, 8)",
               r"e_G^\infty \simeq c\,D^{1/\delta},\ \delta = \tfrac{1}{\beta} + 2\ (\text{random}),\ "
               r"\tfrac{2}{\beta} + 2\ (\text{deterministic});\ c_{opt} = \Big[\tfrac{\pi^2}{2}\int Du\,"
               r"\tfrac{e^{-u^2/2}}{H(u)}\Big]^{-1/3} \approx 0.447", _VKC),

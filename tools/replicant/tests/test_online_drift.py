@@ -117,6 +117,7 @@ def _vkc_flow(rule, D=0.0, kind="random", noise=0.0, typed_noise=None):
     return DR.drift_flow(VR.Modulation(w), D=D, kind=kind, noise=noise, averages="quadrature")
 
 
+@slow
 def test_vkc_modulations_maximise_drho_in_their_class():
     """Each typed VKC modulation (Eqs. (22)-(25), chi = 2 noise) is a stationary point of drho/dalpha
     (the flow's rate, quadrature averages) along every direction of its information class; typing
@@ -136,7 +137,13 @@ def test_vkc_claim_modulations_do_not_depend_on_drift():
     dependence on the examples noise level chi)'.  Tested as stated: the maximiser of drho/dalpha
     within each class, found from the flow's rate (gradient and Hessian by central differences in a
     class basis), is the same at D = 0, D = 0.3 (random) and D = 0.01 (deterministic), and
-    it changes with the noise level.  Planted: a W-dependent drift term (drift._PLANT["coupling"])."""
+    it changes with the noise level.  Planted: a W-dependent drift term (drift._PLANT["coupling"]).
+    This check is close to structural: drift.py composes the drift term independently of W, so the
+    test confirms the composition and the class maximisation rather than the physics; the
+    independent evidence that the drift enters as composed is the finite-N band
+    (test_online_drift_sim.py), where the teacher drifts in the simulation.  The typed W* is checked
+    to be stationary in its class at every D here (default tier); all four VKC rules and the chi
+    mapping in test_vkc_modulations_maximise_drho_in_their_class (slow)."""
     def argmax(flow, basis, theta):
         n = len(basis)
         g0 = _directional(DR.drift_flow(VR.Modulation(lambda d, th: 0 * d), D=flow.D, kind=flow.kind,
@@ -289,9 +296,11 @@ _TABLE = (("annealed_hebb", "random"), ("symmetric", "random"), ("step", "random
 def test_small_drift_laws_vs_banked():
     """eps_inf ~ c D^(1/delta) for small D: the measured log-slope (D = 1e-8 -> 1e-7) and the
     coefficient against VKC Tables I-II (and KC93 Eq. (25) for the optimal rule, random drift); the
-    exponents obey VKC Eq. (34), delta = 1/beta + 2 (random), 2/beta + 2 (deterministic), also for
-    the perceptron at a fixed rate (beta = 1/3: delta = 5, 8, VKC p. 15).  Controls: each
-    coefficient against the next rule's key."""
+    exponents obey VKC Eq. (34), delta = 1/beta + 2 (random), 2/beta + 2 (deterministic), for these
+    decoupled rules (W independent of |J|).  The perceptron at a fixed rate is the exception: its |J|
+    self-tunes under drift and delta = 3, 4 (drift.drift_exponent), not VKC p. 15's 5, 8 (banked,
+    UNCLAIMED), with the step rule's coefficients (4D)^(1/3)/pi, 2^(5/4)/pi D^(1/4).  Controls: each
+    coefficient against the next rule's key; the perceptron against VKC's exponents."""
     got = {}
     for rule, kind in _TABLE:
         sd = DR.small_drift(rule, kind)
