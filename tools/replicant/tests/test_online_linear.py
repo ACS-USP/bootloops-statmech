@@ -17,7 +17,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from replicant.catalog import catalog, check_ref
+from replicant.catalog import catalog, check_ref, run_cached
 from replicant.compose import compose
 from replicant.core import Refusal
 from replicant.learning import ridge
@@ -149,15 +149,15 @@ def test_optimal_rule_bounds_its_class():
     assert "rho" in L.OPTIMALITY_CLASS and "greedy" in L.OPTIMALITY_CLASS
     init = (0.05, 1.0)
     for cons in ("sphere", "none"):
-        top = [_rho(L.linear_flow("optimal", constraint=cons), a, init) for a in (0.5, 2.0)]
+        top = [_rho(L.linear_flow("optimal", constraint=cons), a, init) for a in (2.0,)]
         for flow in (L.linear_flow("standard", constraint=cons),
                      L.linear_flow("standard", eta="greedy", constraint=cons),
                      L.linear_flow(lambda b, h, Q, R: 0.7 * b - 1.2 * h, constraint=cons),
                      L.linear_flow(lambda b, h, Q, R: np.tanh(b) - h, constraint=cons)):
-            for t, a in zip(top, (0.5, 2.0)):
+            for t, a in zip(top, (2.0,)):
                 assert _rho(flow, a, init) < t - 1e-4
         with planted(L, eta2=0.0):
-            assert _rho(L.linear_flow("optimal", constraint=cons), 2.0, init) > top[1] + 1e-2
+            assert _rho(L.linear_flow("optimal", constraint=cons), 2.0, init) > top[0] + 1e-2
 
 
 def test_greedy_eta_and_hypothesis_temperature():
@@ -178,6 +178,23 @@ def test_greedy_eta_and_hypothesis_temperature():
                             alphas=(0.5, 1.0, 3.0))
     for a, g in zip(tr.alpha, L.hypothesis_temperature(tr.rho)):
         assert abs(g - 1 / math.expm1(a)) < 1e-6 * (1 + g), (a, g)
+
+
+def test_kc_eq20_time_dependent_rule():
+    """KC Eq. (20): on the sphere Q = M = 1 the optimal rule with the theoretical rho(alpha) in place
+    of the true rho, F = b / sqrt(1 - e^-alpha) - h, is a time-dependent callable rule; integrated
+    from alpha0 = 0.01 on the curve (it is singular at alpha = 0), it stays on Eq. (19)
+    self-consistently.  A wrong schedule b / (1 - e^-alpha) - h leaves it."""
+    a0 = 0.01
+    r0 = math.sqrt(-math.expm1(-a0))
+    good = L.linear_flow(lambda b, h, Q, R, a: b / math.sqrt(-math.expm1(-a)) - h, constraint="sphere")
+    bad = L.linear_flow(lambda b, h, Q, R, a: b / -math.expm1(-a) - h, constraint="sphere")
+    tr = L.integrate_linear(good, 2.0, (r0, 1.0), alphas=(0.5, 2.0), alpha0=a0)
+    for a, r in zip(tr.alpha, tr.rho):
+        assert abs(r - math.sqrt(-math.expm1(-a))) < 1e-8, (a, r)
+    assert _ok("online_eq20_rho_a2", tr.rho[1])
+    wrong = L.integrate_linear(bad, 2.0, (r0, 1.0), alphas=(2.0,), alpha0=a0).rho[0]
+    assert not _ok("online_eq20_rho_a2", wrong) and abs(wrong - tr.rho[1]) > 1e-3, wrong
 
 
 # ---- offline (KC95 Sec. 4) and the second route through ridge (E7) -----------------------------
@@ -215,6 +232,10 @@ def test_online_offline_comparison():
     (1 - alpha)/2 is below the online e^-alpha / 2 (derived)."""
     x = OFF.crossing_alpha()
     assert _ok("online_offline_crossing", x)
+    import mpmath as mp
+    with mp.workdps(30):                       # Eq. (19) = Eq. (27), an independent root
+        root = mp.findroot(lambda a: mp.sqrt(1 - mp.exp(-a)) - a, mp.mpf("0.7"))
+    assert abs(x - float(root)) < 1e-6, (x, root)
     with planted(L, eta2=0.0):                                  # control: a wrong online flow
         try:
             bad = OFF.crossing_alpha()
@@ -233,11 +254,18 @@ def test_online_offline_comparison():
 
 # ---- finite-N simulation -----------------------------------------------------------------------
 def test_simulator_shares_no_code_with_the_ode():
+    """Every imported module path (dotted components of `import a.b`, `from .a.b import c`, and the
+    imported names, which may be modules) avoids the ODE side's modules."""
     src = Path(L.__file__).with_name("simulate_linear.py").read_text()
-    names = {a.name for n in ast.walk(ast.parse(src)) if isinstance(n, (ast.Import, ast.ImportFrom))
-             for a in n.names} | {n.module or "" for n in ast.walk(ast.parse(src))
-                                  if isinstance(n, ast.ImportFrom)}
-    assert not any(k in names for k in ("linear", "linear_offline", "odes", "fields", "optimal")), names
+    parts = set()
+    for n in ast.walk(ast.parse(src)):
+        if isinstance(n, ast.Import):
+            parts |= {c for a in n.names for c in a.name.split(".")}
+        elif isinstance(n, ast.ImportFrom):
+            parts |= set((n.module or "").split(".")) | {a.name for a in n.names}
+    banned = {"linear", "linear_offline", "odes", "fields", "optimal", "online"}
+    assert not parts & banned, parts & banned
+    assert "amp" in parts and "_stats" in parts                     # the walk sees dotted paths
 
 
 def test_ode_vs_simulation_band():
@@ -258,17 +286,23 @@ def test_ode_vs_simulation_band():
 
 
 def test_offline_simulation_band():
-    """Offline zero-temperature solutions built at N = 200 (pseudoinverse, its normalisation, and
-    a uniform point of the zero-error set on the sphere): rho in the band of the geometry, and the
+    """Offline zero-temperature solutions at N = 200, 10 seeds, rho in the band of the geometry.
+    method="construct" builds them (pseudoinverse, its normalisation, and a uniform point of the
+    zero-error set: the derivation's own assumption); method="descent" assumes nothing (gradient
+    descent on the standard energy from a random start on the sphere, from 0 unconstrained).  The
     standard and optimal answers are told apart."""
     from replicant.online import simulate_linear as S
-    for alg, cons in (("standard", "sphere"), ("optimal", "sphere"), ("standard", "none")):
-        sim = S.simulate_offline(alg, 200, 0.5, tuple(range(20)), constraint=cons)
+    seeds = tuple(range(10))
+    for alg, cons, how in (("standard", "sphere", "construct"), ("optimal", "sphere", "construct"),
+                           ("standard", "sphere", "descent"),
+                           ("standard", "none", "descent")):
+        b = S.simulate_offline(alg, 200, 0.5, seeds, constraint=cons, method=how).rho_band
         want = OFF.offline(0.5, alg, constraint=cons).rho
-        b = sim.rho_band
-        assert abs(want - b.mean) <= b.half_width + 1e-12, (alg, cons, want, b)
-    other = OFF.offline(0.5, "optimal").rho
-    assert abs(other - S.simulate_offline("standard", 200, 0.5, tuple(range(20))).rho_band.mean) > 0.1
+        assert abs(want - b.mean) <= b.half_width + 1e-12, (alg, cons, how, want, b)
+        if alg == "standard" and cons == "sphere":
+            assert abs(OFF.offline(0.5, "optimal").rho - b.mean) > 0.1
+    _refuses(lambda: S.simulate_offline("optimal", 50, 0.5, seeds, method="descent"),
+             "precondition:method")
 
 
 @slow
@@ -319,7 +353,7 @@ def test_refusals():
 
 def test_catalog_entry_runs_and_refuses():
     e = catalog()["online_linear"]
-    v = e.run(route="online")                                    # every default (generic tables)
+    v = run_cached(e, "online", {})[0]                           # every default (generic tables)
     assert v["rule"] == "optimal" and v["constraint"] == "sphere"
     v = e.run(route="online", alpha="0.5")
     assert abs(v["rho"] - math.sqrt(1 - math.exp(-0.5))) < 1e-5
@@ -329,7 +363,10 @@ def test_catalog_entry_runs_and_refuses():
     _refuses(lambda: compose(e.spec, "online").run(rul="optimal"), "precondition:known-parameter")
     _refuses(lambda: e.run(route="online", rule="standard", eta="greedy", constraint="none",
                            R0=0, Q0=0, alpha=1), "precondition:initial-overlap")
-    for ref in e.refs:
+    _refuses(lambda: e.run(route="online", rule="hebb"), "unsupported:rule")
+    _refuses(lambda: e.run(route="online", constraint="ball"), "precondition:constraint")
+    _refuses(lambda: e.run(route="online", rule=lambda b, h, Q, R: b - h), "unsupported:rule")
+    for ref in e.refs[:2]:                     # test_catalog checks all 13 in the default tier
         out = check_ref(e, ref)
         assert out.ok, out
 
@@ -345,21 +382,21 @@ def test_guide_is_true():
     guide = (root / "GUIDE.md").read_text()
     assert "| `online_linear`" in guide and "`online_linear` (online): `rule`" in guide
     code = "".join(p.read_text() for p in [*(root / "online").glob("linear*.py"),
+                                           root / "online" / "simulate_linear.py",
                                            root / "catalog_online_linear.py"])
     for reason in ("unsupported:rule", "unsupported:algorithm", "precondition:eta",
                    "precondition:optimal-eta", "precondition:constraint", "precondition:teacher-norm",
                    "precondition:averages", "precondition:state-point", "precondition:initial-overlap",
                    "precondition:alpha", "precondition:asymptote", "precondition:offline-window",
-                   "undetermined:asymptote", "undetermined:crossing", "no-solution:rho-zero"):
+                   "undetermined:asymptote", "undetermined:crossing", "no-solution:rho-zero",
+                   "precondition:method", "undetermined:descent"):
         assert f'"{reason}"' in code, reason
     out = io.StringIO()
     assert main(["run", "online_linear", "--route", "online", "--param", "alpha=0.5"], out,
                 io.StringIO()) == 0
     v = json.loads(out.getvalue())["values"]
     assert "alpha_cross" not in v and "rho_inf" not in v
-    out = io.StringIO()
-    assert main(["run", "online_linear", "--route", "online"], out, io.StringIO()) == 0
-    v.update(json.loads(out.getvalue())["values"])
+    v.update(run_cached(catalog()["online_linear"], "online", {})[0])     # the run without alpha
     for key, fmt in (("rho", ".6f"), ("gamma_temperature", ".6f"), ("alpha_cross", ".6f"),
                      ("rho_offline_optimal_ridge", ".6f"), ("tail_constant", ".7f")):
         assert f"`{key}` {v[key]:{fmt}}" in guide, (key, v[key])

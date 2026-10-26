@@ -46,16 +46,11 @@ _ODE_NOTE = ("N -> oo ODE limit: self-averaging assumed (KC95 Sec. 3.1, 'in the 
 _SEEDS = tuple(range(20))
 
 
-def _str(p, key, default, allowed):
-    v = p.get(key, default)
-    if v not in allowed:
-        raise Refusal(f"precondition:{key}", f"{key}={v!r}: {' | '.join(allowed)}")
-    return v
-
-
 def _flow(p):
-    rule = _str(p, "rule", "optimal", L.RULES)
-    cons = _str(p, "constraint", "sphere", L.CONSTRAINTS)
+    rule, cons = p.get("rule", "optimal"), p.get("constraint", "sphere")
+    if callable(rule):
+        raise Refusal("unsupported:rule", "the catalog takes named rules; a callable rule goes "
+                      "through online.linear.linear_flow")
     eta = p.get("eta", 1)
     eta = "greedy" if eta == "greedy" else _num(p, "eta", 1)
     return L.linear_flow(rule, eta=eta, constraint=cons, M=_num(p, "M", 1))
@@ -132,7 +127,11 @@ def _offline(p):
         rr = OFF.ridge_route(a, f.M)
         vals.update(rho_offline_optimal_ridge=rr.rho, eg_pinv_ridge=rr.eg, ridge_gamma=rr.gamma)
     except Refusal as r:
-        notes.append(f"ridge route: {r.reason} ({r.detail})")
+        if r.reason != "precondition:gamma-not-one":
+            raise
+        notes.append("ridge route skipped at gamma = 1/alpha = 1: ridge refuses gamma = 1 because HMRT Eq. (8) "
+                     "states the ridgeless limit for gamma != 1 only (it diverges there for sigma2 > 0); at the "
+                     "sigma2 = 0 used here the bias r^2 (1 - 1/gamma) tends to 0, but no value is claimed")
     return Out(vals, f"zero-temperature offline solutions at alpha = {a:g} (zero-energy-set geometry; "
                f"ridge at gamma = 1/alpha, sigma2 = 0 for the pseudoinverse)", notes=tuple(notes))
 

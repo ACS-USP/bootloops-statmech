@@ -293,6 +293,9 @@ UNCLAIMED[("ksat", "alpha_1rsb_stability_k3")] = (
 # ---- reference checks --------------------------------------------------------------------
 _RUNS = {}
 
+UNCLAIMED[("online_linear", "online_eq20_rho_a2")] = (
+    "KC95 Eq. (20) is a time-dependent rule (a callable F(b, h, Q, R, alpha)), not a named catalog rule: "
+    "tests/test_online_linear.py test_kc_eq20_time_dependent_rule integrates it and checks this key")
 
 def _freeze(p):
     return tuple(sorted((k, tuple(v) if isinstance(v, list) else v) for k, v in p.items()))

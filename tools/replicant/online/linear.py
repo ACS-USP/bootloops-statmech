@@ -20,6 +20,7 @@ do), with (b, h) jointly Gaussian, <b^2> = M, <h^2> = Q, <b h> = R:
 Rules: "standard" F = b - h (KC Eq. (22), gradient of (b - h)^2 / 2), at a learning rate eta (a
 number, a schedule eta(alpha), or "greedy": greedy_eta below); "optimal" F = sqrt(Q/M) b / rho - h =
 (Q / R) b - h (KC Eq. (9) with I = 1), eta = 1, class in OPTIMALITY_CLASS; or a callable F(b, h, Q, R)
+or F(b, h, Q, R, alpha) (five parameters: a time-dependent rule such as KC Eq. (20))
 (averaged by a Gauss-Hermite rule).  For F = c b - d h the moments are bilinear:
 <b F> = c M - d R, <h F> = c R - d Q, <F^2> = c^2 M - 2 c d R + d^2 Q.
 
@@ -30,7 +31,7 @@ Closed forms (derived here from the rates; the ODE is checked against them):
       rho = rho_max + (rho0 - rho_max) e^{-(1 + m) alpha / 2}, rho_max = 2 sqrt(m) / (1 + m) (Eq. (24));
   optimal: drho/dalpha = (1 - rho^2) / (2 rho) (KC Eq. (17)), so rho^2 = 1 - (1 - rho0^2) e^{-alpha};
       unconstrained dQ/dalpha = Q (1 - rho^2) / rho^2 (Eq. (18)), so Q = Q0 rho^2 / rho0^2.
-greedy_eta(R, Q, M) = (Q M - R^2) / (R (M + Q - 2R)) maximises drho/dalpha over eta for F = eta (b - h)
+greedy_eta(R, Q, M) = (Q M - R^2) / (R (M + Q - 2R)) (derived here, not in KC95) maximises drho/dalpha over eta for F = eta (b - h)
 (the rate is eta A - eta^2 B).  KC's learning-rate parameter is Gamma = (1 - rho^2) / rho^2 (Eq. (13)).
 
 The integrator is odes._dopri on (D, Q): D = |J - B|^2 > 0 has no cancellation as J -> B.
@@ -58,13 +59,21 @@ OPTIMALITY_CLASS = (
     "reads rho and M, so it is not a practical algorithm (KC Sec. 3.5), and it is the optimum at eta "
     "= 1 only. It maximises rho, not e_g: unconstrained, e_g = (M + Q - 2R)/2 also depends on |J|, "
     "and the rule's Q = Q0 rho^2 / rho0^2 makes e_g large unless sqrt(Q0) = rho0 sqrt(M) (KC p. 9, Fig. 1; "
-    "e.g. e_g = 7.6 at alpha = 3 from (R0, Q0) = (0.1, 0.5)). greedy_eta is optimal only in the subclass F = eta (b - h): greedy per example; on the "
+    "e.g. e_g = 7.6 at alpha = 3 from (R0, Q0) = (0.1, 0.5)). greedy_eta (derived here, not in KC95) is optimal only in the subclass F = eta (b - h): greedy per example; on the "
     "sphere, where rho alone evolves, that makes it optimal for the whole curve within the subclass; "
     "unconstrained it is greedy only")
 _PLANT = {"eta2": 1.0, "cross": 1.0}
 LinTrajectory = namedtuple("LinTrajectory", "alpha R Q rho eg")
 Asymptote = namedtuple("Asymptote", "alpha rho eg tail")
 _GH = np.polynomial.hermite_e.hermegauss(12)
+
+
+def _arity(fn):
+    import inspect
+    try:
+        return len(inspect.signature(fn).parameters)
+    except (TypeError, ValueError):
+        return 4
 
 
 def _real(v):
@@ -122,7 +131,8 @@ class LinearFlow:
         b = math.sqrt(M) * z1
         h = (R / math.sqrt(M)) * z1 + math.sqrt(max(Q - R * R / M, 0.0)) * z2
         if callable(self.rule):
-            F = np.asarray(self.rule(b, h, Q, R), dtype=float) * np.ones_like(b)
+            args = (b, h, Q, R, alpha) if _arity(self.rule) == 5 else (b, h, Q, R)
+            F = np.asarray(self.rule(*args), dtype=float) * np.ones_like(b)
         else:
             c, d = self._coef(R, Q)
             F = c * b - d * h
@@ -182,23 +192,26 @@ def _init(flow, init):
     return R0, Q0
 
 
-def integrate_linear(flow, alpha_max, init=None, alphas=None, rtol=1e-10, atol=1e-18):
-    """LinTrajectory(alpha, R, Q, rho, eg) of `flow` from init = (R0, Q0) at `alphas` (default 50
+def integrate_linear(flow, alpha_max, init=None, alphas=None, rtol=1e-10, atol=1e-18, alpha0=0.0):
+    """LinTrajectory(alpha, R, Q, rho, eg) of `flow` from init = (R0, Q0) at alpha0 (default 0; a
+    time-dependent rule singular at alpha = 0, KC Eq. (20), starts later) at `alphas` (default 50
     equally spaced points up to alpha_max)."""
     if not (_real(alpha_max) and alpha_max > 0):
         raise Refusal("precondition:alpha", f"alpha_max={alpha_max!r}: need a finite alpha > 0")
     R0, Q0 = _init(flow, init)
+    if not (_real(alpha0) and 0 <= alpha0 < alpha_max):
+        raise Refusal("precondition:alpha", f"alpha0={alpha0!r}: need 0 <= alpha0 < alpha_max")
     outs = sorted(float(a) for a in (alphas if alphas is not None else
                                      np.linspace(alpha_max / 50, alpha_max, 50)))
-    if not outs or outs[0] <= 0 or outs[-1] > alpha_max * (1 + 1e-12):
-        raise Refusal("precondition:alpha", f"alphas must lie in (0, alpha_max = {alpha_max}]")
+    if not outs or outs[0] <= alpha0 or outs[-1] > alpha_max * (1 + 1e-12):
+        raise Refusal("precondition:alpha", f"alphas must lie in (alpha0, alpha_max = {alpha_max}]")
     M = flow.M
 
     def f(a, y):
         D, Q = y
         dR, dQ = flow.rates(a, (M + Q - D) / 2, Q)
         return np.array([dQ - 2 * dR, dQ])
-    ys = _dopri(f, 0.0, (M + Q0 - 2 * R0, Q0), outs, rtol, atol, hi=math.inf)
+    ys = _dopri(f, float(alpha0), (M + Q0 - 2 * R0, Q0), outs, rtol, atol, hi=math.inf)
     D = np.array([y[0] for y in ys])
     Q = np.array([y[1] for y in ys])
     R = (M + Q - D) / 2
@@ -217,16 +230,15 @@ def asymptote(flow, init, alpha_big=60.0, alpha_tail=20.0):
     if flow.constraint != "sphere" or callable(flow.rule) or callable(flow.eta) or flow.eta != 1:
         raise Refusal("precondition:asymptote", "asymptotes are measured for the named rules at "
                       "eta = 1 on the sphere (KC Eqs. (24), (25), (31))")
-    tr = integrate_linear(flow, alpha_big, init, alphas=(0.75 * alpha_big, alpha_big))
-    if abs(tr.rho[1] - tr.rho[0]) > 1e-9 or abs(tr.eg[1] - tr.eg[0]) > 1e-9:
-        raise Refusal("undetermined:asymptote", f"rho moved {abs(tr.rho[1] - tr.rho[0]):.3g} between "
+    tr = integrate_linear(flow, alpha_big, init, alphas=(alpha_tail, 0.75 * alpha_big, alpha_big))
+    if abs(tr.rho[2] - tr.rho[1]) > 1e-9 or abs(tr.eg[2] - tr.eg[1]) > 1e-9:
+        raise Refusal("undetermined:asymptote", f"rho moved {abs(tr.rho[2] - tr.rho[1]):.3g} between "
                       f"alpha = {0.75 * alpha_big:g} and {alpha_big:g}: not converged")
     tail = None
     Q0 = float(init[1])
     if flow.rule == "optimal" and abs(Q0 - flow.M) <= 1e-12 * flow.M:
-        t = integrate_linear(flow, alpha_tail, init, alphas=(alpha_tail,))
-        tail = math.exp(alpha_tail) * one_minus_rho(2 * t.eg[0], t.Q[0], flow.M)
-    return Asymptote(alpha_big, float(tr.rho[1]), float(tr.eg[1]), tail)
+        tail = math.exp(alpha_tail) * one_minus_rho(2 * tr.eg[0], tr.Q[0], flow.M)
+    return Asymptote(alpha_big, float(tr.rho[2]), float(tr.eg[2]), tail)
 
 
 def standard_closed_form(alpha, eta, init, M=1.0):

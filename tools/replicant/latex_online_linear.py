@@ -56,9 +56,11 @@ def online_linear(route):
             sp.Eq(sp.Symbol("Gamma"), (1 - RHO**2) / RHO**2), source=_KC,
             check=Check((RHO,), lambda rho: float(L.hypothesis_temperature(float(rho))),
                         (("0.2",), ("0.6",), ("0.95",)), "rhs")),
-        sym("Greedy learning rate of the standard rule: argmax over eta of drho/dalpha = eta A - eta^2 B "
-            "(derived; 1 on the tabula rasa manifold R = Q, KC p. 9)",
-            sp.Eq(sp.Symbol("eta^*"), (Q * M - R**2) / (R * (M + Q - 2 * R))), source=_KC,
+        sym("Greedy learning rate of the standard rule, derived here (not in KC95): argmax over eta of "
+            "drho/dalpha = eta A - eta^2 B (1 on the tabula rasa manifold R = Q, where KC p. 9 find the standard "
+            "rule optimal)",
+            sp.Eq(sp.Symbol("eta^*"), (Q * M - R**2) / (R * (M + Q - 2 * R))),
+            source="derived here (online/linear.py greedy_eta), not in KC95",
             check=Check((R, Q, M), lambda r, q, mm: L.greedy_eta(*_f(r, q, mm)),
                         (("0.3", "0.3", "1"), ("0.6", "1", "1"), ("0.5", "2", "1.5")), "rhs")),
         sym("Offline T = 0 solution on the sphere (KC Eq. (47), rho = alpha / r): the standard algorithm "

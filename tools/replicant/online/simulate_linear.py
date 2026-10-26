@@ -11,11 +11,23 @@ online  J <- J + (eta / N) F xi with F = b - h (standard) or F = (Q / R) b - h (
         reads the current R and Q exactly: it is the rule that knows rho); eta = "greedy" is
         (Q M - R^2) / (R (M + Q - 2R)) from the current weights.  constraint "sphere" rescales J
         to |J|^2 = Q0 after every example (KC's decay Omega to O(1/N)).
-offline the zero-temperature solutions of KC Sec. 4 built from the sampled data X (P x N,
-        P = round(alpha N) < N): the projection P B onto the span of the inputs (QR of X^T) is the
-        pseudoinverse (unconstrained); on the sphere the optimal solution is sqrt(Q) P B / |P B|
-        and the standard one is P B + w, w a uniformly random direction orthogonal to the data with
-        |w|^2 = Q - |P B|^2 (a uniform point of the zero-error set).
+offline the zero-temperature solutions of KC Sec. 4 from the sampled data X (P x N, P = round(alpha N)
+        < N), two ways.  method="construct": the projection P B onto the span of the inputs (QR of
+        X^T) is the pseudoinverse (unconstrained); on the sphere the optimal solution is
+        sqrt(Q) P B / |P B| and the standard one is P B + w, w a uniformly random direction
+        orthogonal to the data with |w|^2 = Q - |P B|^2.  That last step IS the derivation's
+        assumption (the T -> 0 Gibbs measure is uniform on the zero-error set), so this method checks
+        the finite-N concentration of |P B|^2 only.  method="descent" assumes nothing about the
+        solution: gradient descent on the standard energy E = |X J - X B|^2 / 2 with step 1 / |X|_2^2, renormalised to |J|^2 = Q after every step from a uniformly
+        random start on the sphere (from J = 0 unconstrained); stopped when the gradient tangent to the
+        sphere (the gradient, unconstrained) is below 1e-9 |X^T c X B| (refused undetermined:descent
+        after 20000 steps).  The gradient lies in the span of the data, so descent keeps the direction
+        of the start's component orthogonal to it: for the standard algorithm it lands on the point of
+        the zero-error set picked by that random direction.  It is offered for the standard algorithm
+        only (refused precondition:method for the optimal one): at finite N the optimal energy with
+        r = sqrt(alpha) has a degenerate zero-error set whenever |P B|^2 < alpha M, so its T = 0
+        minimiser is not unique and differs from the N -> oo answer by the O(1/sqrt N) fluctuation
+        of |P B|^2 (measured: rho 0.67 +- 0.06 at N = 100, against sqrt(1/2)).
 
 e_g = (M + Q - 2R) / 2 and rho = R / sqrt(Q M) are exact for Gaussian inputs given the weights.
 Seeds: each seed owns its numpy Generator (default_rng(seed)); 99% Student-t bands over seeds
@@ -109,8 +121,33 @@ def simulate_linear(rule, N, alpha_max, seeds, eta=1.0, constraint="none", M=1.0
     return _result(alpha_max, J, B, M, N, seeds)
 
 
-def simulate_offline(algorithm, N, alpha, seeds, constraint="sphere", M=1.0, Q=None):
+def _descent(X, beta, c, Q, g, sphere):
+    y = c * (X @ beta)
+    step = 1 / np.linalg.norm(X, 2) ** 2
+    if sphere:
+        J = g.standard_normal(X.shape[1])
+        J *= math.sqrt(Q) / np.linalg.norm(J)
+    else:
+        J = np.zeros(X.shape[1])
+    scale = np.linalg.norm(X.T @ y)
+    for _ in range(20000):
+        grad = X.T @ (X @ J - y)
+        tang = grad - (grad @ J) / (J @ J) * J if sphere else grad
+        if np.linalg.norm(tang) < 1e-9 * scale:
+            return J
+        J = J - step * grad
+        if sphere:
+            J *= math.sqrt(Q) / np.linalg.norm(J)
+    raise Refusal("undetermined:descent", "gradient descent did not reach zero training error in 20000 steps")
+
+
+def simulate_offline(algorithm, N, alpha, seeds, constraint="sphere", M=1.0, Q=None, method="construct"):
     """LinSim of the zero-temperature OFFLINE solutions built from sampled data (module docstring)."""
+    if method not in ("construct", "descent"):
+        raise Refusal("precondition:method", f"method={method!r}: construct | descent")
+    if method == "descent" and algorithm == "optimal" and constraint == "sphere":
+        raise Refusal("precondition:method", "descent is offered for the standard algorithm only (the "
+                      "finite-N optimal energy has a degenerate zero-error set; module docstring)")
     if algorithm not in ("standard", "optimal"):
         raise Refusal("unsupported:algorithm", f"algorithm {algorithm!r}: standard | optimal")
     if constraint not in ("none", "sphere"):
@@ -124,7 +161,11 @@ def simulate_offline(algorithm, N, alpha, seeds, constraint="sphere", M=1.0, Q=N
     B = _teacher(rngs, N, M)
     Js = []
     for g, beta in zip(rngs, B):
-        U, _ = np.linalg.qr(g.standard_normal((P, N)).T)                   # (N, P) span of the data
+        X = g.standard_normal((P, N))
+        if method == "descent":
+            Js.append(_descent(X, beta, 1.0, Q, g, constraint == "sphere"))
+            continue
+        U, _ = np.linalg.qr(X.T)                                            # (N, P) span of the data
         pb = U @ (U.T @ beta)
         if constraint == "none":
             Js.append(pb)
