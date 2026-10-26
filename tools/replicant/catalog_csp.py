@@ -84,7 +84,7 @@ def _core(p):
 
 def _finite(p):
     K, N, a = _K(p), p["N"], p["alpha"]
-    seeds = XF._seeds(p.get("seeds", _DEFAULT_SEEDS))
+    seeds = _checks.seeds(p.get("seeds", _DEFAULT_SEEDS))
     r = XF.xorsat_sat_probability(K, N, a, seeds)
     cores = [XF.xorsat_sampled_core(K, N, a, s) for s in seeds]
     vals = {}

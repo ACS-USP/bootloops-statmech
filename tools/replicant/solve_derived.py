@@ -59,8 +59,10 @@ solve_derived_stability.assess(state).
     derived replicon, SK / perceptrons / Hopfield; for Hopfield also the mode of the
     extra order parameter m from the derived phi), each value _derived_num.checked;
     quad_error includes a fine-panel disagreement when that fallback was used.
-    STABILITY CONTRACT: stable is True only when every mode is computed and > 0 and
-    (discrete variables) the RS entropy is >= 0; False when a computed one fails;
+    STABILITY CONTRACT: stable is True only when every mode assess computes (the
+    replicon and, for Hopfield, the m-mode; the longitudinal / anomalous q-modes are
+    not computed) is > 0 and (discrete variables) the RS entropy is >= 0; False when a
+    computed one fails;
     None means UNKNOWN: a composer must treat None as unknown and never present that
     RS answer as final.  Local stability only.  No capacity or threshold is computed.
 

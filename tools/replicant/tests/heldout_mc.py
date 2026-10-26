@@ -1,4 +1,4 @@
-"""Held-out routes by Monte Carlo and exact enumeration (E11), used by tests/test_heldout.py.
+"""Held-out routes by Monte Carlo and exact enumeration (E11), used by tests/test_heldout_mc.py.
 
 Each check returns (failures, lines): failures empty = the check passes; lines are printed
 by the test (the measured bands, including contrasts that are NOT resolved and therefore not

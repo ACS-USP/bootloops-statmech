@@ -158,3 +158,19 @@ def test_touched_modules_leave_line_headroom():
         with open(os.path.join(here, name)) as f:
             n = sum(1 for _ in f)
         assert n <= 380, (name, n)
+
+
+def test_amp_route_malformed_seeds_are_refused():
+    """T15 (E3b deferred minor): a single integer (`--param seeds=1`), an empty list or a
+    negative seed is refused precondition:named-seeds on both amp entries (it used to end
+    in ERROR TypeError, exit 1, and an empty list silently fell back to the default)."""
+    for argv in (("sk", "--param", "beta=1.5"), ("teacher_student", "--param", "alpha=1")):
+        code, _, err = _cli("run", *argv, "--route", "amp", "--param", "N=60", "--param",
+                            "seeds=1")
+        assert code == 2 and "REFUSED: precondition:named-seeds" in err, (argv, code, err)
+    cat = catalog()
+    sk, ts = compose(cat["sk"].spec, "amp"), compose(cat["teacher_student"].spec, "amp")
+    for calc, p in ((sk, {"beta": "1.5"}), (ts, {"alpha": 1})):
+        for bad in ((), (-1,), (0, "x")):
+            r = _refusal(lambda: calc.run(**p, N=60, seeds=bad, iters=2))
+            assert r.reason == "precondition:named-seeds", (bad, r)

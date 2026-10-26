@@ -22,6 +22,7 @@ import mpmath as mp
 
 from .catalog import Out, Stability, fstep, has
 from .core import Refusal
+from .csp import _checks
 
 BM11 = ("Bayati & Montanari, IEEE Trans. Inf. Theory 57, 764 (2011), arXiv:1001.3448, Thm 4; "
         "Bolthausen, Commun. Math. Phys. 325, 333 (2014), arXiv:1201.2891")
@@ -90,8 +91,8 @@ def _sk_se(p):
 
 def _sk_finite(p):
     from .amp import random_init_q, sk_amp_ensemble, sk_state_evolution
-    seeds, iters, law = tuple(p.get("seeds") or SEEDS), p.get("iters", 100), p.get("law",
-                                                                                  "gaussian")
+    seeds, iters, law = _checks.seeds(p.get("seeds", SEEDS)), p.get("iters", 100), p.get("law",
+                                                                                      "gaussian")
     beta, h = p["beta"], p.get("h", 0)
     ens = sk_amp_ensemble(p["N"], float(mp.mpf(beta)), float(mp.mpf(h)), seeds=seeds,
                           iters=iters, law=law)
@@ -167,7 +168,7 @@ def _ts_se(p):
 
 def _ts_finite(p):
     from .amp import gamp_ensemble, perceptron_state_evolution
-    seeds, iters = tuple(p.get("seeds") or SEEDS), p.get("iters", 30)
+    seeds, iters = _checks.seeds(p.get("seeds", SEEDS)), p.get("iters", 30)
     ens = gamp_ensemble(p["N"], float(mp.mpf(p["alpha"])), "gaussian", seeds=seeds,
                         iters=iters)
     se_t = perceptron_state_evolution(p["alpha"], "gaussian", iters=iters).trajectory[-1]

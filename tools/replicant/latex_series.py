@@ -48,7 +48,8 @@ def series_ising2d(route):
         text("Series route", "Square-lattice Ising model, isotropic coupling, zero field, v = tanh K, "
              "u = v^2; g(v) = ln Z/N - ln 2 - 2 ln cosh K. The Onsager integral is expanded in exact "
              "rational arithmetic; the L x L torus (parity transfer matrix) is an independent exact "
-             "route that agrees below v^L", source=_ONS),
+             "route that equals the bulk for every v^k with k < L and, for odd L, for every even k "
+             "through v^(2L - 2) (L = 7: a4 .. a12)", source=_ONS),
         cited("Onsager's free energy (zero field)",
               r"-\beta f = \ln 2 + \frac{1}{8\pi^2}\int_0^{2\pi}\!\!\int_0^{2\pi}\ln\left[\cosh^2 2K - "
               r"\sinh 2K\,(\cos\theta_1 + \cos\theta_2)\right]d\theta_1\, d\theta_2", _ONS),

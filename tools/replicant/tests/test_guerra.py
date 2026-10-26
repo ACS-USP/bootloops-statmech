@@ -260,3 +260,27 @@ def test_1rsb_bound_forty_digits_and_m_one_is_rs():
     # m = 1: (1/m) ln E_y cosh = ln cosh + beta^2 (q1 - q0)/2, so P_1RSB(q0, q1, 1) = P_RS(q0)
     one = guerra_1rsb_bound(2, "0.3", "0.7", 1, digits=25)
     assert one.overlaps(guerra_rs_bound(2, 0, "0.3"))
+
+
+def test_planted_dG_shift_above_beta_one():
+    """T15 (E10 deferred minor): the planted G' shift for beta > 1.  At beta = 2, h = 0,
+    G'(0) = 1 - beta^2 = -3; a shift of +3 or more removes the certified sign on every [0, a]
+    and is refused undetermined:stationary-points.  Stated limit: shifts that keep the sign
+    pattern (-1, +1 here) leave the certificate's verdict and the minimiser unchanged (the hook
+    perturbs the completeness argument, not G or P_RS), so they are NOT detected."""
+    from replicant.bounds import guerra, guerra_rs_best_bound
+    want = guerra_rs_best_bound(2, 0)
+    reg = guerra._HOOKS
+    old = reg["dG_shift"]
+    try:
+        for s in (3, 10):
+            reg["dG_shift"] = s
+            r = _refuses(lambda: guerra_rs_best_bound(2, 0), "undetermined:stationary-points")
+            assert "[0, a]" in r.detail, r.detail
+        for s in (-1, 1):
+            reg["dG_shift"] = s
+            got = guerra_rs_best_bound(2, 0)
+            assert got.overlaps(want) and got.q.overlaps(want.q), s
+    finally:
+        reg["dG_shift"] = old
+        assert guerra._HOOKS is reg and reg["dG_shift"] is old

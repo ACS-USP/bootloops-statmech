@@ -324,3 +324,20 @@ def test_catalog_entry_ldpc_bec():
     assert "| `ldpc_bec`" in guide and "precondition:variable-degree-at-least-3" in guide
     assert all(check_ref(e, r).ok for r in e.refs if not r.slow)
     assert mp.mp.dps == dps
+
+
+def test_map_cite_and_de_note_name_what_was_read():
+    """T15 (E6a deferred minors): MMU's Example 6 is cited for (3, 6) only (it verifies the
+    MAP conditions for that pair); other pairs cite KRU Lemma 4 without it.  The DE label
+    says the concentration theorem (Richardson-Urbanke 2001) was not fetched.  l = 2 is
+    refused by the catalog on every call (the threshold step always runs), while density
+    evolution itself accepts l = 2 through the Python API."""
+    e = catalog()["ldpc_bec"]
+    c36 = compose(e.spec, "cavity").run().finality["eps_map"].cite
+    c48 = compose(e.spec, "cavity").run(l=4, r=8).finality["eps_map"].cite
+    assert "Ex. 6" in c36 and "Ex. 6" not in c48 and "Kudekar" in c48, (c36, c48)
+    de = compose(e.spec, "cavity").run(eps="0.45").finality["de_bit_erasure"]
+    assert "Richardson & Urbanke 2001, was not fetched" in de.note, de.note
+    _refuses(lambda: compose(e.spec, "cavity").run(l=2, r=4, eps="0.3"),
+             "precondition:variable-degree-at-least-3")
+    assert L.bec_density_evolution(2, 4, 0.3).converged

@@ -276,3 +276,40 @@ def test_gardner_temperature_p4_and_scan_density():
     signs = [G.onersb_replicon("ising_pspin", p=3, beta=1 / T) > 0 for T in Ts]
     flips = [Ts[i] for i in range(len(Ts) - 1) if signs[i] != signs[i + 1]]
     assert len(flips) == 1 and flips[0] < tg < flips[0] + mp.mpf("0.01"), flips
+
+
+def test_spherical_no_transition_detail_is_tied_to_the_scan():
+    """T15 (E4 deferred minors): the no-transition detail opens with the scanned points and
+    their resolution limit, and says "equal ... T-independent" only when the scanned values
+    are equal; a planted T-dependent positive rule (chi_R times T: replicon 1 - (p-1) y T > 0)
+    still gives no-transition but the detail reports the spread instead."""
+    r = _refuses(lambda: G.pspin_gardner_temperature(3), "no-transition:gardner")
+    assert r.detail.startswith("1RSB replicon positive") and "5 scanned" in r.detail, r.detail
+    assert "would be missed" in r.detail and "T-independent" in r.detail, r.detail
+    orig = dict(G.CHI_R)
+    sph = orig["spherical"]
+    try:
+        G.CHI_R["spherical"] = lambda p, beta, q, m: sph(p, beta, q, m) / mp.mpf(beta)
+        r = _refuses(lambda: G.pspin_gardner_temperature(3), "no-transition:gardner")
+        assert "differ by up to" in r.detail and "T-independent" not in r.detail, r.detail
+    finally:
+        G.CHI_R.clear()
+        G.CHI_R.update(orig)
+    assert all(G.CHI_R[k] is orig[k] for k in orig) and set(G.CHI_R) == set(orig)
+
+
+def test_ising_tg_cache_does_not_reuse_a_stale_value():
+    """T15 (E4 deferred minor): with the registered rule's T_G cached first, a planted rule
+    gets its own search (a different T_G), and the restored rule gets the cached value back."""
+    base = G.pspin_gardner_temperature(3, variables="ising")
+    orig = dict(G.CHI_R)
+    sech4 = orig["ising"]
+    try:
+        G.CHI_R["ising"] = lambda p, beta, q, m: mp.mpf("1.05") * sech4(p, beta, q, m)
+        planted = G.pspin_gardner_temperature(3, variables="ising")
+    finally:
+        G.CHI_R.clear()
+        G.CHI_R.update(orig)
+    assert all(G.CHI_R[k] is orig[k] for k in orig) and set(G.CHI_R) == set(orig)
+    assert abs(planted - base) > mp.mpf("1e-4"), (planted, base)
+    assert G.pspin_gardner_temperature(3, variables="ising") == base

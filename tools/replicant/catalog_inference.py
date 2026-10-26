@@ -102,7 +102,8 @@ def _map_label(v):
         note += (f"; for ({v.get('l')}, {v.get('r')}) the equality is cited from KRU Lemma 4 "
                  "(stated there for every regular ensemble; proof referred to Richardson & "
                  "Urbanke, Modern Coding Theory (2008), not fetched)")
-    return Stability("exact-by-literature", "rs", f"{MMU}, Lemmas 2-3, Thm 10, Ex. 6; {KRU}", note)
+    ex6 = ", Ex. 6" if (v.get("l"), v.get("r")) == (3, 6) else ""
+    return Stability("exact-by-literature", "rs", f"{MMU}, Lemmas 2-3, Thm 10{ex6}; {KRU}", note)
 
 
 def _de_label(v):
@@ -110,7 +111,8 @@ def _de_label(v):
         return Stability("exact-by-literature", "rs", f"{MM15}; {LMSS}",
                          "N -> oo erasure probabilities of BP decoding (density evolution on the "
                          "tree-like ensemble; concentration of the finite-N decoder on DE as "
-                         "summarised in the Notes of Mezard-Montanari ch. 15)")
+                         "summarised in the Notes of Mezard-Montanari ch. 15: the concentration "
+                         "theorem itself, Richardson & Urbanke 2001, was not fetched)")
     return Stability("not-computed", "rs", MM15, "density evolution did not converge within "
                      f"{L.MAX_ITER} sweeps (critical slowing down at eps_BP): NOT final")
 

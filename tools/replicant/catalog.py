@@ -236,7 +236,7 @@ _HELD_OUT = ("Ising perceptron: held out of the catalog on purpose (Task 16 comp
              "answer up); level (b) gardner_capacity('ising') reproduces it in "
              "tests/test_perceptron.py")
 _HELD_OUT_SK = ("+-J SK: held out of the catalog (Task 16); the composed level-(a) "
-                "calculation is checked against it in tests/test_heldout.py, never a "
+                "calculation is checked against it in tests/test_heldout_sk.py, never a "
                 "catalog pipeline")
 _GAMP = ("Ising-prior (binary teacher) GAMP thresholds: located by bisection on the state "
          "evolution and RS potential of amp/gamp_se.py (ising_thresholds) in tests/test_gamp.py; "

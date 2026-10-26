@@ -197,7 +197,7 @@ def test_solve_derived_hopfield_matches_hopfield_rs():
     assert abs(s.values["qhat"] - al * be**2 * ref.r) < 1e-10
     f = hopfield_free_energy(ref.m, ref.q, ref.r, al, be)
     assert abs(s.free_energy - al * be / 2 - (-be * f)) < 1e-10
-    assert abs(s.replicon - ref.replicon) < 1e-10 and s.stable is (ref.replicon > 0)
+    assert abs(s.replicon - ref.replicon) < 1e-10 and s.stable is ref.stable
 
 
 @slow

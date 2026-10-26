@@ -91,7 +91,7 @@ def test_series_matches_exact_finite_lattice():
     non-contractible loops add 2L v^L / L^2 = (2/L) v^L (positive control: the first wrong
     coefficient differs, by exactly that).  Odd L: even-length wrapping needs two odd windings or
     class (1, 1), length >= 2L, so the even coefficients agree through v^(2L - 2) and differ at v^(2L)
-    (L = 7: a4 .. a12, the independent check of the banked a8 and a10)."""
+    (L = 7: a4 .. a12, the independent check of the banked a4 .. a10)."""
     bulk = ising2d_free_energy_series(14)
     for L in (4, 5, 6, 8):
         tor = torus_free_energy_series(L, L)
@@ -106,7 +106,7 @@ def test_series_matches_exact_finite_lattice():
     tor7 = torus_free_energy_series(7, 14)
     for n in (4, 6, 8, 10, 12):
         assert tor7[n] == bulk[n]
-    for n in (8, 10):                              # the banked a8, a10 from the 7 x 7 torus
+    for n in (4, 6, 8, 10):                        # the banked a4 .. a10 from the 7 x 7 torus
         assert check(BANK[f"a{n}"], str(mp.mpf(tor7[n].numerator) / tor7[n].denominator), label=f"a{n}").ok
     _refuses(lambda: torus_free_energy_series(9, 9), "precondition:torus-size")
     _refuses(lambda: torus_free_energy_series(2, 2), "precondition:torus-size")

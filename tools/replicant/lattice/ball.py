@@ -159,7 +159,9 @@ def certify(thunk, digits=DIGITS, start_dps=None):
     def attempt(dps):
         r = b.run(thunk, dps=dps)
         rad = r.value.rad() if r.value.is_finite() else None
-        if seen and seen[-1][1] is not None and rad is not None and not rad < seen[-1][1] / 2:
+        exact = rad is not None and rad == 0 and seen and seen[-1][1] == 0   # exact twice: no stall
+        if seen and seen[-1][1] is not None and rad is not None and not exact \
+                and not rad < seen[-1][1] / 2:
             raise Refusal("no-solution:radius-stall", f"radius {seen[-1][1].str(3, radius=False)} at "
                           f"dps {seen[-1][0]}, {rad.str(3, radius=False)} at dps {dps}: more precision "
                           "does not shrink the enclosure")

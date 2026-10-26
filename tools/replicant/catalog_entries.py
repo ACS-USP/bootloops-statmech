@@ -22,7 +22,7 @@ from .agree import default_spec
 from .catalog import Out, RefCheck, Stability, entry, fstep, from_flag, has, lacks, saddle
 from .catalog_amp import sk_amp_route
 from .catalog_pspin import ising_pspin, pspin
-from .catalog_ts import teacher_student
+from .catalog_ts import _saddle, teacher_student
 from .cavity import dense
 from .cavity.dense_hopfield import energy as hopfield_cavity_energy
 from .core import Refusal, Step
@@ -42,10 +42,6 @@ MEZARD_CITE = "Mezard, J. Phys. A 22, 2181 (1989)"
 AGS_CITE = ("Amit, Gutfreund & Sompolinsky, PRL 55, 1530 (1985); Ann. Phys. 173, 30 (1987)")
 MPV = "Mezard, Parisi & Virasoro, Spin Glass Theory and Beyond (1987), ch. V"
 AT_CITE = "de Almeida & Thouless, J. Phys. A 11, 983 (1978) (replicon)"
-
-
-def _saddle(ansatz, stable, **values):
-    return {"ansatz": ansatz, "stable": stable, **values}
 
 
 def cavity_route(model, required, collect, cite):

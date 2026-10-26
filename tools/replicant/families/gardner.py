@@ -237,14 +237,20 @@ def pspin_gardner_temperature(p, variables="spherical"):
         scan = [(mp.mpf(f) * ts, lam(mp.mpf(f) * ts)) for f in _SPH_SCAN]
         shown = ", ".join(f"T = {mp.nstr(T, 4)}: {mp.nstr(v, 8)}" for T, v in scan)
         if all(v > _MARGIN for _, v in scan):
+            vals = [v for _, v in scan]
+            spread = max(vals) - min(vals)
+            same = (f"the scanned values are equal within {mp.nstr(spread, 2)}, as the "
+                    "static-line formula 1 - (p-1) y predicts (T-independent)" if spread < 1e-12
+                    else f"the scanned values differ by up to {mp.nstr(spread, 3)}")
             raise Refusal("no-transition:gardner",
-                          f"no Gardner transition for the pure spherical p-spin (p = {p}); 1RSB "
-                          f"replicon positive (> {mp.nstr(_MARGIN, 2)}) at every scanned T < T_s "
-                          f"= {mp.nstr(ts, 8)}: computed scan {shown} (on the static line the "
-                          "formula gives 1 - (p-1) y, the same for every T; Montanari & "
-                          "Ricci-Tersenghi 2003, Sec. 1, state it for this model; Crisanti & "
-                          "Leuzzi 2006, App. C, for the s+p model with s > 2, of which the pure "
-                          "model is the mu_s -> 0 edge)")
+                          f"1RSB replicon positive (> {mp.nstr(_MARGIN, 2)}) at each of the "
+                          f"{len(scan)} scanned temperatures below T_s = {mp.nstr(ts, 8)} "
+                          f"(fractions {', '.join(_SPH_SCAN)} of T_s; two sign changes between "
+                          f"adjacent points would be missed): computed scan {shown}; {same}. "
+                          f"Read as: no Gardner transition for the pure spherical p-spin (p = {p}) "
+                          "on this scan; Montanari & Ricci-Tersenghi 2003, Sec. 1, state it for "
+                          "this model; Crisanti & Leuzzi 2006, App. C, for the s+p model with "
+                          "s > 2, of which the pure model is the mu_s -> 0 edge")
         hot_first = scan[::-1]
         for (t_hi, v_hi), (t_lo, v_lo) in zip(hot_first, hot_first[1:]):
             if (v_hi > 0) != (v_lo > 0):

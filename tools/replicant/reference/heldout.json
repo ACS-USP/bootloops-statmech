@@ -3,12 +3,12 @@
     "value": "1",
     "tol": "1e-12",
     "cite": "Universality of the SK limiting free energy with respect to the coupling law: Carmona & Hu, 'Universality in Sherrington-Kirkpatrick's spin glass model', arXiv:math/0403359 (2004), abstract: the limiting free energy 'does not depend on the environment' (the coupling distribution; the paper's exact moment assumptions were not read here). The Gaussian value Tc = 1 (J = 1) is the one banked in sk.json/tc (Sherrington & Kirkpatrick 1975, read from Crisanti, Rizzo & Temesvari, arXiv:cond-mat/0302538, Sec. 3). Convention: J_ij = +-1/sqrt(N) with equal probability, h = 0",
-    "independent_route": "the composed +-J SK calculation (level-(a) steps, the disorder step adapted to pm_one; no catalog lookup): q = 0 at beta = 0.95 and q > 0 at beta = 1.05, and the root in beta of the composed paramagnetic replicon (trivial branch) located by secant; tests/test_heldout.py. The banked number is the target only"
+    "independent_route": "the composed +-J SK calculation (level-(a) steps, the disorder step adapted to pm_one; no catalog lookup): q = 0 at beta = 0.95 and q > 0 at beta = 1.05, and the root in beta of the composed paramagnetic replicon (trivial branch) located by secant; tests/test_heldout_sk.py. The banked number is the target only"
   },
   "sk_pm_one_rs_ground_energy": {
     "value": "-0.79788",
     "tol": "1e-5",
     "cite": "Universality (Carmona & Hu, arXiv:math/0403359, as in sk_pm_one_tc) applied to the RS ground energy of the Gaussian SK model, -sqrt(2/pi), as banked in sk.json/rs_ground_energy (Sherrington & Kirkpatrick 1975; digits read from Stojnic, arXiv:2507.09247, Table 3, row '1 (full)'). Universality is stated for the free energy; that the RS saddle of the +-J model has the same leading-order equations is the level-(a) derivation's own claim (dropped fourth cumulant, O(1/N) per spin), not the paper's",
-    "independent_route": "the composed +-J SK RS energy u = (S - phi)/beta at beta = 4, 5, 6, 8, 10, extrapolated to T = 0 by a polynomial in T without a linear term (de/dT = T dS/dT -> 0 with finite RS entropy at T = 0); error estimate = difference between the 4- and 5-point extrapolations; tests/test_heldout.py (slow). Does not use the banked number"
+    "independent_route": "the composed +-J SK RS energy u = (S - phi)/beta at beta = 4, 5, 6, 8, 10, extrapolated to T = 0 by a polynomial in T without a linear term (de/dT = T dS/dT -> 0 with finite RS entropy at T = 0); error estimate = difference between the 4- and 5-point extrapolations; tests/test_heldout_sk.py (slow). Does not use the banked number"
   }
 }

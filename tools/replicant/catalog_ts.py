@@ -13,6 +13,7 @@ TS_CITE = ("Gyorgyi, Phys. Rev. A 41, 7097 (1990); Seung, Sompolinsky & Tishby, 
 
 
 def _saddle(ansatz, stable, **values):
+    """The values of one saddle point (shared with catalog_entries.py)."""
     return {"ansatz": ansatz, "stable": stable, **values}
 
 

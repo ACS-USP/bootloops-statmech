@@ -33,7 +33,9 @@ KAUF = ("Kaufman, Phys. Rev. 76, 1232 (1949) (not fetched), as printed by Izmail
         "E 65 (2002), arXiv:cond-mat/0009024, Eqs. (10)-(16), and Kastner, arXiv:cond-mat/0605568, "
         "Eqs. (6)-(8)")
 ONE_D = ("Wang, Diaz-Mendez & Capdevila, arXiv:1907.11701, Eqs. (1), (4)-(12) (read; journal "
-         "reference not checked); Baxter, Exactly Solved Models (1982), Ch. 2 (not fetched)")
+         "reference not checked; their derivation is by induction on N, which they show equals the "
+         "transfer-matrix trace Z_N = Tr P^N, Eq. (7)); Baxter, Exactly Solved Models (1982), Ch. 2 "
+         "(not fetched)")
 TM = "Duminil-Copin, arXiv:2208.00864 (2022), Frame 2 (Z of the torus = Tr V^N)"
 DM = "Dembo & Montanari, Ann. Appl. Probab. 20, 565 (2010), arXiv:0804.4726"
 ARB = "python-flint arb through tools/baller (baller.solve / baller.run; acb.integral)"
