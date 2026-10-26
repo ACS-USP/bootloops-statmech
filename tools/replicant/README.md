@@ -111,8 +111,13 @@ series` for `series_ising2d`, `--route bound` for `sk_bounds`, and `--pdf` (with
   the CKC96 noise mapping), `tcm_flow.py` (its ODEs, integration, closed forms and asymptotic constants),
   `simulate_tcm.py` (finite-N TCM learning); catalog entry `online_tcm` (`catalog_online_tcm.py`,
   `latex_online_tcm.py`).
+  O5: `scm.py` (the soft committee machine: Saad-Solla ODEs, the closed-form erf averages I2, I3, I4 and an
+  independent Gauss-Hermite route), `scm_flow.py` (integration, BRW / SS initial conditions, symmetric fixed
+  points, the asymptotic modes, critical learning rates), `plateau.py` (plateau detection by BRW's definition,
+  `undetermined` reports, the rtol check), `simulate_scm.py` (finite-N online gradient descent); catalog entry
+  `online_scm` (`catalog_online_scm.py`, `latex_online_scm.py`).
 - `catalog*.py`, `compose.py` (+ `compose_result.py`: `Result` and the finality rule), `cli.py`,
-  `__main__.py`: the 23-entry catalog (`catalog_ts.py` holds the teacher-student entry,
+  `__main__.py`: the 24-entry catalog (`catalog_ts.py` holds the teacher-student entry,
   `catalog_pspin.py` the two p-spin entries; LaTeX in `latex_pspin.py`), the composer,
   the command line.
 - `latex*.py`, `tex*.py`, `derive_tex.py`: the LaTeX derivation writer.

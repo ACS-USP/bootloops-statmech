@@ -306,6 +306,10 @@ UNCLAIMED.update({("online_tcm", f"cc95_fig1_es_a{a}"): (
     "CC95 Fig. 1 read off the figure: the nonlocal K = 3 ODE (a 3D field average per step) to alpha = 16.5 costs "
     "about 3.5 s at rtol 1e-9 (measured by the O4 reviewer), so it is checked in the slow test "
     "tests/test_online_tcm.py test_cc95_figure1_and_the_integrated_asymptote") for a in ("3p3", "6p7", "10", "16p5")})
+UNCLAIMED.update({("online_scm", k): f"integrated over a plateau or to K = 12 (seconds): checked in the slow test {t}" for k, t in (
+    ("ss_eta_max_coefficient", "tests/test_online_scm.py test_ss_eta_max_first_order_in_one_over_k"),
+    ("brw96_eq17_log_slope", "tests/test_online_scm_plateau.py test_brw96_eq17_half_log_slope_and_fig2_shift"),
+    ("ss_trapping_eta_exponent", "tests/test_online_scm_plateau.py test_ss_fig1_plateau_and_trapping_time"))})
 
 def _freeze(p):
     return tuple(sorted((k, tuple(v) if isinstance(v, list) else v) for k, v in p.items()))

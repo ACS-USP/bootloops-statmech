@@ -20,6 +20,11 @@
                mapping (Copelli-Caticha 1995; Copelli-Kinouchi-Caticha 1996)
   tcm_flow.py  the TCM ODEs, integration, closed forms, asymptotic constants
   simulate_tcm.py    finite-N online TCM learning (shares no code with the ODEs)
+  scm.py       (O5) the soft committee machine: Saad-Solla ODEs with the closed-form erf averages I2, I3, I4
+               and an independent Gauss-Hermite route (Saad-Solla 1995; Biehl-Schwarze 1995; BRW 1996)
+  scm_flow.py  SCM integration, initial conditions, symmetric fixed points, asymptotic modes, critical rates
+  plateau.py   plateau detection (BRW's definition), undetermined reports, the rtol check
+  simulate_scm.py    finite-N online gradient descent in the SCM (shares no code with the ODEs)
 
 Convention (Biehl & Riegler, Europhys. Lett. 28, 525 (1994)): |B| = 1, xi_j i.i.d. N(0, 1),
 J <- J + (eta / N) F(h, b, Q) b xi, h = J . xi, R = J . B, Q = J . J, eps = arccos(R / sqrt Q) / pi.
