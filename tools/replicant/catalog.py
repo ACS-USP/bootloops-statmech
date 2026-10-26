@@ -32,7 +32,8 @@ spiked Wigner and block-model entries in catalog_spiked_sbm.py) and catalog_lear
 (high-dimensional learning: ridge) and catalog_series.py (exact series: series_ising2d, route
 "series") and catalog_lattice.py (solvable lattice models, certified: ising2d, ising1d, route
 "exact"; bethe_ising, route "cavity") and catalog_bounds.py (Guerra's certified upper bounds on the SK
-pressure: sk_bounds, route "bound").
+pressure: sk_bounds, route "bound") and catalog_online.py (online learning, route "online":
+online_perceptron).
 """
 import math
 from dataclasses import dataclass, field
@@ -343,10 +344,12 @@ def catalog() -> dict:
         from .catalog_inference import inference_entries
         from .catalog_lattice import lattice_entries
         from .catalog_learning import learning_entries
+        from .catalog_online import online_entries
         from .catalog_series import series_entries
         from .catalog_sparse import sparse_entries
         for e in (dense_entries() + sparse_entries() + csp_entries() + inference_entries()
-                  + learning_entries() + series_entries() + lattice_entries() + bounds_entries()):
+                  + learning_entries() + series_entries() + lattice_entries() + bounds_entries()
+                  + online_entries()):
             _CATALOG[e.name] = e
     return dict(_CATALOG)
 

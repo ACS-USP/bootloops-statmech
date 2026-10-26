@@ -15,7 +15,7 @@ reader can follow to the paper, a per-value finality label, and a comparison wit
 values. Two levels: (a) a symbolic derivation (replicate, average the disorder, introduce order
 parameters, RS ansatz, n -> 0, stationarity, solve) that works for models you describe, and (b) the
 published pipelines of a catalog of 19 entries, each with a replica route and/or a cavity route (and an
-`amp` route for `sk` and `teacher_student`; the constraint-satisfaction entries `xorsat` and `ksat`, the code entry `ldpc_bec` and the block model `sbm` are cavity-only; the spiked Wigner model `spiked_wigner` is amp-only; the ridge-regression entry `ridge` is replica-only, its RS saddle point a cited closed form, not a level-(a) derivation; the 2D Ising entry `series_ising2d` has the route `series` only: an exact series and its holonomic operator, no replica or cavity step; the solvable lattice entries `ising2d` and `ising1d` have the route `exact` and `bethe_ising` the route `cavity`, all three certified in ball arithmetic, `rigor` "certified"; the bound entry `sk_bounds` has the route `bound` only: Guerra's rigorous upper bounds on the SK pressure, certified, and a consistency check of the package's own RS / 1RSB / K-RSB optimisers against them). A composer
+`amp` route for `sk` and `teacher_student`; the constraint-satisfaction entries `xorsat` and `ksat`, the code entry `ldpc_bec` and the block model `sbm` are cavity-only; the spiked Wigner model `spiked_wigner` is amp-only; the ridge-regression entry `ridge` is replica-only, its RS saddle point a cited closed form, not a level-(a) derivation; the 2D Ising entry `series_ising2d` has the route `series` only: an exact series and its holonomic operator, no replica or cavity step; the solvable lattice entries `ising2d` and `ising1d` have the route `exact` and `bethe_ising` the route `cavity`, all three certified in ball arithmetic, `rigor` "certified"; the bound entry `sk_bounds` has the route `bound` only: Guerra's rigorous upper bounds on the SK pressure, certified, and a consistency check of the package's own RS / 1RSB / K-RSB optimisers against them; the online-learning entry `online_perceptron` has the route `online` only: the N -> oo order-parameter ODEs of online learning in alpha = examples / N, physics-level, checked against finite-N simulation). A composer
 matches a model description against the catalog, reuses what applies, adapts what it can through
 registered hooks, and says what it reused, adapted, or could not do. A LaTeX writer turns any run into a
 derivation document. Monte Carlo (parallel tempering) and exact enumeration (`numerics/`) check the
@@ -194,6 +194,22 @@ CLI (from `tools/`):
   digits=12`, 116 s at the default 20 digits);
   `--param K=3` is refused `precondition:K` (bounds.check_bound_chain takes K <= 5, levels above 2
   numerical).
+- Worked example, online learning (`online_perceptron`, route `online`; Biehl-Riegler convention: |B| =
+  1, inputs i.i.d. N(0, 1), J <- J + (eta / N) F b xi, R = J . B, Q = J . J, eps = arccos(R / sqrt Q) / pi
+  against the true teacher; 0.7-1.1 s each, measured): `python3 -m replicant run online_perceptron --route
+  online --param rule=perceptron` -> `eps_exponent` 0.33349 (the log-slope of the integrated ODE between
+  alpha = 5000 and 10000; derived 1/3, `eps_exponent_derived`), `eps_constant` 0.278147 (alpha^(1/3) eps at
+  alpha = 1e4; Biehl-Riegler Eq. (8): (1/pi)(2/3)^(1/3) = 0.278069, the gap is the slow correction).
+  `--param rule=optimal --param R0=0.01` -> `eps_exponent` 0.99965, `eps_constant` 0.883184 and
+  `eps_constant_formula` 0.883400 (2 / I(0), the rho -> 1 limit; VKC 1998 print 0.88); without `R0` it is
+  refused `precondition:initial-overlap` (W* carries 1/rho). `--param rule=hebb --param alpha=10 --param
+  N=500` -> `eps` 0.125397 (ODE), `eps_hebb_closed_form` 0.125397 (`hebb_closed_form_gap` 2.3e-11),
+  `eps_sim` 0.124991 (`errors` 9.0e-4, `eps_sim_halfwidth99` 0.00259: 20 named seeds at N = 500).
+  `--param rule=optimal --param R0=0.01 --param noise=0.3` -> `no_learning_boundary` 0.100000 (Copelli et
+  al.'s 2 lam - 1/2) and `robust_boundary` 0.149730 (their Fig. 1a solid line, read 0.150), both located
+  on the ODE; the asymptote step is skipped with noise for rules other than Hebb. No value is final
+  (`not-computed`: the ODE limit is physics-level); `run online_perceptron` without `--route online` is
+  refused `missing-step:route:replica`, without `rule` `precondition:state-point`.
 - Worked example, amp route (`sk`, `teacher_student`; under 1 s each, measured):
   `python3 -m replicant run sk --route amp --param beta=1.5` -> `q_se` 0.352602 (the SE fixed point,
   `exact-by-literature`: Bayati-Montanari Thm 4 proves SE for AMP on Gaussian J; it is the AMP limit,
@@ -356,6 +372,23 @@ Student-t `Band`; `extrapolate_in_n({n: Band})` -> the band of R_inf in mean_n =
 bands must use disjoint seeds); `limit_ensemble(ns, gamma, lam, sigma2, seeds, signal=1)` -> ({n: Band},
 Band of R_inf), seeds shifted by k * 10^6 for the k-th size.
 Example: `ridge_test_error("1", "0.5", "1", "1")` -> 0.666666666666667 (2/3).
+`from replicant.online import fields, odes, optimal, simulate` (O1; floats; theta = arccos rho):
+`odes.perceptron_flow(rule, eta=1.0, noise=0.0, noise_estimate=None, averages="closed")` -> `Flow`
+(`rule` hebb | perceptron | adatron | optimal or a callable F(h, b, Q), numpy-vectorised; `eta` a number
+> 0 or a schedule eta(alpha); `noise` the label flip probability in [0, 1/2); `noise_estimate` read by
+the optimal rule only); `Flow.rates(alpha, R, Q)` -> (dR/dalpha, dQ/dalpha), `Flow.theta_rate(alpha,
+theta, Q)`; `odes.integrate(flow, alpha_max, init=(R0, Q0), alphas=None, rtol=1e-9)` -> `Trajectory(alpha,
+R, Q, eps)` (no init: `precondition:state-point`); `odes.hebb_closed_form(alpha, eta, noise, init)` -> (R,
+Q, eps); `odes.asymptote(flow, init, alpha_big=1e4)` -> (log-slope, alpha_big^p eps); `odes.EXPONENT`;
+`odes._PLANT` (private planted-error hook: the eta^2 term). `fields.closed(rule, theta, noise,
+noise_est)` and `fields.quadrature(f, theta, noise, n_r=48, n_phi=32)` -> `Averages(ay, ax, a2, drive)`
+(<f b y>, <f b x>, <f^2>, <f b (y - rho x)>; `fields._PLANT` hooks the sqrt(2 pi)). `optimal.w_star(delta,
+theta, noise)`, `optimal.optimal_modulation(rho, noise)` -> a callable F(h, b, Q) with `.optimality_class`
+(= `optimal.OPTIMALITY_CLASS`), `optimal.asymptotic_constant(noise, printed=False)`,
+`optimal.noise_boundaries(noise)` -> `NoiseBoundaries(no_learning, robust, robust_error)`.
+`simulate.simulate_perceptron(rule, N, alpha_max, seeds, eta, noise, noise_estimate, init, alphas)` ->
+`SimResult(alpha, eps_mean, band, eps_seeds, N, seeds, alphas, curve)` (99% Student-t `band`). Example:
+`odes.integrate(odes.perceptron_flow("adatron"), 1e4, (0, 1), alphas=(1e4,)).eps[-1] * 1e4` -> 1.49982.
 `from replicant.series import ...` (E8; exact `Fraction` coefficients; needs `tools/` on the path for
 `tools/annihilator`): `ising2d_free_energy_series(order, variable="v")` -> [a_0 .. a_order] in v =
 tanh K (`variable="u"`: [b_0 .. b_order] in u = v^2; anything else `unsupported:variable`; order <=
@@ -486,7 +519,11 @@ default 4), `Ly` (default L); `ising1d` (exact): `beta` (default 1), `h` (defaul
 8); `bethe_ising` (cavity): `k` (coordination, default 3), `beta` (default 1), `h` (default 0), `branch`;
 `sk_bounds` (bound): `beta` (rational > 0, default 2), `h` (default 0), `K` (1 or 2, default 1), `digits`
 (an int 1 .. 200: certified digits of the K-step balls, default 20, else `precondition:digits`; the RS values
-always 40).
+always 40); `online_perceptron` (online): `rule` (required: hebb | perceptron | adatron | optimal), `eta`
+(> 0, default 1; the optimal rule needs 1), `noise` (flip probability in [0, 1/2), default 0),
+`noise_estimate` (optimal rule only; default the true noise), `R0`, `Q0` (default 0, 1; the optimal rule
+needs R0 > 0), `alpha` (the learning curve), `N` (finite-N simulation; an int >= 10, needs `alpha`) and
+`seeds` (default 0-19; needs `N`).
 Without `beta` an entry returns its T = 0 / critical headline values. A composed spec
 (not a catalog entry) does not refuse an unknown name: its notes list "unused parameters [...]".
 
@@ -526,6 +563,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `precondition:gamma`, `:lambda`, `:sigma2`, `:signal`, `:gamma-not-one`, `:size`, `:named-seeds`, `:two-samples`, `:two-sizes`, `no-solution:bracket` | ridge (`learning/`): gamma not a finite number > 0; lam, sigma2 or signal not a finite number >= 0 (bools refused; the RS saddle point needs lam > 0; `optimal_lambda` needs signal > 0); the ridgeless limit at gamma = 1 (it diverges for sigma2 > 0, and HMRT state it for gamma != 1 only); n or p not an int >= 10; malformed seeds as for XORSAT; a band from fewer than two seeds; a 1/n extrapolation from one size; `argmin_lambda` with its minimum at an end of the search interval |
 | `precondition:order`, `:torus-size`, `:series-length`, `:fit-terms`, `:bounds`, `:exact-series`, `:two-primes`, `:prime`, `unsupported:variable`, `no-operator-within-bounds`, `no-solution:held-out`, `:prime-disagreement`, `:exact-reconstruction`, `:inconsistent-scan`, `:torus-disagreement`, `:critical-point`, `:analytic-point`, `unsupported:irregular-singularity`, `missing-tool:annihilator` | exact series (`series/`): order not an int in range (or odd / < 20 in the entry); torus L outside 3 .. 8; the fit window too short for the maximal ansatz, or no held-out terms; bounds not ints >= 1; a coefficient not int / Fraction; fewer than two primes, or a denominator divisible by one; no operator of theta-order <= max_order and degree <= max_degree on the fit window (the `Certificate`: full column rank mod both primes; a bound, never a proof of non-D-finiteness); the fitted recurrence fails on a held-out term; the two primes pin different (degree, order); the exact Q step fails; the scan and the maximal-ansatz rank disagree; the torus window is not the expected one; no positive singular point; every local solution analytic at the point; Fuchs fails; `tools/annihilator` not importable |
 | `precondition:beta`, `:J`, `:h`, `:size`, `:coordination`, `:branch`, `:ordered-phase`, `:certified-radius`, `ambiguous:branch`, `undetermined:spinodal`, `no-solution:certification`, `:radius-stall`, `:not-an-integer-polynomial`, `:torus-disagreement`, `:ring-identity`, `:audit`, `unsupported:python-flint`, `:baller-integrity` | lattice (`lattice/`): beta not a rational > 0 (bools, nan refused); J <= 0 (ferromagnet only; `beta_c` needs J = 1); h not rational; a torus side outside its range; k not an int >= 2; a branch not among the fixed points; Yang at or below beta_c (m* = 0 there); a certified route returning a value without its radius; the magnetization at h = 0 below T_c without a branch; a fixed-point count or stability sign undecided at 4096 bits; baller.solve could not certify the digits; a radius that does not halve when the precision doubles; Kaufman's coefficient balls (radius < 1/4) containing no integer; Kaufman's polynomial differing from the transfer matrix's; the 1D ring balls not overlapping; the two Bethe free-energy forms disagreeing; python-flint missing (use the project venv, INSTALL.md); `baller.verify()` failing |
+| `unsupported:rule`, `precondition:eta`, `:noise`, `:optimal-eta`, `:initial-overlap`, `:alpha`, `:overlap`, `:averages`, `:asymptote`, `undetermined:asymptote`, `:rho-sign`, `no-solution:rho-zero`, `:step-size`, `:overflow` | online (`online/`, `online_perceptron`): a rule that is not hebb / perceptron / adatron / optimal or a callable; eta not a finite number > 0 (also a schedule turning non-positive); a flip probability outside [0, 1/2); the optimal rule with eta != 1 or a schedule; (R0, Q0) with Q0 <= 0 or rho0 >= 1, or R0 <= 0 for the optimal rule; alpha <= 0; rho <= 0 for the optimal modulation; a measured log-slope further than 0.01 from the derived exponent; a simulated seed of the optimal rule reaching rho <= 0; the optimal flow reaching rho = 0 at finite alpha (below the no-learning line); the step-size or ln Q > 700 guards |
 | `precondition:order-parameter`, `:levels`, `:digits`, `:K`, `:temperature-range`, `unsupported:field`, `undetermined:stationary-points`, `ambiguous:minimiser`, `no-solution:certification`, `:radius-stall` | bounds (`bounds/`, `sk_bounds`): q or m outside Guerra's admissible set (q nondecreasing in [0, 1], m nondecreasing in (0, 1]); overlap / Parisi-parameter counts that do not match; digits not an int 1 .. 200; K outside 1 .. 5 (catalog: 1 or 2); K-step staircases outside 1 < beta <= 3 or with h != 0; the stationary points of P_RS not certified complete (a cover or monotone run undecided); two local minima with overlapping values; interval Newton or the precision escalation failing |
 | `precondition:coupling-matrix`, `:pm-one-couplings`, `:enumeration-size`, `:integer-patterns`, `:seed`, `:betas`, `:sweeps`, `:nbetas`, `:windows`, `:sizes`, `:samples`, `:order`, `:supported-disorder-law`, `no-solution:capacity`, `undetermined:ground-states`, `undetermined:equilibration` | Monte Carlo and enumeration (`numerics/`): J not a finite symmetric matrix with zero diagonal (PT: a stack of them), or not +-1/sqrt N for the +-J spectrum; N above the enumeration limit (SK 26, perceptron 30); P not an int >= 0, or alpha N not an integer; a seed not an int >= 0 (or a list of them); betas not positive and strictly increasing (the finite-size thermal route also needs beta > 0.5, `moments.pm_one_gap_limit` 0 <= beta < 1); sweeps / nbetas not an int >= 1 or betas not a sequence (never a silent default); fewer than two samples or a window split that is empty; fewer than three distinct sizes, or a size without >= 2 samples; a closure order other than 2, 3; a law other than `pm_one`, `gaussian`; every drawn pattern stored (draw more); the two PT runs of a sample disagreeing on its ground state (raise sweeps); a size whose late and early energy windows differ beyond the 99% band (raise sweeps) |
 | `unstable:<ansatz>` | `require_final` or `require_stable`: a computed stability is negative (RS replicon or cavity lambda < 0); `unstable:1rsb` also from `pspin_gardner_temperature` when the spherical scan is negative everywhere |
@@ -541,7 +579,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `unbanked:missing-entry`, `:malformed`, `:no-citation`, `:no-independent-route` | a banked reference value is absent or has no citation / no independent route (a value that fed a fit never certifies it) |
 | `tex-engine:failed`, `tex-engine:unavailable` | `--pdf`: the engine ran and failed, or could not reach its offline resources |
 
-CATALOG (19 entries: the 7 of v1 and 12 added by the extensions E4-E10; `list` shows the live table;
+CATALOG (20 entries: the 7 of v1, 12 added by the extensions E4-E10 and 1 by the online-learning task O1; `list` shows the live table;
 values at the default / banked state points):
 
 | entry | routes | headline values | banked references | finality |
@@ -564,6 +602,7 @@ values at the default / banked state points):
 | `bethe_ising` ferromagnet on the Bethe lattice / random k-regular graph, certified | cavity | `beta_c` 0.549306 (k = 3); per fixed point `cavity_field_*`, `magnetization_*`, `phi_*`, `jacobian_*`; `phi` 1.503159 (k = 3, beta = 1, h = 0) | `bethe_beta_c_k3` (atanh(1/2), Dembo-Montanari Eq. (2.5)) | `beta_c` not-computed (a closed-form threshold, DM's physics prediction); per fixed point stable / unstable by the computed BP Jacobian; `phi`, `magnetization` those of the selected fixed point (Dembo-Montanari Thm 2.4) |
 | `series_ising2d` 2D Ising (Onsager) free energy, exact series | series | `a4` 1 .. `a20` 8174.2 (v = tanh K); `operator_order` 3, `operator_degree` 8, `elliptic_factor_order` 2; `u_c` 3 - 2 sqrt 2, `v_c` 0.414214, `critical_exponent` 2, `alpha` 0 | `a4`, `a6`, `a8`, `a10` (Finch's table; independently the exact 7 x 7 torus), `v_c` (Kramers-Wannier / Onsager via Duminil-Copin), `alpha` (Onsager via Duminil-Copin, Baxter) | coefficients exact-by-literature (the cited integral, expanded exactly); operator values not-computed (L g = P proved exactly; minimal within bounds only); `u_c`, `v_c`, `alpha` exact-by-literature |
 | `sk_bounds` SK pressure: Guerra's RS and K-step RSB upper bounds, certified | bound | `rs_bound` 1.584786 (beta = 2: min over q of P_RS), `rs_q` 0.530368 and every stationary point; `rsb1_bound` 1.582418 at the package's 1RSB optimiser (`K=2`: `rsb2_bound`); `chain_verdict` | `annealed_pressure_beta_half` (ln 2 + 1/16: Guerra 1992 Thm 3, the annealed value for beta <= 1) | bounds exact-by-literature (Guerra 2003 Thm 3), certified radii; `rs_q` stable iff P_RS''(q*) > 0 certified; the chain verdict is a consistency check (meta), not a theorem |
+| `online_perceptron` online learning of a perceptron teacher (Hebb, perceptron, AdaTron, optimal; output noise) | online | `eps_exponent`, `eps_constant` (alpha = 1e4; noiseless or Hebb), optimal `eps_constant_formula`; at `alpha`: `eps`, `R`, `Q`, `rho` (Hebb: `eps_hebb_closed_form`); optimal with noise: `no_learning_boundary`, `robust_boundary`; with `N`: `eps_sim` | exponents and constants for the four rules (Biehl-Riegler Eqs. (7), (8), (15); 0.88 from VKC 1998 Tables I-II, Kinouchi-Caticha 1992 not fetched); no-learning line 2 lam - 1/2 at lam = 0.3, 0.4 (Copelli et al. p. 5); robust line at lam = 0.2, 0.3, 0.4 READ OFF Copelli et al. Fig. 1a (tol 0.003) | all not-computed (physics-level ODE limit, self-averaging assumed); `eps_sim` statistical |
 | `viana_bray` sparse +-J | cavity | `beta_c` (3-regular) 0.881374; T = 0 RS `p0` 1/3, `e0` -23/18; factorized 1RSB -1.27231, mu* 0.4174 | those, plus slow/statistical population-dynamics RS and 1RSB at k = 5, T = 0.8 | `beta_c` stable; the rest not-computed |
 
 HELD-OUT EVIDENCE (the test of REUSE; `tests/test_heldout_sk.py`, `tests/test_heldout_perceptron.py`,
@@ -640,11 +679,13 @@ numerically), the derived replicon (E1) and 1RSB (E2), AMP / GAMP and state evol
 replicon and the Gardner transition (E4), K-XORSAT and K-SAT (closed forms, small-N exact checks, BP on
 trees, the SP-rule audit, small SP populations), LDPC density evolution and small peeling runs, the
 spiked-Wigner and SBM state evolution / KS line, the ridge closed forms and small simulations, the exact
-series and its operator, the certified lattice values and Guerra bounds, and the PT detailed-balance gate
-and exact enumeration (E11). `--full` adds 132 `@slow` tests (full-RSB Parisi up to K = 9,
+series and its operator, the certified lattice values and Guerra bounds, the PT detailed-balance gate
+and exact enumeration (E11), and the online-learning ODEs, Gaussian averages and a small simulation
+band (O1). `--full` adds 133 `@slow` tests (full-RSB Parisi up to K = 9,
 population dynamics at reference sizes, the XORSAT GF(2) crossing at N = 400-2000 and leaf removal at
 N = 100000, the K-SAT SP-population crossing and BP window, the LDPC crossing at N = 20000, the spiked
-AMP and SBM bands at reference sizes, the ridge 1/n bands at n = 400, 1000, the 2RSB certified bound and
+AMP and SBM bands at reference sizes, the ridge 1/n bands at n = 400, 1000, the online ODE-vs-simulation
+bands at N = 1000 (8 s), the 2RSB certified bound and
 the K = 5 chain, the E11 Monte Carlo / enumeration held-out routes (about 4.6 min), the Hopfield replicon
 scans, the p-spin T -> 0 energy, solver-based composed and LaTeX checks, a PDF compile when a TeX engine
 is present) and takes about 18 minutes on a laptop (measured 18 min 11 s, 557 tests); run it before merging a change to a family. The `@slow` marker is
@@ -1168,6 +1209,27 @@ KNOWN HAZARDS:
   0, m = 1: its functional is ln 2 + beta^2/4 > P_RS) is reported `ordering:1rsb>rs`; a reported value
   off by 1e-6 `functional:1rsb`; the evaluator's innermost exponent planted at 1.01 m `functional:1rsb`
   (against an independent mpmath value).
+- Online learning (O1, `online/`, entry `online_perceptron`). Convention Biehl & Riegler 1994 (preprint
+  read): |B| = 1, inputs i.i.d. N(0, 1), J <- J + (eta / N) F(h, b, Q) b xi, R = J . B, Q = J . J (BR's
+  Q is |J|), alpha = examples / N, eps = arccos(R / sqrt Q) / pi against the TRUE teacher (the
+  prediction error on noisy labels is not reported); output noise flips the label with probability
+  lam (Copelli et al. Eq. (7)); VKC 1998 use normalised fields and a modulation W = F / |J|. The N -> oo
+  ODEs assume self-averaging (no concentration theorem fetched): every ODE value is `not-computed`.
+  The flow is integrated in (theta = arccos rho, ln Q) with the averages' `drive` <F b (y - rho x)>
+  computed without cancellation; the perceptron rule is stiff at large alpha (its theta relaxes on a
+  scale alpha^(1/3) much shorter than alpha), which is why the asymptote is taken at alpha = 1e4 (0.03 s), where the measured
+  constants sit 9e-7 (Hebb), 7.8e-5 (perceptron), 1.8e-4 (AdaTron) and 2.2e-4 (optimal) from their
+  limits. "Optimal" is optimal only in `optimal.OPTIMALITY_CLASS` (single-example modulated Hebbian rules
+  that know rho and the noise level, eta = 1, greedy per example); it is about twice the batch Bayes
+  constant of `teacher_student` (0.8834 vs 0.4417, a comparison, never an input). Kinouchi & Caticha
+  1992 itself was NOT fetched (IOP behind a bot check): its 0.88 is banked from VKC 1998 Tables I-II
+  and BR p. 4. Copelli et al. Eq. (8) print I(lam) with Dt e^{-t^2}, which gives C(0) = 1.325, not 0.88:
+  replicant derives C = 2 / I with Dt e^{-t^2/2} (0.8834) and records the printed form as a
+  discrepancy (`asymptotic_constant(printed=True)`). Below the no-learning line the optimal flow
+  reaches rho = 0 at finite alpha (W* ~ 1/rho) and is refused `no-solution:rho-zero`; at finite N the
+  optimal rule from a small R0 can cross rho = 0 (refused `undetermined:rho-sign`), so start it at R0
+  well above 1/sqrt(N). With noise > 0 only the Hebb asymptote is reported (no power law is claimed
+  for the other rules).
 - families/sk.py's float64 1RSB functional (`_rsb_phi_e`, 80 x 80 Gauss-Hermite; v1 code, unchanged) is
   inaccurate in the q0 = 0 / large q1 - q0 sector, where the branch points of cosh^m (zeros of cosh at
   Im = pi/2) are not smoothed by an outer Gaussian average. Against the certified balls of bounds/krsb.py:
@@ -1221,7 +1283,7 @@ RSB analysis of [SK94]; the Viana-Bray model [VB85], the sparse cavity and popul
 [Ran11] [BKMMZ19] with [JM13], the binary teacher-student thresholds [Gyo90] [BKMMZ19] [LHZH22]. Random K-XORSAT (`csp/`): the cavity / leaf-removal solution [MRZ03] [CDMM03], the proofs of the threshold [DM02] [PS16] and of the 2-core [Mol05], the textbook treatment [MM09] and the solution geometry [IKKM15] [AM15]. Random K-SAT: BP and survey propagation [BMZ05] [MPZ02] [MZ02],
 the SP population dynamics and thresholds [MMZ06] [LM19], the clustering / condensation thresholds
 [KMRSZ07], the first-moment bound [FP83] and the proof for large K [DSS22]. LDPC codes on the BEC (`inference/`): density evolution and the peeling decoder [LMSS01] [MM09], the Maxwell construction and the MAP threshold [MMU08] [KRU10] [RU08], tabulated thresholds [KRU12] [Pfi15]. Spiked Wigner and the block model (`inference/`): the Bayes-optimal limits and state evolution [LeMi19] [MV21] [DAM15] [BDMKLZ16], the spectral threshold [FP07] [BGN11], the block-model BP and thresholds [DKMZ11] [MNS15] [Mas14] [MNS18]. Ridge regression (`learning/`): [HMRT22] [DW18] [AS20] [LGCGKMZ21] with [SS07] [TV04], context [BLLT20]. Exact series (`series/`): Onsager's integral [Ons44] [KW41] as printed by [DC22] [Bax10], the coefficient table [Fin99] [HM87], the hypergeometric identities [DLMF], the susceptibility series and its natural boundary [A002906] [Nic99] [ONGP01], the non-holonomic control [FGS05]. The universality of the SK free energy used in the held-out test is [CH04]. Solvable lattice models (`lattice/`): Onsager's free energy [Ons44] and Yang's magnetization [Yan52] as printed by [DC22], the critical constant [A242743], Kaufman's torus [Kau49] as printed by [IH02] [Kas06], the Bethe-lattice ferromagnet [DM10], the 1D transfer matrix [WDC19] [Bax82] [Wiki-Ising]; ball arithmetic is Arb [Joh17] through tools/baller. Bounds on the SK
-pressure (`bounds/`): the broken-replica bound [Gue03], the high-temperature identity [Gue92] [ALR87]. Monte Carlo and enumeration (`numerics/`): the finite-size exponent and the banked finite-N ground energies [Boe05] [Pal03], the exchange rule of parallel tempering [HN96]. Reference digits are read
+pressure (`bounds/`): the broken-replica bound [Gue03], the high-temperature identity [Gue92] [ALR87]. Online learning (`online/`): the perceptron learning curves [BR94], the variational optimal modulation [KC92] as restated by [VKC98] and [BR94], output-noise robustness [CEKBSRC97]. Monte Carlo and enumeration (`numerics/`): the finite-size exponent and the banked finite-N ground energies [Boe05] [Pal03], the exchange rule of parallel tempering [HN96]. Reference digits are read
 from [Sto25] [OSS07] [CRT03] [SY17] [DM15] [FP16] [Gyo01] [PRGE20] [Cov65] [Bar97] as stated in the bank
 cites. The typed-step architecture, the symbolic level (a), the composer, the refusal and
 finality discipline and the LaTeX writer are ours. Each bank entry names the source its digits were

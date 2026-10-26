@@ -288,6 +288,8 @@ _DOCUMENTED = {
     ("ising1d", "exact"): {"beta", "h", "N"},
     ("bethe_ising", "cavity"): {"k", "beta", "h", "branch"},
     ("sk_bounds", "bound"): {"beta", "h", "K", "digits"},
+    ("online_perceptron", "online"): {"rule", "alpha", "eta", "noise", "noise_estimate", "R0", "Q0",
+                                      "N", "seeds"},
     ("viana_bray", "cavity"): {"graph", "k", "c", "J", "beta", "ansatz", "m", "ys", "pop",
                                "inner", "sweeps", "burn_in", "runs", "seed",
                                "require_equilibrated"},

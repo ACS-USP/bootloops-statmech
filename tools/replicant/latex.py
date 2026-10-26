@@ -64,7 +64,10 @@ ROUTES = {"replica": "replica method: replicated partition function Z^n, disorde
           "exact": "exact solution: the cited closed forms evaluated in ball arithmetic (certified "
                    "enclosures, radii in errors) and checked against an independent exact route",
           "bound": "rigorous bounds: Guerra's interpolation bounds on the pressure evaluated in ball "
-                   "arithmetic (certified enclosures), checked against the package's own optimisers"}
+                   "arithmetic (certified enclosures), checked against the package's own optimisers",
+          "online": "online learning: the N -> oo order-parameter ODEs in alpha = examples / N, from "
+                    "Gaussian averages over the local fields, integrated, and checked against finite-N "
+                    "simulation over named seeds"}
 
 
 def _block(b: TexBlock, bib):
@@ -162,7 +165,8 @@ def _derivation(res):
                         "amp": "AMP and state evolution (amp/)",
                         "series": "Series and operator (series/)",
                         "exact": "Exact solution (lattice/)",
-                        "bound": "Bounds (bounds/)"}.get(res.route,
+                        "bound": "Bounds (bounds/)",
+                        "online": "Online-learning ODEs (online/)"}.get(res.route,
                                                                   "The cavity argument"),
                  res.entry.derivation(res.route)))
     return rows, LEVEL_A_CITE, why
@@ -226,6 +230,9 @@ def _result_body(res, bib, extra, slow):
         intro = ("The expansion, the finite-lattice route and the operator identity as series/ "
                  "implements them; each formula in sympy form is checked against that code by "
                  "tests/test_latex.py, the theorems used are cited.")
+    elif res.route == "online":
+        intro = ("The online-learning ODEs as online/ implements them; each formula in sympy form is "
+                 "checked against that code by tests/test_latex.py, the rest is cited.")
     elif res.route in ("exact", "bound"):
         what = ("The exact solution as lattice/ implements it" if res.route == "exact" else
                 "The bounds as bounds/ implements them")

@@ -90,6 +90,13 @@ series` for `series_ising2d`, `--route bound` for `sk_bounds`, and `--pdf` (with
   (`enumeration.py`), parallel tempering with an equilibration diagnostic (`pt.py`), finite-size
   extrapolation (`finite_size.py`), exact finite-N moments and the quenched-annealed closure (`moments.py`);
   used by `tests/test_heldout_mc.py` through `tests/heldout_mc.py`.
+- `online/` (O1): online learning, the N -> oo order-parameter ODEs in alpha = examples / N
+  (`fields.py`: Gaussian averages over the local fields, closed forms and an independent polar
+  quadrature; `odes.py`: the perceptron flow for Hebb, perceptron, AdaTron, the optimal rule or any
+  F(h, b, Q), with a learning rate or schedule and output noise, its integrator and asymptotes;
+  `optimal.py`: the variationally optimal modulation of Kinouchi-Caticha and its noise-robustness
+  boundaries; `simulate.py`: finite-N online learning over named seeds, sharing no code with the ODEs);
+  catalog entry `online_perceptron` (route `online`) (`catalog_online.py`, `latex_online.py`).
 - `catalog*.py`, `compose.py` (+ `compose_result.py`: `Result` and the finality rule), `cli.py`,
   `__main__.py`: the 19-entry catalog (`catalog_ts.py` holds the teacher-student entry,
   `catalog_pspin.py` the two p-spin entries; LaTeX in `latex_pspin.py`), the composer,
