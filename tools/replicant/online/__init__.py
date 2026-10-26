@@ -11,6 +11,10 @@
                unconstrained, greedy eta, closed forms (Kinouchi-Caticha 1995)
   linear_offline.py  zero-temperature offline solutions of the linear perceptron and the ridge route
   simulate_linear.py finite-N online and offline linear learning (shares no code with the above)
+  drift.py     (O3) a drifting teacher (random or deterministic, jumps, schedules) composed onto the
+               flow; stationary states, small-drift laws, the KC93 bound (Kinouchi-Caticha 1993; VKC 1998)
+  drift_rules.py     VKC's annealed Hebb, step, symmetric modulations, their averages and closed forms
+  simulate_drift.py  finite-N online learning with the teacher drifting (shares no code with the ODEs)
 
 Convention (Biehl & Riegler, Europhys. Lett. 28, 525 (1994)): |B| = 1, xi_j i.i.d. N(0, 1),
 J <- J + (eta / N) F(h, b, Q) b xi, h = J . xi, R = J . B, Q = J . J, eps = arccos(R / sqrt Q) / pi.

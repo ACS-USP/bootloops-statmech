@@ -101,8 +101,13 @@ series` for `series_ising2d`, `--route bound` for `sk_bounds`, and `--pdf` (with
   unconstrained, greedy eta, closed forms), `linear_offline.py` (zero-temperature offline solutions and the
   ridge route), `simulate_linear.py` (finite-N online and offline); catalog entry `online_linear`
   (`catalog_online_linear.py`, `latex_online_linear.py`).
+  O3: `drift.py` (the drift term, random or deterministic, composed onto the O1 flow; integration with
+  jumps; stationary states; small-drift laws), `drift_rules.py` (VKC's annealed Hebb, step, symmetric
+  and optimal modulations, their averages, closed-form stationary states and KC93's I(lambda)),
+  `simulate_drift.py` (finite-N with the teacher drifting); catalog entry `online_drift`
+  (`catalog_online_drift.py`, `latex_online_drift.py`).
 - `catalog*.py`, `compose.py` (+ `compose_result.py`: `Result` and the finality rule), `cli.py`,
-  `__main__.py`: the 19-entry catalog (`catalog_ts.py` holds the teacher-student entry,
+  `__main__.py`: the 22-entry catalog (`catalog_ts.py` holds the teacher-student entry,
   `catalog_pspin.py` the two p-spin entries; LaTeX in `latex_pspin.py`), the composer,
   the command line.
 - `latex*.py`, `tex*.py`, `derive_tex.py`: the LaTeX derivation writer.

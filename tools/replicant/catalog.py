@@ -296,6 +296,10 @@ _RUNS = {}
 UNCLAIMED[("online_linear", "online_eq20_rho_a2")] = (
     "KC95 Eq. (20) is a time-dependent rule (a callable F(b, h, Q, R, alpha)), not a named catalog rule: "
     "tests/test_online_linear.py test_kc_eq20_time_dependent_rule integrates it and checks this key")
+UNCLAIMED.update({("online_drift", k): (
+    "VKC p. 15's delta = 5, 8 for the perceptron at a fixed rate; replicant's ODE (|J| at its stationary value) "
+    "gives the derived 1/delta = 1/3, 1/4 (online/drift.py drift_exponent), checked against this key's failure in "
+    "tests/test_online_drift.py") for k in ("random_perceptron_exponent", "det_perceptron_exponent")})
 
 def _freeze(p):
     return tuple(sorted((k, tuple(v) if isinstance(v, list) else v) for k, v in p.items()))

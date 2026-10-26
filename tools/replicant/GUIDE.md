@@ -15,7 +15,7 @@ reader can follow to the paper, a per-value finality label, and a comparison wit
 values. Two levels: (a) a symbolic derivation (replicate, average the disorder, introduce order
 parameters, RS ansatz, n -> 0, stationarity, solve) that works for models you describe, and (b) the
 published pipelines of a catalog of 19 entries, each with a replica route and/or a cavity route (and an
-`amp` route for `sk` and `teacher_student`; the constraint-satisfaction entries `xorsat` and `ksat`, the code entry `ldpc_bec` and the block model `sbm` are cavity-only; the spiked Wigner model `spiked_wigner` is amp-only; the ridge-regression entry `ridge` is replica-only, its RS saddle point a cited closed form, not a level-(a) derivation; the 2D Ising entry `series_ising2d` has the route `series` only: an exact series and its holonomic operator, no replica or cavity step; the solvable lattice entries `ising2d` and `ising1d` have the route `exact` and `bethe_ising` the route `cavity`, all three certified in ball arithmetic, `rigor` "certified"; the bound entry `sk_bounds` has the route `bound` only: Guerra's rigorous upper bounds on the SK pressure, certified, and a consistency check of the package's own RS / 1RSB / K-RSB optimisers against them; the online-learning entries `online_perceptron` and `online_linear` have the route `online` only: the N -> oo order-parameter ODEs of online learning in alpha = examples / N, physics-level, checked against finite-N simulation). A composer
+`amp` route for `sk` and `teacher_student`; the constraint-satisfaction entries `xorsat` and `ksat`, the code entry `ldpc_bec` and the block model `sbm` are cavity-only; the spiked Wigner model `spiked_wigner` is amp-only; the ridge-regression entry `ridge` is replica-only, its RS saddle point a cited closed form, not a level-(a) derivation; the 2D Ising entry `series_ising2d` has the route `series` only: an exact series and its holonomic operator, no replica or cavity step; the solvable lattice entries `ising2d` and `ising1d` have the route `exact` and `bethe_ising` the route `cavity`, all three certified in ball arithmetic, `rigor` "certified"; the bound entry `sk_bounds` has the route `bound` only: Guerra's rigorous upper bounds on the SK pressure, certified, and a consistency check of the package's own RS / 1RSB / K-RSB optimisers against them; the online-learning entries `online_perceptron`, `online_linear` and `online_drift` have the route `online` only: the N -> oo order-parameter ODEs of online learning in alpha = examples / N, physics-level, checked against finite-N simulation). A composer
 matches a model description against the catalog, reuses what applies, adapts what it can through
 registered hooks, and says what it reused, adapted, or could not do. A LaTeX writer turns any run into a
 derivation document. Monte Carlo (parallel tempering) and exact enumeration (`numerics/`) check the
@@ -228,6 +228,19 @@ CLI (from `tools/`):
   1 - e^-1 = 0.632 and the optimal 0.795), `eta_greedy` 1.188487; the ridge route is skipped at gamma = 1
   with a note (HMRT Eq. (8) is stated for gamma != 1 only; at sigma2 = 0 its bias tends to 0 there, but no
   value is claimed).  No value is final.
+- Worked example, learning a drifting rule (`online_drift`, route `online`; the O1 engine with a teacher
+  that drifts after each example, randomly (autocorrelation e^{-D alpha}, VKC 1998 Eqs. (4), (26); KC93
+  Eqs. (3)-(6) with T = D) or deterministically away from the student (VKC Eqs. (28)-(31)); about 1 s each,
+  measured): `python3 -m replicant run online_drift --route online` (the defaults: the optimal rule, random
+  drift, no D) -> the small-drift law `eps_exponent` 0.333333, `eps_coefficient` 0.447321 (KC93 Eq. (25):
+  0.447; VKC Table I: 0.45).  `--param rule=annealed_hebb --param D=0.1 --param alpha=5` ->
+  `eps_inf` 0.226041 (`eps_inf_closed` 0.226041, the closed form), the KC93 bound `eps_inf_bound` 0.195856
+  (the optimal rule), `eps` 0.229107 and `eps_bound` 0.199379 at alpha = 5.  `--param D=0.01 --param
+  drift=deterministic` -> `eps_inf` 0.195820 (`eps_inf_kc93` 0.195820 from KC93's I(lambda)).  `--param
+  rule=perceptron --param D=0.1 --param alpha=4 --param N=200` -> `eps_inf` 0.220719 at `Q_inf` 1.434972
+  (|J| settles under drift), `eps` 0.247551, `eps_sim` 0.243858 (`eps_sim_halfwidth99` 0.0116: 20 named
+  seeds at N = 200).  `--param rule=hebb --param D=0.1` is refused `no-solution:no-tracking` (plain Hebb:
+  R -> eta a / D while Q grows, eps -> 1/2).  No value is final.
 - Worked example, amp route (`sk`, `teacher_student`; under 1 s each, measured):
   `python3 -m replicant run sk --route amp --param beta=1.5` -> `q_se` 0.352602 (the SE fixed point,
   `exact-by-literature`: Bayati-Montanari Thm 4 proves SE for AMP on Gaussian J; it is the AMP limit,
@@ -426,6 +439,22 @@ method="construct" | "descent")`
 -> `LinSim(alpha, band, rho_band, eg_seeds, N, seeds)` (99% Student-t bands of e_g and rho). Example:
 `linear.integrate_linear(linear.linear_flow("optimal", constraint="sphere"), 1, (1e-3, 1), alphas=(1,)).rho[0]`
 -> 0.795060.
+`from replicant.online import drift, drift_rules, simulate_drift` (O3; floats):
+`drift.drift_flow(rule, D=0.0, kind="random", eta=1.0, noise=0.0, noise_estimate=None, averages="closed")`
+-> `DriftFlow` (`rule` an O1 rule (hebb | perceptron | adatron | optimal or a callable F(h, b, Q)), a VKC rule
+(annealed_hebb | step | symmetric, unit rate) or a `drift_rules.Modulation(W(Delta, theta))`; `D` >= 0 or a
+schedule D(alpha); `kind` random | deterministic); `.theta_rate(alpha, theta, Q)`, `.rho_rate(alpha, theta,
+Q)`; `drift.integrate_drift(flow, alpha_max, init=(R0, Q0), alphas=None, jumps=(), jump_overlap=0.0)` ->
+`odes.Trajectory` (a jump replaces the teacher: R <- jump_overlap sqrt(Q)); `drift.stationary(flow)` ->
+`Stationary(eps, theta, Q, unstable)`; `drift.small_drift(rule, kind, noise=0, eta=1, Ds=(1e-12, 1e-11))`
+-> `SmallDrift(exponent, exponent_derived, coefficient, Ds, eps)`; `drift.drift_exponent(rule, kind)`;
+`drift.hebb_drift_closed_form(alpha, D, eta, noise, init)`; `_PLANT` (private: "drift" scales the drift
+term, "coupling" adds a W-dependent one). `drift_rules.vkc_modulation(rule, delta, theta, noise)`,
+`vkc_averages(rule, theta, noise, route="closed" | "quadrature")`, `conditional_averages(g, theta, noise)`,
+`VKC_CLASS`, `annealed_hebb_stationary(D, kind, noise)`, `kc93_I(lam, printed=False)`,
+`kc93_stationary(D, kind)`. `simulate_drift.simulate_drift(rule, N, alpha_max, seeds, D, drift, eta, noise,
+noise_estimate, init, alphas, jumps, jump_overlap)` -> `SimResult`. Example:
+`drift.stationary(drift.drift_flow("optimal", D=0.1)).eps` -> 0.195856.
 `from replicant.series import ...` (E8; exact `Fraction` coefficients; needs `tools/` on the path for
 `tools/annihilator`): `ising2d_free_energy_series(order, variable="v")` -> [a_0 .. a_order] in v =
 tanh K (`variable="u"`: [b_0 .. b_order] in u = v^2; anything else `unsupported:variable`; order <=
@@ -564,7 +593,12 @@ needs R0 > 0), `alpha` (the learning curve), `N` (finite-N simulation; an int >=
 `constraint` (sphere (default) | none), `eta` (standard rule: > 0 or `greedy`, default 1; the optimal rule
 needs 1), `M` (teacher norm |B|^2, default 1), `R0`, `Q0` (default R0 = 1e-3 M for the optimal rule or the
 greedy eta, else 0; Q0 = M), `alpha` (the online curve and the offline solutions), `N` (finite-N online
-simulation; needs `alpha`) and `seeds` (default 0-19; needs `N`).
+simulation; needs `alpha`) and `seeds` (default 0-19; needs `N`); `online_drift` (online): `rule` (optimal
+(default) | annealed_hebb | step | symmetric | hebb | perceptron | adatron), `drift` (random (default) |
+deterministic), `D` (>= 0; without it the small-drift law, noiseless rules only), `eta` (O1 rules; the
+optimal and VKC rules need 1), `noise`, `noise_estimate` (optimal rule only), `R0`, `Q0` (default R0 = 0.01
+for the rules that read rho, else 0; Q0 = 1), `alpha` (the learning curve and its KC93 bound), `N`
+(finite-N simulation with the teacher drifting; needs `alpha`) and `seeds` (default 0-19; needs `N`).
 Without `beta` an entry returns its T = 0 / critical headline values. A composed spec
 (not a catalog entry) does not refuse an unknown name: its notes list "unused parameters [...]".
 
@@ -606,6 +640,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `precondition:beta`, `:J`, `:h`, `:size`, `:coordination`, `:branch`, `:ordered-phase`, `:certified-radius`, `ambiguous:branch`, `undetermined:spinodal`, `no-solution:certification`, `:radius-stall`, `:not-an-integer-polynomial`, `:torus-disagreement`, `:ring-identity`, `:audit`, `unsupported:python-flint`, `:baller-integrity` | lattice (`lattice/`): beta not a rational > 0 (bools, nan refused); J <= 0 (ferromagnet only; `beta_c` needs J = 1); h not rational; a torus side outside its range; k not an int >= 2; a branch not among the fixed points; Yang at or below beta_c (m* = 0 there); a certified route returning a value without its radius; the magnetization at h = 0 below T_c without a branch; a fixed-point count or stability sign undecided at 4096 bits; baller.solve could not certify the digits; a radius that does not halve when the precision doubles; Kaufman's coefficient balls (radius < 1/4) containing no integer; Kaufman's polynomial differing from the transfer matrix's; the 1D ring balls not overlapping; the two Bethe free-energy forms disagreeing; python-flint missing (use the project venv, INSTALL.md); `baller.verify()` failing |
 | `unsupported:rule`, `precondition:eta`, `:noise`, `:optimal-eta`, `:initial-overlap`, `:alpha`, `:overlap`, `:averages`, `:asymptote`, `undetermined:asymptote`, `:rho-sign`, `no-solution:rho-zero`, `:step-size`, `:overflow` | online (`online/`, `online_perceptron`): a rule that is not hebb / perceptron / adatron / optimal or a callable; eta not a finite number > 0 (also a schedule turning non-positive); a flip probability outside [0, 1/2); the optimal rule with eta != 1 or a schedule; (R0, Q0) with Q0 <= 0 or rho0 >= 1, or R0 <= 0 for the optimal rule; alpha <= 0; rho <= 0 for the optimal modulation; a measured log-slope further than 0.01 from the derived exponent; a simulated seed of the optimal rule reaching rho <= 0; the optimal flow reaching rho = 0 at finite alpha (below the no-learning line); the step-size or ln Q > 700 guards |
 | `unsupported:rule`, `unsupported:algorithm`, `precondition:eta`, `:optimal-eta`, `:constraint`, `:teacher-norm`, `:averages`, `:state-point`, `:initial-overlap`, `:alpha`, `:asymptote`, `:offline-window`, `:method`, `undetermined:asymptote`, `:crossing`, `:descent`, `no-solution:rho-zero` | online (`online/linear*.py`, `simulate_linear.py`, `online_linear`): a rule other than standard / optimal or a callable F(b, h, Q, R); an offline algorithm other than standard / optimal; eta not > 0 nor `greedy`; the optimal rule with eta != 1 or greedy; a constraint other than sphere / none; M <= 0; (R0, Q0) with Q0 < 0 (or = 0 on the sphere, for the optimal or greedy rule), R0^2 > Q0 M, J0 = B, or R0 <= 0 for the optimal rule or the greedy eta; alpha <= 0; an asymptote off the sphere or not converged to 1e-9 between 45 and 60; the standard offline algorithm on an unrealizable sphere (alpha > Q/M, or alpha >= 1 with Q != M); no single crossing on the grid; R <= 0 under the optimal modulation or the greedy eta; `simulate_offline` with method descent for the optimal algorithm (its finite-N zero-error set is degenerate) or descent not converged in 20000 steps |
+| `unsupported:rule`, `unsupported:stationary`, `precondition:drift`, `:drift-kind`, `:optimal-eta`, `:known-parameter`, `:noise`, `:initial-overlap`, `:alpha`, `:averages`, `:overlap`, `undetermined:stationary`, `:small-drift`, `:rho-sign`, `no-solution:no-tracking` | online with drift (`online/drift*.py`, `simulate_drift.py`, `online_drift`): an unknown rule; a stationary state for a callable F(h, b, Q); D < 0 or a schedule where a constant D > 0 is needed (stationary, small drift); a drift other than random / deterministic; a VKC rule at eta != 1 or with noise_estimate; R0 <= 0 or jump_overlap <= 0 for a rule that reads rho (optimal, VKC); jumps outside (0, alpha_max); several stable stationary states; a small-drift log-slope more than 0.01 from the derived exponent; a simulated seed reaching rho <= 0 under a rule that reads rho; plain Hebb under drift (R -> eta a / D while Q grows: no stationary state) |
 | `precondition:order-parameter`, `:levels`, `:digits`, `:K`, `:temperature-range`, `unsupported:field`, `undetermined:stationary-points`, `ambiguous:minimiser`, `no-solution:certification`, `:radius-stall` | bounds (`bounds/`, `sk_bounds`): q or m outside Guerra's admissible set (q nondecreasing in [0, 1], m nondecreasing in (0, 1]); overlap / Parisi-parameter counts that do not match; digits not an int 1 .. 200; K outside 1 .. 5 (catalog: 1 or 2); K-step staircases outside 1 < beta <= 3 or with h != 0; the stationary points of P_RS not certified complete (a cover or monotone run undecided); two local minima with overlapping values; interval Newton or the precision escalation failing |
 | `precondition:coupling-matrix`, `:pm-one-couplings`, `:enumeration-size`, `:integer-patterns`, `:seed`, `:betas`, `:sweeps`, `:nbetas`, `:windows`, `:sizes`, `:samples`, `:order`, `:supported-disorder-law`, `no-solution:capacity`, `undetermined:ground-states`, `undetermined:equilibration` | Monte Carlo and enumeration (`numerics/`): J not a finite symmetric matrix with zero diagonal (PT: a stack of them), or not +-1/sqrt N for the +-J spectrum; N above the enumeration limit (SK 26, perceptron 30); P not an int >= 0, or alpha N not an integer; a seed not an int >= 0 (or a list of them); betas not positive and strictly increasing (the finite-size thermal route also needs beta > 0.5, `moments.pm_one_gap_limit` 0 <= beta < 1); sweeps / nbetas not an int >= 1 or betas not a sequence (never a silent default); fewer than two samples or a window split that is empty; fewer than three distinct sizes, or a size without >= 2 samples; a closure order other than 2, 3; a law other than `pm_one`, `gaussian`; every drawn pattern stored (draw more); the two PT runs of a sample disagreeing on its ground state (raise sweeps); a size whose late and early energy windows differ beyond the 99% band (raise sweeps) |
 | `unstable:<ansatz>` | `require_final` or `require_stable`: a computed stability is negative (RS replicon or cavity lambda < 0); `unstable:1rsb` also from `pspin_gardner_temperature` when the spherical scan is negative everywhere |
@@ -646,6 +681,7 @@ values at the default / banked state points):
 | `sk_bounds` SK pressure: Guerra's RS and K-step RSB upper bounds, certified | bound | `rs_bound` 1.584786 (beta = 2: min over q of P_RS), `rs_q` 0.530368 and every stationary point; `rsb1_bound` 1.582418 at the package's 1RSB optimiser (`K=2`: `rsb2_bound`); `chain_verdict` | `annealed_pressure_beta_half` (ln 2 + 1/16: Guerra 1992 Thm 3, the annealed value for beta <= 1) | bounds exact-by-literature (Guerra 2003 Thm 3), certified radii; `rs_q` stable iff P_RS''(q*) > 0 certified; the chain verdict is a consistency check (meta), not a theorem |
 | `online_perceptron` online learning of a perceptron teacher (Hebb, perceptron, AdaTron, optimal; output noise) | online | `eps_exponent`, `eps_constant` (alpha = 1e4; noiseless or Hebb), optimal `eps_constant_formula`; at `alpha`: `eps`, `R`, `Q`, `rho` (Hebb: `eps_hebb_closed_form`); optimal with noise: `no_learning_boundary`, `robust_boundary`; with `N`: `eps_sim` | exponents and constants for the four rules (Biehl-Riegler Eqs. (7), (8), (15); 0.88 from VKC 1998 Tables I-II, Kinouchi-Caticha 1992 not fetched); no-learning line 2 lam - 1/2 at lam = 0.3, 0.4 (Copelli et al. p. 5); robust line at lam = 0.2, 0.3, 0.4 READ OFF Copelli et al. Fig. 1a (tol 0.003) | all not-computed (physics-level ODE limit, self-averaging assumed); `eps_sim` statistical |
 | `online_linear` online versus offline learning of a linear teacher (standard F = b - h and the optimal F = (Q/R) b - h; sphere or unconstrained; greedy eta) | online | at `alpha`: `rho`, `eg`, `R`, `Q`, `eps_sign`, optimal `gamma_temperature`, greedy `eta_greedy`, `rho_offline_standard` / `_optimal`, `eg_offline_*`, `rho_offline_optimal_ridge`, `eg_pinv_ridge`; on the sphere at eta = 1: `rho_inf`, `eg_inf`, optimal `tail_constant`, `alpha_cross`; with `N`: `eg_sim`, `rho_sim` | Kinouchi-Caticha 1995 (preprint IFUSP/P-1157 read): rho_opt = sqrt(1 - e^-alpha) at alpha = 1, 3 (Eq. (19)), rho_std = 1 - e^-1 (Eq. (26)), rho_max 0.8 at M/Q = 4 (Eq. (24)), e_g^oo 0.9 / 0.5 at Q = 4 (Eq. (25)), tail 1/2 (Eq. (31)), offline rho = alpha, sqrt(alpha) and e_g = 1 - alpha, 1 - sqrt(alpha) (Eqs. (27), (49), (53), (54)), the crossing 0.71 (p. 11, tol 0.005) | all not-computed (physics-level ODE limit; offline from the derived zero-energy geometry); `eg_sim` statistical |
+| `online_drift` online learning of a drifting perceptron teacher (random or deterministic drift; the O1 rules and VKC's annealed Hebb, step, symmetric and optimal modulations) | online | without `D`: `eps_exponent`, `eps_coefficient` (small-drift law); with `D`: `eps_inf`, `theta_inf`, perceptron `Q_inf`, the KC93 bound `eps_inf_bound`, annealed Hebb `eps_inf_closed`, optimal `eps_inf_kc93`; at `alpha`: `eps`, `R`, `Q`, `rho`, `eps_bound`; with `N`: `eps_sim` | VKC 1998 (arXiv read): Tables I-II small-drift coefficients and exponents of the four rules (random and deterministic; the deterministic optimal formula as printed is inconsistent with its 0.63, the number is banked), Figs. 4 and 6 read off at two D each (tol 0.003); KC93 (preprint IFUSP/P-1044 read) C = 0.447 (Eq. (25)); VKC p. 15's perceptron delta = 5, 8 banked but UNCLAIMED (replicant derives 3, 4) | all not-computed (physics-level ODE limit); `eps_sim` statistical |
 | `viana_bray` sparse +-J | cavity | `beta_c` (3-regular) 0.881374; T = 0 RS `p0` 1/3, `e0` -23/18; factorized 1RSB -1.27231, mu* 0.4174 | those, plus slow/statistical population-dynamics RS and 1RSB at k = 5, T = 0.8 | `beta_c` stable; the rest not-computed |
 
 HELD-OUT EVIDENCE (the test of REUSE; `tests/test_heldout_sk.py`, `tests/test_heldout_perceptron.py`,
@@ -725,11 +761,13 @@ spiked-Wigner and SBM state evolution / KS line, the ridge closed forms and smal
 series and its operator, the certified lattice values and Guerra bounds, the PT detailed-balance gate
 and exact enumeration (E11), and the online-learning ODEs, Gaussian averages and a small simulation
 band (O1), the linear perceptron's ODEs, closed forms, offline geometry, ridge route and small online and
-offline simulation bands (O2). `--full` adds 134 `@slow` tests (full-RSB Parisi up to K = 9,
+offline simulation bands (O2), the drift flow, the VKC modulations and their class maximisation, VKC's
+drift-independence claim, the KC93 bound for every rule, stationary states and small-drift laws against
+the bank and a small drifting-teacher simulation band (O3). `--full` adds 137 `@slow` tests (full-RSB Parisi up to K = 9,
 population dynamics at reference sizes, the XORSAT GF(2) crossing at N = 400-2000 and leaf removal at
 N = 100000, the K-SAT SP-population crossing and BP window, the LDPC crossing at N = 20000, the spiked
 AMP and SBM bands at reference sizes, the ridge 1/n bands at n = 400, 1000, the online ODE-vs-simulation
-bands at N = 1000 (8 s; linear perceptron 2.3 s), the 2RSB certified bound and
+bands at N = 1000 (8 s; linear perceptron 2.3 s; drifting teacher 9 s), the 2RSB certified bound and
 the K = 5 chain, the E11 Monte Carlo / enumeration held-out routes (about 4.6 min), the Hopfield replicon
 scans, the p-spin T -> 0 energy, solver-based composed and LaTeX checks, a PDF compile when a TeX engine
 is present) and takes about 18 minutes on a laptop (measured 18 min 11 s, 557 tests); run it before merging a change to a family. The `@slow` marker is
@@ -1296,6 +1334,25 @@ KNOWN HAZARDS:
   is checked as a time-dependent callable rule from alpha0 = 0.01 (banked, unclaimed by the catalog). The
   offline simulation has two methods: `construct` builds the solutions with a uniform w (the derivation's
   own assumption), `descent` finds the standard ones by gradient descent from a random start.
+- Drifting rules (O3, `online/drift.py`, `drift_rules.py`, `simulate_drift.py`, entry `online_drift`).
+  Papers read: Vicente, Kinouchi & Caticha 1998 (arXiv:cond-mat/9801297) and Kinouchi & Caticha 1993 (J.
+  Phys. A 26, 6161; the preprint IFUSP/P-1044, March 1993, scanned, read page by page). Biehl & Schwarze
+  (Europhys. Lett. 20, 733 (1992); J. Phys. A 26, 2651 (1993), doi:10.1088/0305-4470/26/11/014) were NOT
+  fetched (IOP bot check, no preprint found); their drift models are used as VKC and KC93 restate them and
+  nothing is banked from them. Conventions: random drift B <- (B + sqrt(2D)/N u)/|.| (VKC's <eta_i eta_j> =
+  2D, KC93's T = D: B . B' = 1 - D/N per example); deterministic drift turns B away from J by
+  arccos(1 - D/N^2); noise = VKC's chi / 2 (O1). VKC's "Hebb" is the annealed Hebb W_AH (their Eq. (22)),
+  not plain Hebb, which under drift does not track (eps -> 1/2). Each VKC rule is optimal only in its
+  information class (`drift_rules.VKC_CLASS`), at unit rate, reading the true rho. VKC's claim (Sec. III,
+  p. 9) that the modulations "do not depend on the drift parameters" under uncorrelated drift is tested as
+  stated: the class maximiser of drho/dalpha is the same at D = 0, 0.3 (random) and 0.01
+  (deterministic), and changes with the noise. KC93 Eq. (22) prints e^{-(1 - lambda^2) u^2/2}; replicant derives (1 + lambda^2) (it agrees
+  with the engine's <W*^2>/2; the printed form diverges for lambda >= 1) and keeps their Eq. (25) constant
+  0.447, unaffected. VKC Table II's deterministic optimal formula (8D/A^2)^(1/4) does not give its printed
+  0.63 (A is not defined in the arXiv text; (8D/(pi^2 A^4))^(1/4), derived, does). VKC p. 15's perceptron
+  delta = 5 (random), 8 (deterministic) rest on Eq. (34); with |J| free the perceptron's |J| settles
+  under drift and replicant's ODE gives delta = 3, 4 with the step rule's coefficients (derived in
+  `drift.drift_exponent`): banked, UNCLAIMED, recorded as a discrepancy.
 - families/sk.py's float64 1RSB functional (`_rsb_phi_e`, 80 x 80 Gauss-Hermite; v1 code, unchanged) is
   inaccurate in the q0 = 0 / large q1 - q0 sector, where the branch points of cosh^m (zeros of cosh at
   Im = pi/2) are not smoothed by an outer Gaussian average. Against the certified balls of bounds/krsb.py:
@@ -1349,7 +1406,7 @@ RSB analysis of [SK94]; the Viana-Bray model [VB85], the sparse cavity and popul
 [Ran11] [BKMMZ19] with [JM13], the binary teacher-student thresholds [Gyo90] [BKMMZ19] [LHZH22]. Random K-XORSAT (`csp/`): the cavity / leaf-removal solution [MRZ03] [CDMM03], the proofs of the threshold [DM02] [PS16] and of the 2-core [Mol05], the textbook treatment [MM09] and the solution geometry [IKKM15] [AM15]. Random K-SAT: BP and survey propagation [BMZ05] [MPZ02] [MZ02],
 the SP population dynamics and thresholds [MMZ06] [LM19], the clustering / condensation thresholds
 [KMRSZ07], the first-moment bound [FP83] and the proof for large K [DSS22]. LDPC codes on the BEC (`inference/`): density evolution and the peeling decoder [LMSS01] [MM09], the Maxwell construction and the MAP threshold [MMU08] [KRU10] [RU08], tabulated thresholds [KRU12] [Pfi15]. Spiked Wigner and the block model (`inference/`): the Bayes-optimal limits and state evolution [LeMi19] [MV21] [DAM15] [BDMKLZ16], the spectral threshold [FP07] [BGN11], the block-model BP and thresholds [DKMZ11] [MNS15] [Mas14] [MNS18]. Ridge regression (`learning/`): [HMRT22] [DW18] [AS20] [LGCGKMZ21] with [SS07] [TV04], context [BLLT20]. Exact series (`series/`): Onsager's integral [Ons44] [KW41] as printed by [DC22] [Bax10], the coefficient table [Fin99] [HM87], the hypergeometric identities [DLMF], the susceptibility series and its natural boundary [A002906] [Nic99] [ONGP01], the non-holonomic control [FGS05]. The universality of the SK free energy used in the held-out test is [CH04]. Solvable lattice models (`lattice/`): Onsager's free energy [Ons44] and Yang's magnetization [Yan52] as printed by [DC22], the critical constant [A242743], Kaufman's torus [Kau49] as printed by [IH02] [Kas06], the Bethe-lattice ferromagnet [DM10], the 1D transfer matrix [WDC19] [Bax82] [Wiki-Ising]; ball arithmetic is Arb [Joh17] through tools/baller. Bounds on the SK
-pressure (`bounds/`): the broken-replica bound [Gue03], the high-temperature identity [Gue92] [ALR87]. Online learning (`online/`): the perceptron learning curves [BR94], the variational optimal modulation [KC92] as restated by [VKC98] and [BR94], output-noise robustness [CEKBSRC97], the linear perceptron online versus offline [KC95]. Monte Carlo and enumeration (`numerics/`): the finite-size exponent and the banked finite-N ground energies [Boe05] [Pal03], the exchange rule of parallel tempering [HN96]. Reference digits are read
+pressure (`bounds/`): the broken-replica bound [Gue03], the high-temperature identity [Gue92] [ALR87]. Online learning (`online/`): the perceptron learning curves [BR94], the variational optimal modulation [KC92] as restated by [VKC98] and [BR94], output-noise robustness [CEKBSRC97], the linear perceptron online versus offline [KC95], drifting rules [VKC98] [KC93]. Monte Carlo and enumeration (`numerics/`): the finite-size exponent and the banked finite-N ground energies [Boe05] [Pal03], the exchange rule of parallel tempering [HN96]. Reference digits are read
 from [Sto25] [OSS07] [CRT03] [SY17] [DM15] [FP16] [Gyo01] [PRGE20] [Cov65] [Bar97] as stated in the bank
 cites. The typed-step architecture, the symbolic level (a), the composer, the refusal and
 finality discipline and the LaTeX writer are ours. Each bank entry names the source its digits were
