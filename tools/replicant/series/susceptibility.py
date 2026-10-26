@@ -3,9 +3,12 @@
 series/data/a002906.txt: the first 420 terms of OEIS A002906 ("High temperature series for spin-1/2
 Ising magnetic susceptibility on 2D square lattice"; chi = (m^2/kT) sum_n a(n) v^n, v = tanh(J/kT)),
 copied from the b-file https://oeis.org/A002906/b002906.txt (fetched 2026-10-25; the entry says it was
-obtained from the Guttmann-Jensen series, terms up to n = 116 from F. Hucht).  The entry cites Nickel,
-J. Phys. A 32, 3889 (1999), for the singularity structure (the natural boundary |v| = 1 of chi; not
-fetched).  These numbers are inputs to a "no operator within bounds" check only, never a proof.
+obtained from the Guttmann-Jensen series, terms up to n = 116 from F. Hucht).  Natural boundary
+(Orrick, Nickel, Guttmann & Perk, arXiv:cond-mat/0103074v1, read: Sec. 1 and Sec. 3.2 give
+"overwhelming evidence", not a proof, that the ISOTROPIC chi has the natural boundary |s| = 1, s =
+sinh 2K; Sec. 6.3: in v = tanh K it maps to the two circles |v +- 1| = sqrt 2; |v| = 1 is the
+boundary of the ANISOTROPIC chi(v, v') in v at fixed v' (Sec. 1, after Nickel 1999)).  These numbers
+are inputs to a "no operator within bounds" check only, never a proof of non-D-finiteness.
 """
 import os
 

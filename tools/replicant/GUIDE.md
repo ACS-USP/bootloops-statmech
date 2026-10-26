@@ -129,14 +129,17 @@ CLI (from `tools/`):
   `precondition:state-point` (gamma is required).
 - Worked example, exact series (`series_ising2d`, route `series` only; square-lattice Ising, zero
   field, v = tanh K, u = v^2, g = ln Z/N - ln 2 - 2 ln cosh K):
-  `python3 -m replicant run series_ising2d --route series` (0.8 s) -> `a4` 1, `a8` 4.5, `a20` 8174.2
-  (exact rationals in `coefficients`, u^0 .. u^100), `torus_agrees_through` 7 and `torus_excess_at_L`
-  1/4 (the exact 8 x 8 torus), `operator_order` 3, `operator_degree` 8 (fitted on 70 u-terms,
-  `heldout_verified` 31), `elliptic_factor_order` 2 with `elliptic_identity` true, `u_c` 0.171573
-  (`u_c_exact` 3 - 2 sqrt 2), `v_c` 0.414214, `critical_exponent` 2, `alpha` 0, all final.
-  `--param max_order=2` is refused `no-operator-within-bounds` (60 equations, 33 unknowns, full
-  column rank mod both primes); without `--route series` the run is refused
-  `missing-step:route:replica`.
+  `python3 -m replicant run series_ising2d --route series` (0.9 s) -> `a4` 1, `a8` 4.5, `a20` 8174.2
+  (exact rationals in `coefficients`, u^0 .. u^100), `torus_agrees_through` 6,
+  `torus_even_agrees_through` 12 and `torus_excess_at_L` 2/7 (the exact 7 x 7 torus: a4 .. a12),
+  `operator_order` 3, `operator_degree` 8 (fitted on 62 u-terms, `heldout_verified` 39),
+  `elliptic_factor_order` 2 with `elliptic_identity` and `theta_g_identity` true, `u_c` 0.171573
+  (`u_c_exact` 3 - 2*sqrt(2)), `v_c` 0.414214, `critical_exponent` 2, `alpha` 0. The coefficients,
+  `u_c`, `v_c`, `critical_exponent` and `alpha` are final; the three operator values are
+  `not-computed` (L g = P is proved exactly, but that is not a computed stability; minimality only
+  within the bounds), so `final` is false. `--param max_order=2` is refused
+  `no-operator-within-bounds` (53 equations, 30 unknowns, full column rank mod both primes); without
+  `--route series` the run is refused `missing-step:route:replica`.
 - Worked example, amp route (`sk`, `teacher_student`; under 1 s each, measured):
   `python3 -m replicant run sk --route amp --param beta=1.5` -> `q_se` 0.352602 (the SE fixed point,
   `exact-by-literature`: Bayati-Montanari Thm 4 proves SE for AMP on Gaussian J; it is the AMP limit,
@@ -297,7 +300,9 @@ tanh K (`variable="u"`: [b_0 .. b_order] in u = v^2; anything else `unsupported:
 `MAX_ORDER` = 600 in v), `onsager_moment(m)` (<(cos t1 + cos t2)^m>, exact), `ising2d._HOOKS`
 (private planted-error hook: the moment), `ising2d.onsager_free_energy_numeric(v)` (quadrature, |v| <
 sqrt 2 - 1), `torus_polynomial(L, order)` (even subgraphs of the L x L torus by edge count, 3 <= L <=
-8, order <= 2L), `torus_free_energy_series(L, order)` ((1/L^2) ln P_L), `torus_window(L)` (= L - 1);
+8, order <= 2L), `torus_free_energy_series(L, order)` ((1/L^2) ln P_L), `torus_window(L)` -> (all,
+even): equal to the bulk for every k <= L - 1, and for even k <= 2L - 2 when L is odd (L - 2 when
+L is even); `theta_g_identity(n)` (theta g = R + s F on exact coefficients through u^n);
 `recognize_holonomic(series, max_order, max_degree, *, fit_terms=None, primes=PRIMES)` ->
 `Recognition(operator, certificate, verified_terms, recurrence, fit_terms)`, `Operator(terms, rhs)`
 (`terms` {(u power, theta power): Fraction}, `order` = theta-order, `degree`, `coefficient(k)`,
@@ -346,9 +351,9 @@ need `N`); `ridge` (replica): `gamma` (required, > 0), `sigma2` (default 1), `si
 default 1), `lam` (>= 0: the ridge closed form; > 0 also the RS saddle point), and for the finite-n
 check `n` (an int >= 10; p = round(gamma n); lam defaults to 0 there) and `seeds` (default 0-19; needs
 `n`); `series_ising2d` (series): `order` (even, >= 20, default 200: the v-order, i.e. u-terms 0 ..
-100), `fit_terms` (default 70; fewer than the u-terms, the rest are held out), `max_order` (default
-4), `max_degree` (default 10; fit_terms >= (max_degree + 1)(max_order + 1) + 5 + max_degree), `L`
-(the torus, 3 .. 8, default 8). Without `beta` an entry returns its T = 0 / critical headline values. A composed spec
+100), `fit_terms` (default 62; fewer than the u-terms, the rest are held out), `max_order` (default
+3), `max_degree` (default 9; fit_terms >= (max_degree + 1)(max_order + 1) + 5 + max_degree), `L`
+(the torus, 3 .. 8, default 7). Without `beta` an entry returns its T = 0 / critical headline values. A composed spec
 (not a catalog entry) does not refuse an unknown name: its notes list "unused parameters [...]".
 
 OUTPUTS: the `Result` object (`values`, `errors`, `rigor`, `route`, `stable`, `final`, `finality`,
@@ -415,7 +420,7 @@ CATALOG (v1; `list` shows the live table; values at the default / banked state p
 | `spiked_wigner` rank-one spiked Wigner | amp | `lambda_c` 1; at `snr`: SE `gamma_se`, `q_se`, `overlap_se`, `mmse_se`, `matrix_mmse_se` (snr = 2: 0.75, 0.866025, 0.25, 0.4375); with `N`: Bayes AMP `q_amp`, `overlap_amp`, `mmse_amp`, `matrix_mmse_amp` | `lambda_c` gaussian and rademacher (LM 2019 Sec. 2.3; DAM Thm 4.3 with Lemma 3.3); gaussian `q`, `matrix_mmse` at lambda = 0.8, 1.5, 2, 3 (LM Eq. (10)); the N = 2000 AMP bands against the bank are tests (slow), not catalog checks | `lambda_c` exact-by-literature; `gamma_se`, `q_se`, `matrix_mmse_se` exact-by-literature (LM Thm 1) when the run finds the SE root to be the RS potential's global minimum; `overlap_se`, `mmse_se` exact-by-literature (MV Thm 2) for lambda > 1; finite-N values not-computed (statistical) |
 | `sbm` two-group block model | cavity | at `c`: the KS point `a_ks`, `b_ks`, `inverse_eps_ks` (c = 3: 3.732051); at `a`, `b`: `ks_margin` tau; with `N`: BP `bp_overlap` | `inverse_eps_ks` at q = 2, c = 3 (DKMZ 2011 Fig. 1: 3.73); the q = 4, c = 16 value 2.33 banked but UNCLAIMED (q = 2 only) | `ks_margin` exact-by-literature (MNS 2015 Thm 2.1 for tau <= 1 with a + b > 2; Massoulie 2014, MNS 2018 for tau > 1 with a > b), not-computed for a + b <= 2 below the line and for a < b above it; KS point exact-by-literature; `bp_overlap` not-computed (statistical) |
 | `ridge` ridge / ridgeless least squares (isotropic Gaussian design) | replica | at `gamma`: `risk_ridgeless` (+ `bias_ridgeless`, `variance_ridgeless`, `test_mse_ridgeless`; not at gamma = 1), `lambda_opt`, `risk_opt`, `test_mse_opt`; with `lam`: `risk`, `bias`, `variance`, `test_mse`, RS `risk_rs`, `rs_V`, `rs_q`, `rs_m`; with `n`: `risk_sim` | ridgeless at gamma = 0.5, 0.9, 1.1, 2, 4 (HMRT Eq. (8)); ridge at three (gamma, lam) points (HMRT Eq. (43), also through `risk_rs`); optimal test MSE at four points (Dobriban-Wager Eq. (8)); lam* at two (HMRT Cor. 5): formula evaluations at chosen points (sympy exact), the papers print formulas, not numbers | closed forms exact-by-literature (HMRT Prop. 2 / Thm 1 / Cor. 5, Thm 6 for the split; DW Thm 2.1); RS values exact-by-literature (Loureiro et al. 2022 Thm 1, specialised here with the label noise); `risk_sim` not-computed (statistical) |
-| `series_ising2d` 2D Ising (Onsager) free energy, exact series | series | `a4` 1 .. `a20` 8174.2 (v = tanh K); `operator_order` 3, `operator_degree` 8, `elliptic_factor_order` 2; `u_c` 3 - 2 sqrt 2, `v_c` 0.414214, `critical_exponent` 2, `alpha` 0 | `a4`, `a6`, `a8`, `a10` (Finch's table), `v_c` (Kramers-Wannier / Onsager via Duminil-Copin), `alpha` (Onsager via Duminil-Copin, Baxter) | coefficients exact-by-literature (the cited integral, expanded exactly); operator stable when the hypergeometric identity holds (else not-computed; minimal within bounds only); `u_c`, `v_c`, `alpha` exact-by-literature |
+| `series_ising2d` 2D Ising (Onsager) free energy, exact series | series | `a4` 1 .. `a20` 8174.2 (v = tanh K); `operator_order` 3, `operator_degree` 8, `elliptic_factor_order` 2; `u_c` 3 - 2 sqrt 2, `v_c` 0.414214, `critical_exponent` 2, `alpha` 0 | `a4`, `a6`, `a8`, `a10` (Finch's table; independently the exact 7 x 7 torus), `v_c` (Kramers-Wannier / Onsager via Duminil-Copin), `alpha` (Onsager via Duminil-Copin, Baxter) | coefficients exact-by-literature (the cited integral, expanded exactly); operator values not-computed (L g = P proved exactly; minimal within bounds only); `u_c`, `v_c`, `alpha` exact-by-literature |
 | `viana_bray` sparse +-J | cavity | `beta_c` (3-regular) 0.881374; T = 0 RS `p0` 1/3, `e0` -23/18; factorized 1RSB -1.27231, mu* 0.4174 | those, plus slow/statistical population-dynamics RS and 1RSB at k = 5, T = 0.8 | `beta_c` stable; the rest not-computed |
 
 HELD-OUT EVIDENCE (the test of REUSE; `tests/test_heldout.py`). Two models that are not catalog entries
@@ -819,17 +824,27 @@ KNOWN HAZARDS:
   by Duminil-Copin 2022, Eq. (3.6); the 1944 original not fetched) expanded in exact rational
   arithmetic: g = ln(1 + u) - sum_k [4^k M_2k / (4k)] W^k, W = u (1 - u)^2/(1 + u)^4, the moments
   M_m = <(cos t1 + cos t2)^m> integrated exactly; it matches Finch's table (Harris-Meir) through v^10.
-  Independent exact route: the L x L torus by a parity transfer matrix (no Onsager integral), equal
-  to the bulk for v^k, k < L, and larger by exactly 2/L at v^L (the 2L straight winding loops): at L
-  <= 8 this checks a4 and a6 only, so it is a short window; a planted moment error is caught. The
-  operator: the annihilator finds theta-order 3, degree 8 (recurrence order 8, degree 3 in n) on 70
-  u-terms, 2-prime confirmed, and none of theta-order <= 2 with degree <= 10; it holds on 31
-  held-out terms (81 in the slow tier). It is INHOMOGENEOUS as an ODE: L g = P(u) = 2u^2(u^5 + 8u^4
+  Independent exact route: the L x L torus by a parity transfer matrix (no Onsager integral). It
+  equals the bulk for every v^k with k < L (a cluster of length k that wraps nothing has extent <=
+  k/2 < L) and is larger by exactly 2/L at v^L (the 2L straight winding loops). For odd L the even
+  coefficients agree through v^(2L - 2): an even subgraph of homology class (a, b) mod 2 has length
+  = a + b mod 2 and contractible cycles are even, so an even-length wrapping cluster needs two odd
+  windings or class (1, 1), length >= 2L; v^(2L) is the first even difference (verified L = 3, 5,
+  7). The default L = 7 checks a4 .. a12, which covers the banked a4 .. a10; a planted moment error
+  is caught. No finite lattice at this size constrains the recognised operator, which needs >= 62
+  u-terms (v^122) at its (degree, order) = (8, 3): the operator rests on the exact identity below and
+  on the held-out terms. The operator: the annihilator finds theta-order 3, degree 8 (recurrence
+  order 8, degree 3 in n) on 62 u-terms (default bounds order <= 3, degree <= 9), 2-prime confirmed,
+  and none of theta-order <= 2 with degree <= 9; it holds on 39 held-out terms (81 in the slow tier,
+  fitted on 80 at bounds (4, 10)). It is INHOMOGENEOUS as an ODE: L g = P(u) = 2u^2(u^5 + 8u^4
   - 10u^3 + 28u^2 - 15u + 4) (the recurrence's boundary terms); a homogeneous operator needs one
   more order. The brief's "order 2 (elliptic)" is true for the right factor: L = M theta, and M
   (order 2) is the hypergeometric operator of F = 2F1(1/2, 1/2; 1; 16 W) = (2/pi) K(k), k = 4v(1 -
   u)/(1 + u)^2 (Onsager's modulus), pulled back and conjugated by s(u): `elliptic_factor_check`
-  proves M(s F) = 0 and M(R) = P exactly, hence L g = P (given the hypergeometric equation). Its
+  proves M(s F) = 0 and M(R) = P exactly, and `theta_g_identity` checks theta g = R + s F on the
+  exact coefficients (u^40 in the run, u^59 in the tests), hence L g = P (given the hypergeometric
+  equation). Finality: the operator values are `not-computed` (a proof is not a computed
+  stability). Its
   singular points: u = 0 (exponents 0, 0, 0), 1 (0, 0, 0), -1, 3 + 2 sqrt 2 and u_c = 3 - 2 sqrt 2
   (0, 2, 2), none apparent. At u_c the logarithm multiplies the exponent-2 solution:
   (u - u_c)^2 ln|u - u_c| in g, 2 - alpha = 2, alpha = 0; a 10% change of the theta^2 coefficient
@@ -838,10 +853,12 @@ KNOWN HAZARDS:
   Q(sqrt d) for factors of degree <= 2; logarithms are detected among integer exponents only
   (non-integer ones are reported numerically, not analysed). Stretch: the susceptibility (OEIS
   A002906, 400 terms) has no operator of theta-order <= 6 and degree <= 40 (360 equations, 287
-  unknowns; slow tier, 6 s); Nickel 1999 (not fetched) gives the natural boundary; the check is a
-  bound only. Partitions p(n) (natural boundary, Flajolet-Gerhold-Salvy 2005, Theorem 1 and the list
-  after it) are refused at (4, 10) on 70 terms, as is the Onsager series with one corrupted
-  coefficient.
+  unknowns; slow tier, 6 s). Orrick, Nickel, Guttmann & Perk (arXiv:cond-mat/0103074, Secs. 1,
+  3.2, 6.3) give strong evidence, not a proof, that the isotropic chi has the natural boundary |s| =
+  1, s = sinh 2K, i.e. the circles |v +- 1| = sqrt 2 in v (|v| = 1 is the boundary of the anisotropic
+  chi(v, v') at fixed v'); the check is a bound only. Partitions p(n) (natural boundary,
+  Flajolet-Gerhold-Salvy 2005, Theorem 1 and the list after it) are refused at (order 3, degree 9)
+  on 70 terms, and the Onsager series with one corrupted coefficient on its 62-term fit window.
 - Banked values often come from secondary open sources where the original is paywalled; each bank
   entry names the source its digits were read from (`reference/*.json`, field `cite`), and where the
   cite says the original was not fetched the digits come from the secondary source named there. Check

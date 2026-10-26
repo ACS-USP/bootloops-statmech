@@ -18,8 +18,17 @@ integer arithmetic over one common denominator.
 Route 2, independent of the integral: the even-subgraph polynomial P_L(v) of the L x L torus by a
 parity transfer matrix (state: the occupied horizontal bonds crossing a column cut; inside a column
 the vertical bonds are fixed by the site parities up to complement, weight v^|e| + v^(L - |e|)).
-(1/L^2) ln P_L equals g for powers v^k with k < L; at k = L the 2L straight non-contractible loops
-add 2/L (tests/test_series.py).  States 2^L: L <= 8.
+Window (derived here, verified in tests/test_series.py for L = 3 .. 8).  ln P_L is a sum over
+connected clusters of polygon components; a cluster of total length k that wraps nothing has linear
+extent <= k/2 and embeds as in the plane when k/2 < L.  So (1/L^2) ln P_L = g for every power v^k with
+k < L; at k = L the 2L straight winding loops add exactly 2/L.  For ODD L more is true for EVEN k: a
+closed even subgraph in homology class (a, b) mod 2 has length = (a + b) L = a + b mod 2, and
+contractible cycles have even length (they lift to the plane), so every odd component winds (length
+>= L) and an even-length cluster needs two of them or one of class (1, 1) (length >= 2L): the even
+coefficients agree through v^(2L - 2), and differ first at v^(2L) (L = 7: a4 .. a12).  States 2^L:
+L <= 8.  No lattice of this size constrains the recognised operator, which needs >= 62 u-terms
+(v^122) at its (degree, order) = (8, 3): the operator rests on the exact identity of series/elliptic.py
+and the held-out terms, not on this route.
 """
 from fractions import Fraction
 from math import comb, lcm
@@ -163,8 +172,10 @@ def torus_free_energy_series(L, order):
 
 
 def torus_window(L):
-    """The largest power of v at which the L x L torus equals the bulk series: L - 1."""
-    return _int(L, "torus-size", TORUS_SIZES.start, TORUS_SIZES.stop - 1) - 1
+    """(all, even): the L x L torus equals the bulk series for every v^k with k <= all = L - 1, and for
+    even k <= even (2L - 2 for odd L, L - 2 for even L, where v^L itself differs)."""
+    L = _int(L, "torus-size", TORUS_SIZES.start, TORUS_SIZES.stop - 1)
+    return L - 1, (2 * L - 2 if L % 2 else L - 2)
 
 
 

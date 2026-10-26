@@ -7,7 +7,7 @@
   elliptic.py    the order-2 factor as the pulled-back hypergeometric (K(k)) operator, exactly
   susceptibility.py  the banked OEIS A002906 susceptibility coefficients (the stretch check)
 """
-from .elliptic import EllipticCheck, elliptic_factor_check
+from .elliptic import EllipticCheck, elliptic_factor_check, theta_g_identity
 from .ising2d import (MAX_ORDER, VARIABLES, ising2d_free_energy_series, onsager_moment,
                       torus_free_energy_series, torus_polynomial, torus_window)
 from .local import LocalExponents, QuadNumber, critical_exponent, local_exponents
@@ -19,4 +19,4 @@ __all__ = ["Certificate", "EllipticCheck", "LocalExponents", "MAX_ORDER", "NoOpe
            "Operator", "PRIMES", "QuadNumber", "Recognition", "Singularity", "VARIABLES",
            "critical_exponent", "elliptic_factor_check", "ising2d_free_energy_series",
            "local_exponents", "onsager_moment", "recognize_holonomic", "singularities",
-           "susceptibility_series", "torus_free_energy_series", "torus_polynomial", "torus_window"]
+           "susceptibility_series", "theta_g_identity", "torus_free_energy_series", "torus_polynomial", "torus_window"]

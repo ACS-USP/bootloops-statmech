@@ -17,7 +17,9 @@ fit_terms >= (r + 1)(s + 1) + 5 + r (else precondition:series-length).  (2) The 
 scan (pf_from_series mode='modp') at two primes; they must agree (GUIDE: the 2-prime confirm is
 mandatory).  (3) None found: the maximal ansatz matrix (columns a_{n+j} n^k, rows n < fit_terms - r)
 has full column rank mod both primes (nullspace_mod_fast returns None), hence over Q, and so does
-every smaller ansatz (its columns are a subset on a subset of rows): no operator of order <= s and
+every smaller ansatz (r' <= r, s' <= s): restricted to the first fit_terms - r rows, its columns are
+a subset of the maximal ansatz's columns, independent there, hence independent on its own (longer)
+row set: no operator of order <= s and
 degree <= r annihilates these terms.  Raised as NoOperatorWithinBounds (reason
 no-operator-within-bounds) carrying the Certificate.  This is a statement about the bounds, never a
 proof that the series is not D-finite.  (4) Found: one exact Q-nullspace at the pinned (r, s)

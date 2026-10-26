@@ -12,6 +12,7 @@ elliptic_factor_check(op) tests, exactly (rational functions as Fraction coeffic
   (ii)  M(s F) = 0, with F represented as A F_z + B F_z' (A, B rational in u) and F_z'' eliminated by
         the hypergeometric equation: A = B = 0 is a sufficient condition;
   (iii) M(R) = op.rhs.
+theta_g_identity(n) checks theta g = R + s F itself on the exact coefficients through u^n.
 Together: op g = M(theta g) = M(R) + M(s F) = P exactly, i.e. the guessed operator is proved for the
 Onsager series (given the hypergeometric equation), and its order-2 factor is the pulled-back
 Legendre / complete-elliptic-integral operator.
@@ -33,6 +34,34 @@ class EllipticCheck:
 
 
 _MEMO = {}
+
+
+def theta_g_identity(n=40):
+    """True iff theta g = R + s F holds exactly through u^n, with g from series/ising2d.py (route 1)
+    and F = sum_k binom(2k, k)^2 W^k composed here with W = u (1 - u)^2/(1 + u)^4 (binomials, not the
+    moment hook): the algebra behind R and s, checked on exact coefficients."""
+    from math import comb
+    from .ising2d import ising2d_free_energy_series
+    b = ising2d_free_energy_series(n, variable="u")
+    inv = [(-1)**j * comb(j + 3, 3) for j in range(n + 1)]
+    w = [0] + [sum(c * inv[k - i] for i, c in enumerate((1, -2, 1)) if i <= k) for k in range(n)]
+    F = [0] * (n + 1)                                   # Horner in W: F = 1 + W (c_1 + W (c_2 + ...))
+    for k in range(n, -1, -1):
+        new = [0] * (n + 1)
+        for i in range(1, n + 1):
+            if w[i]:
+                for j in range(n + 1 - i):
+                    if F[j]:
+                        new[i + j] += w[i] * F[j]
+        new[0] += comb(2 * k, k)**2
+        F = new
+    geo = [1] * (n + 1)                                  # 1/(1 - u)
+    geo2 = [1 if j % 2 == 0 else 0 for j in range(n + 1)]   # 1/(1 - u^2)
+    R = [Fraction(geo[j] - 3 * (geo[j - 1] if j else 0), 4) for j in range(n + 1)]
+    sp_ = [Fraction(-(geo2[j] - 6 * (geo2[j - 1] if j else 0) + (geo2[j - 2] if j > 1 else 0)), 4)
+           for j in range(n + 1)]
+    rhs = [R[m] + sum(sp_[i] * F[m - i] for i in range(m + 1)) for m in range(n + 1)]
+    return all(m * b[m] == rhs[m] for m in range(n + 1))
 
 
 def elliptic_factor_check(op):
@@ -132,4 +161,4 @@ def _check(op):
     return EllipticCheck(True, 2, kills, diff.is_zero())
 
 
-__all__ = ["EllipticCheck", "elliptic_factor_check"]
+__all__ = ["EllipticCheck", "elliptic_factor_check", "theta_g_identity"]

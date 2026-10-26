@@ -107,7 +107,10 @@ class QuadNumber:
         return r + mp.mpf(self.b.numerator) / self.b.denominator * mp.sqrt(self.d)
 
     def __repr__(self):
-        return str(self.a) if not self.b else f"{self.a} + {self.b}*sqrt({self.d})"
+        if not self.b:
+            return str(self.a)
+        sign, mag = ("-", -self.b) if self.b < 0 else ("+", self.b)
+        return f"{self.a} {sign} {mag}*sqrt({self.d})" if self.a else f"{self.b}*sqrt({self.d})"
 
 
 def roots_of(coeffs):

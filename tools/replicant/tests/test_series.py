@@ -17,13 +17,15 @@ from math import comb
 import mpmath as mp
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from replicant.catalog import catalog, check_ref
+from replicant.catalog import check_ref
+from replicant.catalog_series import series_ising2d
 from replicant.core import Refusal
 from replicant.refdata import check, load
 from replicant.series import ising2d as I
 from replicant.series import (NoOperatorWithinBounds, Operator, QuadNumber, critical_exponent,
                               elliptic_factor_check, ising2d_free_energy_series, local_exponents,
-                              recognize_holonomic, singularities, torus_free_energy_series)
+                              recognize_holonomic, singularities, theta_g_identity,
+                              torus_free_energy_series)
 from replicant.testing import slow
 
 BANK = load("series")
@@ -87,12 +89,25 @@ def test_series_refuses_other_variables_and_bad_orders():
 def test_series_matches_exact_finite_lattice():
     """The L x L torus agrees with the bulk exactly for k < L; at k = L the 2L straight
     non-contractible loops add 2L v^L / L^2 = (2/L) v^L (positive control: the first wrong
-    coefficient differs, by exactly that)."""
-    bulk = ising2d_free_energy_series(8)
+    coefficient differs, by exactly that).  Odd L: even-length wrapping needs two odd windings or
+    class (1, 1), length >= 2L, so the even coefficients agree through v^(2L - 2) and differ at v^(2L)
+    (L = 7: a4 .. a12, the independent check of the banked a8 and a10)."""
+    bulk = ising2d_free_energy_series(14)
     for L in (4, 5, 6, 8):
         tor = torus_free_energy_series(L, L)
         assert tor[:L] == bulk[:L], (L, tor, bulk)
         assert tor[L] != bulk[L] and tor[L] - bulk[L] == Fraction(2, L), (L, tor[L], bulk[L])
+        assert I.torus_window(L)[0] == L - 1
+    for L in (3, 5, 7):
+        tor = torus_free_energy_series(L, 2 * L)
+        assert all(tor[k] == bulk[k] for k in range(0, 2 * L - 1, 2)), (L, tor, bulk)
+        assert tor[2 * L] != bulk[2 * L] and tor[L] - bulk[L] == Fraction(2, L), L
+        assert I.torus_window(L) == (L - 1, 2 * L - 2)
+    tor7 = torus_free_energy_series(7, 14)
+    for n in (4, 6, 8, 10, 12):
+        assert tor7[n] == bulk[n]
+    for n in (8, 10):                              # the banked a8, a10 from the 7 x 7 torus
+        assert check(BANK[f"a{n}"], str(mp.mpf(tor7[n].numerator) / tor7[n].denominator), label=f"a{n}").ok
     _refuses(lambda: torus_free_energy_series(9, 9), "precondition:torus-size")
     _refuses(lambda: torus_free_energy_series(2, 2), "precondition:torus-size")
 
@@ -109,18 +124,18 @@ def test_torus_route_detects_a_planted_moment_error():
 
 # ---- recognition ------------------------------------------------------------------------
 def test_onsager_free_energy_is_d_finite_order_three_with_an_order_two_elliptic_factor():
-    """Fit on 70 coefficients of the u-series, verify on 31 held out (u^70 ... u^100)."""
+    """Fit on 62 coefficients of the u-series, verify on 39 held out (u^62 ... u^100)."""
     b = _u(101)
-    rec = recognize_holonomic(b, max_order=4, max_degree=10, fit_terms=70)
+    rec = recognize_holonomic(b, max_order=3, max_degree=9, fit_terms=62)
     op = rec.operator
     assert (op.order, op.degree) == (3, 8), (op.order, op.degree)
-    assert rec.verified_terms == 31 and rec.fit_terms == 70
+    assert rec.verified_terms == 39 and rec.fit_terms == 62
     assert rec.certificate.found and len(rec.certificate.primes) == 2
     assert op.coefficient(0) == ()                 # L = M theta: constants are solutions
     assert op.rhs and any(op.rhs)                  # L g = P(u): the boundary terms
     assert all(x == 0 for x in op.apply(b)[len(op.rhs):])
-    # minimal within bounds: no theta-order <= 2 operator of degree <= 10 on these terms
-    r = _refuses(lambda: recognize_holonomic(b, max_order=2, max_degree=10, fit_terms=70),
+    # minimal within bounds: no theta-order <= 2 operator of degree <= 9 on these terms
+    r = _refuses(lambda: recognize_holonomic(b, max_order=2, max_degree=9, fit_terms=62),
                  "no-operator-within-bounds")
     assert r.certificate.max_order == 2 and r.certificate.equations > r.certificate.unknowns
 
@@ -129,7 +144,7 @@ def test_elliptic_factor_is_the_pulled_back_hypergeometric_operator():
     """theta g = R(u) + s(u) F(16 W(u)), F = 2F1(1/2, 1/2; 1; z) = (2/pi) K(k), k^2 = 16 W; the
     guessed order-2 factor M kills s F exactly (F'' eliminated by the hypergeometric ODE) and
     maps R to the boundary polynomial: a proof that L g = P, not a fit."""
-    rec = recognize_holonomic(_u(101), max_order=4, max_degree=10, fit_terms=70)
+    rec = recognize_holonomic(_u(101), max_order=3, max_degree=9, fit_terms=62)
     chk = elliptic_factor_check(rec.operator)
     assert chk.right_factor_theta and chk.kills_sF and chk.maps_R_to_rhs, chk
     # negative control: scale the theta^1 coefficient of M; the identity fails
@@ -137,10 +152,14 @@ def test_elliptic_factor_is_the_pulled_back_hypergeometric_operator():
     t[(1, 1)] = t[(1, 1)] * 2
     bad = elliptic_factor_check(Operator(t, rec.operator.rhs))
     assert not (bad.kills_sF and bad.maps_R_to_rhs)
+    # theta g = R + s F itself, on the exact coefficients (F composed from binomials here)
+    assert theta_g_identity(59)
+    with _PlantedMoment(lambda m: I.onsager_moment(m) + (Fraction(1, 16) if m == 4 else 0)):
+        assert not theta_g_identity(12)
 
 
 def test_singularity_at_critical_point_and_log_exponent():
-    op = recognize_holonomic(_u(101), max_order=4, max_degree=10, fit_terms=70).operator
+    op = recognize_holonomic(_u(101), max_order=3, max_degree=9, fit_terms=62).operator
     sing = singularities(op)
     pts = {s.point: s for s in sing}
     assert U_C in pts and QuadNumber(3, 2, 2) in pts and 1 in pts and -1 in pts, list(pts)
@@ -181,38 +200,42 @@ def test_recognition_refuses_when_series_is_not_holonomic_at_bounds():
     b = _u(101)
     bad = list(b)
     bad[30] += 1                                   # one corrupted coefficient in the fit window
-    r = _refuses(lambda: recognize_holonomic(bad, max_order=4, max_degree=10, fit_terms=70),
+    r = _refuses(lambda: recognize_holonomic(bad, max_order=3, max_degree=9, fit_terms=62),
                  "no-operator-within-bounds")
     c = r.certificate
-    assert (c.max_order, c.max_degree, c.n_terms) == (4, 10, 70) and not c.found
-    assert c.unknowns == 55 and c.equations == 60 and len(c.primes) == 2, c
+    assert (c.max_order, c.max_degree, c.n_terms) == (3, 9, 62) and not c.found
+    assert c.unknowns == 40 and c.equations == 53 and len(c.primes) == 2, c
     late = list(b)
     late[90] += 1                                  # corrupted beyond the fit window
-    _refuses(lambda: recognize_holonomic(late, max_order=4, max_degree=10, fit_terms=70),
+    _refuses(lambda: recognize_holonomic(late, max_order=3, max_degree=9, fit_terms=62),
              "no-solution:held-out")
     # integer partitions (natural boundary at |x| = 1: not D-finite, Flajolet-Gerhold-Salvy)
     p = [1] + [0] * 69
     for k in range(1, 70):
         for n in range(k, 70):
             p[n] += p[n - k]
-    _refuses(lambda: recognize_holonomic(p, max_order=4, max_degree=10),
+    _refuses(lambda: recognize_holonomic(p, max_order=3, max_degree=9),
              "no-operator-within-bounds")
-    _refuses(lambda: recognize_holonomic(b[:40], max_order=4, max_degree=10),
+    _refuses(lambda: recognize_holonomic(b[:40], max_order=3, max_degree=9),
              "precondition:series-length")
-    _refuses(lambda: recognize_holonomic(b, max_order=0, max_degree=10), "precondition:bounds")
+    _refuses(lambda: recognize_holonomic(b, max_order=0, max_degree=9), "precondition:bounds")
 
 
 # ---- the catalog entry ------------------------------------------------------------------
 def test_series_entry_runs_and_labels_finality():
-    e = catalog()["series_ising2d"]
+    e = series_ising2d()                           # (catalog registration: tests/test_catalog.py)
     assert e.routes == {"series"}
     v = e.run()
     assert v["operator_order"] == 3 and v["operator_degree"] == 8 and v["elliptic_factor_order"] == 2
-    assert v["heldout_verified"] >= 30 and v["elliptic_identity"] is True
-    assert v["torus_agrees_through"] == 7
+    assert v["heldout_verified"] >= 30 and v["elliptic_identity"] is True and v["theta_g_identity"] is True
+    assert (v["torus_L"], v["torus_agrees_through"], v["torus_even_agrees_through"]) == (7, 6, 12)
+    assert v["u_c_exact"] == "3 - 2*sqrt(2)"
     fin = e.finality_of(v)
-    assert all(st.final for st in fin.values()), {k: s.state for k, s in fin.items() if not s.final}
-    assert fin["alpha"].state == "exact-by-literature" and fin["operator_order"].state == "stable"
+    op_keys = {"operator_order", "operator_degree", "elliptic_factor_order"}
+    assert all(fin[k].state == "not-computed" and "proved exactly" in fin[k].note for k in op_keys)
+    assert all(st.final for k, st in fin.items() if k not in op_keys), \
+        {k: s.state for k, s in fin.items() if not s.final}
+    assert fin["alpha"].state == "exact-by-literature" and "Finch" not in fin["a12"].cite
     for ref in e.refs:
         assert check_ref(e, ref).ok, ref.key
     _refuses(lambda: e.run(max_order=2), "no-operator-within-bounds")
@@ -229,7 +252,9 @@ def test_recognition_on_a_longer_series_holds_out_eighty_terms():
 @slow
 def test_susceptibility_has_no_operator_within_bounds():
     """Stretch: the 2D Ising high-temperature susceptibility (OEIS A002906, from the Guttmann-
-    Jensen series; natural boundary |v| = 1 per Nickel 1999 / Orrick et al. 2001).  Claim: no
+    Jensen series).  Natural boundary of the isotropic chi: |s| = 1, s = sinh 2K, i.e. the circles
+    |v +- 1| = sqrt 2 (Orrick, Nickel, Guttmann & Perk, arXiv:cond-mat/0103074, Secs. 1, 3.2, 6.3:
+    strong evidence, not a proof; |v| = 1 is the anisotropic chi(v, v') at fixed v').  Claim: no
     operator within the bounds, with the certificate; never a proof of non-D-finiteness."""
     from replicant.series import susceptibility_series
     chi = susceptibility_series(400)

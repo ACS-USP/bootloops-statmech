@@ -8,10 +8,10 @@ an independent exact finite-lattice route, operator guessing (tools/annihilator)
 confirm and held-out terms, an exact operator identity with the hypergeometric (K(k)) equation, and
 the local analysis of the operator at its singular points.  Run parameters:
   order        the v-order of the series (default 200: u-terms 0 .. 100), even, >= 2 fit_terms
-  fit_terms    u-coefficients shown to the annihilator (default 70); the rest are held out
-  max_order    theta-order bound of the search (default 4)
-  max_degree   degree bound (default 10); fit_terms >= (max_degree + 1)(max_order + 1) + 5 + max_degree
-  L            torus size of the independent route (default 8; 3 .. 8)
+  fit_terms    u-coefficients shown to the annihilator (default 62); the rest are held out
+  max_order    theta-order bound of the search (default 3)
+  max_degree   degree bound (default 9); fit_terms >= (max_degree + 1)(max_order + 1) + 5 + max_degree
+  L            torus size of the independent route (default 7: a4 .. a12; 3 .. 8)
 """
 from fractions import Fraction
 
@@ -21,7 +21,7 @@ from .catalog import Out, RefCheck, Stability, entry, fstep
 from .core import Refusal
 from .series import ising2d as S
 from .series import (critical_exponent, elliptic_factor_check, recognize_holonomic, singularities,
-                     torus_free_energy_series)
+                     theta_g_identity, torus_free_energy_series)
 from .spec import ModelSpec
 
 ONSAGER = ("Onsager, Phys. Rev. 65, 117 (1944) (not fetched), the free energy as printed by "
@@ -34,17 +34,19 @@ FINCH = "Finch, arXiv:math/9810155v3 (1999), Sec. 4 (Harris & Meir 1987 via Finc
 ANN = "tools/annihilator (pf_from_series mode='modp' at 2 primes, mode='auto'; rec_to_theta)"
 HYP = "DLMF 15.10.1 (hypergeometric equation) and 19.5.1 (K(k) = (pi/2) 2F1(1/2, 1/2; 1; k^2))"
 CAVEAT = ("series route: the high-temperature series is the exact expansion of the cited Onsager "
-          "integral (exact rational coefficients, checked against the exact L x L torus for powers "
-          "below L); the operator is guessed by tools/annihilator (2-prime confirm, held-out terms) "
-          "and then proved for this series by an exact identity with the hypergeometric equation "
-          "of K(k); 'minimal' means within the searched bounds only; the critical point and alpha are "
-          "the operator's, final because the literature (Kramers-Wannier, Onsager) establishes them")
+          "integral (exact rational coefficients, checked against the exact L x L torus below v^L and, "
+          "for odd L, at even powers through v^(2L - 2): a4 .. a12 at the default L = 7); the operator "
+          "is guessed by tools/annihilator (2-prime confirm, held-out terms) and then proved for this "
+          "series by an exact identity with the hypergeometric equation of K(k), so its values are "
+          "not-computed (proved, not a stability); 'minimal' means within the searched bounds only; "
+          "no finite lattice here constrains the operator; the critical point and alpha are the "
+          "operator's, final because the literature (Kramers-Wannier, Onsager) establishes them")
 _HEAD = tuple(range(4, 21, 2))
 
 
 def _p(p):
-    order, fit = p.get("order", 200), p.get("fit_terms", 70)
-    for name, v in (("order", order), ("fit_terms", fit), ("L", p.get("L", 8))):
+    order, fit = p.get("order", 200), p.get("fit_terms", 62)
+    for name, v in (("order", order), ("fit_terms", fit), ("L", p.get("L", 7))):
         if isinstance(v, bool) or not isinstance(v, int):
             raise Refusal(f"precondition:{name}", f"{name}={v!r}: need an int")
     if order < 20 or order % 2:
@@ -52,7 +54,7 @@ def _p(p):
     if order // 2 + 1 <= fit:
         raise Refusal("precondition:series-length", f"order={order} gives {order // 2 + 1} "
                       f"u-coefficients, not more than fit_terms={fit}: no held-out terms")
-    return order, fit, p.get("max_order", 4), p.get("max_degree", 10), p.get("L", 8)
+    return order, fit, p.get("max_order", 3), p.get("max_degree", 9), p.get("L", 7)
 
 
 def _mp(x):
@@ -75,13 +77,19 @@ def _expansion(p):
 
 def _torus(p):
     L = _p(p)[4]
-    bulk, tor = S.ising2d_free_energy_series(L), torus_free_energy_series(L, L)
-    agree = next((k for k in range(L + 1) if tor[k] != bulk[k]), L + 1) - 1
-    if agree != L - 1 or tor[L] - bulk[L] != Fraction(2, L):
-        raise Refusal("no-solution:torus-disagreement", f"L = {L}: agreement through v^{agree}, "
-                      f"excess at v^{L} {tor[L] - bulk[L]} (expected through v^{L - 1}, 2/{L})")
-    return Out({"torus_L": L, "torus_agrees_through": agree, "torus_excess_at_L": str(tor[L] - bulk[L])},
-               f"exact {L} x {L} torus: equal to the bulk through v^{agree}; at v^{L} the 2L straight "
+    top = 2 * L if L % 2 else L
+    bulk, tor = S.ising2d_free_energy_series(top), torus_free_energy_series(L, top)
+    agree = next((k for k in range(top + 1) if tor[k] != bulk[k]), top + 1) - 1
+    even = next((k for k in range(0, top + 1, 2) if tor[k] != bulk[k]), top + 2) - 2
+    want = S.torus_window(L)
+    if (agree, even) != want or tor[L] - bulk[L] != Fraction(2, L) or tor[top] == bulk[top]:
+        raise Refusal("no-solution:torus-disagreement", f"L = {L}: agreement through v^{agree} (even "
+                      f"k through v^{even}), excess at v^{L} {tor[L] - bulk[L]}; expected {want}, 2/{L}, "
+                      f"and a difference at v^{top}")
+    return Out({"torus_L": L, "torus_agrees_through": agree, "torus_even_agrees_through": even,
+                "torus_excess_at_L": str(tor[L] - bulk[L])},
+               f"exact {L} x {L} torus: equal to the bulk through v^{agree} and, for even powers, "
+               f"through v^{even} (first even difference at v^{even + 2}); at v^{L} the 2L straight "
                f"winding loops add 2/{L}")
 
 
@@ -105,9 +113,12 @@ def _recognition(p):
 
 def _elliptic(p):
     chk = elliptic_factor_check(_rec(p).operator)
-    return Out({"elliptic_factor_order": chk.factor_order, "elliptic_identity": chk.ok},
+    tg = theta_g_identity(40)
+    return Out({"elliptic_factor_order": chk.factor_order, "elliptic_identity": chk.ok,
+                "theta_g_identity": tg},
                "L = M theta; M (s F) = 0 with F = 2F1(1/2, 1/2; 1; 16 W) and M(R) = P: "
-               + ("holds exactly" if chk.ok else "FAILS"))
+               + ("holds exactly" if chk.ok else "FAILS") + "; theta g = R + s F through u^40: "
+               + ("exact" if tg else "FAILS"))
 
 
 def _singular(p):
@@ -143,25 +154,29 @@ def series_ising2d():
              RefCheck("series", "alpha", lambda v: v["alpha"], route="series")]
     coef = Stability("exact-by-literature", "exact series", f"{ONSAGER}; {FINCH}",
                      "exact rational expansion of the cited integral (no truncation error); equal to "
-                     "the exact L x L torus below v^L and to Finch's table through v^10")
+                     "the exact 7 x 7 torus through v^12 and to Finch's table through v^10")
+    coef_hi = Stability("exact-by-literature", "exact series", ONSAGER,
+                        "exact rational expansion of the cited integral (no truncation error); a12 also "
+                        "equals the exact 7 x 7 torus; beyond v^12 no finite-lattice check here")
 
     def op_label(v):
-        if v.get("elliptic_identity"):
-            return Stability("stable", "holonomic", f"{ANN}; {HYP}",
-                             "guessed operator verified on held-out terms and proved for this series "
-                             "by the exact hypergeometric identity (elliptic_identity); its order is "
-                             "minimal only within the searched bounds")
-        return Stability("not-computed", "holonomic", ANN, "guessed and held-out verified only")
+        if v.get("elliptic_identity") and v.get("theta_g_identity"):
+            return Stability("not-computed", "holonomic", f"{ANN}; {HYP}",
+                             f"L g = P proved exactly (DLMF 15.10.1 + theta g = R + s F); minimality only "
+                             f"within the searched bounds (degree <= {v['max_degree']}, order <= "
+                             f"{v['max_order']}); held-out terms verified")
+        return Stability("not-computed", "holonomic", ANN, "guessed and held-out verified only; the "
+                         "exact identity did not hold")
     crit = Stability("exact-by-literature", "holonomic", KW, "the dominant singular point of the "
                      "operator, u_c = 3 - 2 sqrt 2 = (sqrt 2 - 1)^2, v_c = sqrt 2 - 1")
     alpha = Stability("exact-by-literature", "holonomic", LOG, "local exponents of the operator at "
                       "u_c: a logarithm multiplies the exponent-2 solution, (u - u_c)^2 ln|u - u_c| "
                       "in g, i.e. 2 - alpha = 2")
-    fin = {**{f"a{n}": coef for n in _HEAD},
+    fin = {**{f"a{n}": (coef if n <= 10 else coef_hi) for n in _HEAD},
            **{k: op_label for k in ("operator_order", "operator_degree", "elliptic_factor_order")},
            "u_c": crit, "v_c": crit, "critical_exponent": alpha, "alpha": alpha}
     meta = ("order", "fit_terms", "max_order", "max_degree", "L", "coefficients", "torus_L",
-            "torus_agrees_through", "torus_excess_at_L", "heldout_verified", "operator",
+            "torus_agrees_through", "torus_even_agrees_through", "torus_excess_at_L", "theta_g_identity", "heldout_verified", "operator",
             "boundary_polynomial", "elliptic_identity", "u_c_exact", "log_at_critical", "singular_points")
     spec = ModelSpec("ising2d", "ising", "none", constraint="square lattice, nearest neighbour, zero field")
     return entry("series_ising2d", spec, ONSAGER, {"series": steps}, refs, {"series": CAVEAT},
