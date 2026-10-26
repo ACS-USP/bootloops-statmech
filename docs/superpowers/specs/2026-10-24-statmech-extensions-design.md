@@ -56,3 +56,93 @@ Internal representation; module names below the package; how each derivation is 
 3. Coloring (E5) and the impossibility certificate for the 2D Ising susceptibility (E8) are stretch goals; if they do not fit at quality they are reported as not done.
 4. E8 and E9 reuse `tools/annihilator`, `tools/ratfit` and `tools/baller` through their documented CLIs/APIs; no change to those packages.
 5. Reference values come from papers fetched during the build; secondary sources are recorded as such.
+
+## As built
+
+Deviations of the implementation from the text above, taken from the build ledger
+(`.superpowers/sdd/2026-10-24-statmech-extensions/progress.md`, not committed) and the task
+reports. Commits 3f149c4 (this design) .. 288f133 (E11), then the documentation and cleanup task.
+
+- **E1 (replicon at level (a)).** Built as specified for the spherical and Ising perceptron and
+  Hopfield. For Hopfield the stability label also needs the m-mode, computed as a Schur complement
+  of the Hessian of the derived functional; it has no error estimate (the quadrature floor is
+  amplified through a near-singular block: 7e-6 relative at 0.9 m_fold, sign robust). The decoupling
+  of the m_a from the replicon sector is argued, not mechanised; only replicon and m-modes are
+  computed (no longitudinal / anomalous q-modes), so `stable` is local. The spherical site is
+  projected at explicit n = 4 (n = 5 checked in the slow tier). One v1 test that asserted "NOT final"
+  for the Ising perceptron at alpha = 0.5 changed, as the spec allows. Default tier +0.75 s.
+- **E2 (1RSB at level (a)).** SK (T = 0 and finite T), the frozen Ising perceptron (Krauth-Mezard
+  capacity reproduced) and Hopfield are derived and solved. The full (q1 < 1) Ising perceptron gives
+  only roots that collapse to RS below the frozen capacity, so no full-1RSB capacity is claimed.
+  Hopfield 1RSB has no independent target (call made 2): the T = 0 limit is implemented for
+  SK-type energies only, so the Steffan-Kuehn T = 0 value is not banked. The root search is seeded;
+  the q0 = 0 edge is searched, the x -> 0 and q1 -> 1 edges are not; SK at h = 0 has two nontrivial
+  saddles and refuses without a branch. The T = 0 local-maximum label rests on a sign agreement
+  checked at finite beta. Every 1RSB value is `not-computed`, never final. The SK solve takes about
+  5 s per point.
+- **E3 (TAP, AMP, state evolution).** Split in two tasks (E3a SK, E3b GAMP and the catalog route).
+  The TAP free energy and its fixed points are an API, not a catalog route. GAMP's state evolution
+  for GLMs is a claim (Barbier et al. 2019, Claim 1), so the `teacher_student` amp values are
+  `not-computed`; only SK's SE on Gaussian J is `exact-by-literature`. The binary-prior alpha_IT
+  sources disagree by 0.004 and both are covered by the tolerance. Universality for +-J is
+  numerical evidence (the cited universality results were read from abstracts).
+- **E4 (Gardner transition).** The 1RSB replicon is implemented as cited (Crisanti-Leuzzi 2006,
+  Montanari-Ricci-Tersenghi 2003), not produced by the E1/E2 rules (neither p-spin is a level-(a)
+  family); it is checked against an explicit integer-n functional at integer m only. A new Ising
+  p-spin family and the catalog entry `ising_pspin` were added (T_G = 0.240260 against Rizzo 2013).
+  The spherical pure p-spin has no Gardner transition (refused with the computed scan), so its 1RSB
+  values became computed `stable`. The frozen Ising-perceptron 1RSB stability is refused
+  (`not-implemented:frozen-1rsb-replicon`). Full RSB below T_G is not computed.
+- **E5 (constraint satisfaction).** XORSAT and K-SAT built as specified. The 3-coloring stretch was
+  not done (call made 3). No K-SAT threshold is labelled final: Ding-Sly-Sun prove the 1RSB formula
+  only for an unspecified large k. The SP-population root 4.2623 +- 0.0108 contains Mertens-Mezard-
+  Zecchina's 4.26675 but cannot separate it from values a few 1e-3 away. The K = 6 XORSAT alpha_d is
+  not banked (one source, a 1.1e-6 discrepancy).
+- **E6 (inference and codes).** LDPC on the BEC, spiked Wigner and the SBM built as specified. The
+  MAP-threshold equality is proved for (3, 6) in the cited paper and cited from Kudekar-Richardson-
+  Urbanke Lemma 4 for the other pairs (their proof is in a book not fetched). A misprint in
+  Measson-Montanari-Urbanke Example 3 was found and that value not banked. The spiked-Wigner
+  conventions differ from Lelarge-Miolane (lambda_LM = lambda^2) and four quantities are reported,
+  not one "MMSE". BP for a disassortative block model is refused. The controller's briefs gave a wrong arXiv
+  identifier twice (Montanari-Ricci-Tersenghi in E4, the Maxwell-construction paper in E6a); both
+  were corrected from the sources.
+- **E7 (high-dimensional learning).** The replica route is a cited closed form (the RS saddle point
+  of Loureiro et al. 2022, Eq. (A.38), with replicant's specialisation of the label-noise term), not
+  a level-(a) derivation: the formal layer has no family with a teacher replica and a quadratic loss.
+  Bank values are formula evaluations at chosen points (the papers print formulas). The simulation
+  extrapolates in 1/n from two sizes on disjoint seed sets.
+- **E8 (exact series, holonomic recognition).** The operator found is of theta-order 3 and degree 8
+  and is inhomogeneous (L g = P); the "order 2, elliptic" expectation holds for its right factor
+  (L = M theta, M the pulled-back hypergeometric operator of K(k), proved exactly). The operator
+  values are `not-computed` (proved identity and minimality within bounds, not a computed
+  stability). The impossibility stretch was done as a bound only: the susceptibility has no operator
+  of theta-order <= 6 and degree <= 40, which is not a proof of non-D-finiteness.
+- **E9 (solvable lattice models, certified).** Ball arithmetic through `tools/baller` (python-flint)
+  as planned. A new `CatalogEntry.rigor` value "certified" marks `ising2d`, `ising1d` and
+  `bethe_ising`; every other entry is unchanged. The finite-lattice check uses the exact integer
+  transfer matrix (no Kac-Ward determinant). The Bethe fixed points are certified by a self-written
+  interval Newton (baller's certify engines do not apply). The Bethe beta_c is `not-computed` (a
+  physics prediction in the cited paper). The lattice tests fail loudly without python-flint (ruling:
+  the batteries run in the project venv).
+- **E10 (bounds).** Guerra's RS, 1RSB and 2RSB bounds are certified; levels K >= 3 enter the chain
+  as numerical values (the nested certified integral grows as nodes^(K+1)). The Aizenman-Sims-Starr
+  variational principle was not implemented (Guerra's bound only). The chain is a consistency check
+  of the package's optimisers against the theorem's ordering of the infima, not a theorem. The h = 0
+  RS minimiser is certified by sign covers of G' except at beta = 1 exactly, which rests on a stated
+  lemma.
+- **E11 (Monte Carlo and enumeration).** Built as specified, with the perceptron counts stopping at
+  N = 24 (not 26-30) for the test budget. Two contrasts are not resolved at the budget and are
+  printed, not asserted: 1RSB against Parisi at T = 0 and "1RSB closer than RS" at beta = 2; the
+  beta = 0.9 moment closure is not asserted. The v1 coarse enumeration test is kept, not superseded:
+  the new routes are added beside it.
+- **Known issue found (v1 code, not fixed).** `families/sk.py` `_rsb_phi_e` (float64 Gauss-Hermite)
+  is inaccurate in the q0 = 0 / large q1 - q0 sector (up to 3.8e-6 at beta = 3 against the E10
+  certified balls). No v1 result is affected: that candidate loses the largest-f selection by
+  1.9e-4 .. 1.3e-3. Documented in the GUIDE hazards; a follow-up.
+- **Cleanup (documentation task).** tests/test_heldout.py was split by model (test_heldout_sk.py,
+  test_heldout_perceptron.py, test_heldout_mc.py, helpers in heldout_common.py) without changing an
+  assertion. Several deferred review minors were fixed (a malformed `seeds` on the amp route is now a
+  refusal, not a TypeError; the LDPC MAP cite and DE note; the spherical no-transition detail tied to
+  its scan; an exact ball no longer counts as a radius stall; stronger enclosure, cache and planted
+  tests); the rest are documented in the GUIDE hazards.
+- **Time standard.** The default battery takes about 22 s (424 tests, measured 21.6 s; v1 was about 16 s, so the extension added about 5.6 s against the 8 s bound); the slow tier (`--full`, 555 tests) about 18 minutes (measured 18 min 2 s).

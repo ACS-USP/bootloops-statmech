@@ -56,6 +56,71 @@ All notable changes to BootLoops are recorded here. The format follows
   `sk` (SE value exact-by-literature by Bayati-Montanari Thm 4; finite-N AMP statistical) and
   `teacher_student` (GAMP SE values not-computed: a claim, not a theorem); a new independent held-out
   check, the composed +-J SK q against AMP on sampled +-J matrices (slow).
+- `replicant` (E4): the Gardner transition. The 1RSB replicon toward further RSB
+  (`families/gardner.py`, the cited Crisanti-Leuzzi / Montanari-Ricci-Tersenghi formula, checked
+  against an explicit integer-n replica functional) gives computed finality for the p-spin entries;
+  new Ising p-spin family and catalog entry `ising_pspin` (T_s, T_d, T_G = 0.240260 at p = 3 against
+  Rizzo 2013; state-point values stable only for T_G < T < T_s); the spherical pure p-spin has no
+  Gardner transition (refused with the computed scan) and its 1RSB values are now computed stable;
+  the frozen Ising-perceptron 1RSB stability is refused as not computed.
+- `replicant` (E5): constraint satisfaction. Random K-XORSAT (`csp/xorsat.py`, entry `xorsat`:
+  leaf-removal / zero-temperature cavity thresholds, 2-core, complexity; exact GF(2) elimination and
+  leaf removal on sampled instances) and random K-SAT (`csp/ksat.py`, `csp/sp.py`, entry `ksat`:
+  first-moment bound, BP, survey propagation on instances and as population dynamics, the root of the
+  SP complexity 4.2623 +- 0.0108 against Mertens-Mezard-Zecchina's 4.26675; exhaustive counts for
+  N <= 22). Only the proved values are final; the K-SAT thresholds are cavity conjectures. The
+  3-coloring stretch was not done.
+- `replicant` (E6): inference and codes. Regular LDPC codes on the erasure channel (`inference/ldpc.py`,
+  entry `ldpc_bec`: density evolution, BP and MAP thresholds by tangency, trial entropy and the area
+  theorem; the peeling decoder on configuration-model graphs); the rank-one spiked Wigner model
+  (`inference/spiked.py`, entry `spiked_wigner`, route amp: Bayes-optimal state evolution, the
+  threshold, Bayes AMP) and the two-group stochastic block model (`inference/sbm.py`, entry `sbm`: the
+  Kesten-Stigum line, BP on sampled graphs).
+- `replicant` (E7): ridge and ridgeless regression on isotropic Gaussian design (`learning/`, entry
+  `ridge`): the Marchenko-Pastur closed forms of Hastie et al. 2022 and the optimal penalty, the RS
+  saddle point of Loureiro et al. 2022 (a cited closed form, not a level-(a) derivation), SVD
+  simulations over named seeds extrapolated in 1/n.
+- `replicant` (E8): the exact high-temperature series of the 2D Ising free energy from the Onsager
+  integral and its holonomic operator through `tools/annihilator` (`series/`, entry `series_ising2d`,
+  route series): theta-order 3, degree 8, inhomogeneous, with the elliptic right factor proved
+  exactly; the critical point 3 - 2 sqrt 2 and alpha = 0 from exact local exponents; an independent
+  exact torus route; the susceptibility has no operator within (6, 40) (a bound, not a proof).
+- `replicant` (E9): solvable lattice models certified in ball arithmetic through `tools/baller`
+  (`lattice/`, entries `ising2d`, `ising1d` route exact, `bethe_ising` route cavity; `rigor`
+  "certified" with radii): Onsager's free energy, Yang's magnetization, Kaufman's torus against the
+  exact integer transfer matrix, the 1D ring, every BP fixed point of the Bethe ferromagnet. Needs
+  python-flint (the project venv).
+- `replicant` (E10): Guerra's RS / 1RSB / 2RSB upper bounds on the SK pressure, certified (`bounds/`,
+  entry `sk_bounds`, route bound), with every stationary point of the RS bound certified and a
+  consistency check of the package's own RS / 1RSB / K-RSB optimisers against the bound chain.
+- `replicant` (E11): Monte Carlo and exact enumeration as independent checks of the held-out models
+  (`numerics/`: Gray-code enumeration of +-J SK spectra up to N = 26 and of Ising-perceptron counts up
+  to N = 30, numpy parallel tempering with an equilibration diagnostic, N^-2/3 finite-size
+  extrapolation, exact finite-N moments). The held-out tests now exclude RS for the SK ground energy
+  (-0.7610 +- 0.0124 contains Parisi), tell quenched from annealed for the +-J E ln Z, and exclude the
+  annealed entropy and capacity of the Ising perceptron; what they do not resolve (1RSB against
+  Parisi, RS against 1RSB at beta = 2) is printed, not asserted.
+
+### Changed
+- `replicant`: finality labels that became computed: the derived RS stability of the perceptrons and
+  Hopfield (E1), the p-spin 1RSB values (E4). `tests/test_heldout.py` split by model
+  (`test_heldout_sk.py`, `test_heldout_perceptron.py`, `test_heldout_mc.py`, helpers in
+  `heldout_common.py`); no assertion changed. Default battery `python3 tools/replicant/selftest.py`
+  424 tests, about 22 s (measured 21.6 s); `--full` 555 tests, about 18 minutes (measured 18 min 2 s). GUIDE, README, REFERENCES and the extension spec's
+  as-built notes updated.
+
+### Fixed
+- `replicant`: `run sk|teacher_student --route amp --param N=... --param seeds=1` ended in
+  `ERROR: TypeError` (exit 1), and an empty seed list fell back to the default; both are now refused
+  `precondition:named-seeds`. `lattice.ball.certify` no longer treats an exact ball (radius 0 at two
+  precisions) as a radius stall. The LDPC MAP-threshold cite names MMU Example 6 only for (3, 6); the
+  spherical p-spin `no-transition:gardner` detail states its scan and resolution first.
+
+### Known issues
+- `replicant`: `families/sk.py` `_rsb_phi_e` (v1, float64 Gauss-Hermite) is inaccurate in the q0 = 0
+  / large q1 - q0 sector (2.8e-9, 2.8e-7, 3.8e-6 at beta = 2, 2.5, 3 against the certified balls of
+  `bounds/`); no v1 result is affected (that candidate loses the selection by 1.9e-4 or more). Left
+  unchanged; recorded in the GUIDE hazards.
 
 ## 1.0.1 (2026-10-09)
 

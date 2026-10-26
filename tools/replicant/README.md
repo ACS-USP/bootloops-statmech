@@ -5,25 +5,32 @@ recorded steps. Each step names its preconditions and its citation; a missing pr
 is a named refusal (`precondition:<name>`, `missing-step:<hook>`, ...), never a silent
 fallback; every run returns a trace, a per-value finality label (`stable`, `unstable`,
 `not-computed`, `exact-by-literature`) and a comparison with banked, cited reference values.
-Results are physics-level (the n -> 0 continuation and the RS/RSB ansaetze are not proved);
-population-dynamics results are statistical. Full documentation: [GUIDE.md](GUIDE.md).
+Results are physics-level (the n -> 0 continuation and the RS/RSB ansaetze are not proved), except
+the four entries certified in ball arithmetic (`ising2d`, `ising1d`, `bethe_ising`, `sk_bounds`);
+population-dynamics, AMP and Monte Carlo results are statistical. Full documentation: [GUIDE.md](GUIDE.md).
+
+Requirements: Python 3 with `sympy`, `mpmath`, `numpy`, `scipy` and `python-flint` (the certified
+entries go through `tools/baller`). Run the battery from the project venv (INSTALL.md: `.venv`, which
+has python-flint): without python-flint the lattice and bounds tests fail loudly
+(`unsupported:python-flint`), by design.
 
 ## Quick start
 
 From the repository root:
 
 ```
-python3 tools/replicant/selftest.py                        # default battery, about 21 s
-cd tools && python3 -m replicant list                      # the 9 catalog entries
+python3 tools/replicant/selftest.py                        # default battery, about 22 s
+cd tools && python3 -m replicant list                      # the 19 catalog entries
 python3 -m replicant run perceptron --param alpha=1.5 --out /tmp/result.json --latex /tmp/p.tex
 ```
 
 `run` also takes a spec file for a model near a catalogued one
 (`python3 -m replicant run spec.json --param beta=1.5 --param h=0`; schema in the GUIDE),
 `--route amp` for `sk`, `teacher_student` and `spiked_wigner` (state evolution, and finite-N AMP / GAMP with
-`--param N=...`), `--route cavity` for the entries that have a cavity route (required for `viana_bray`, `xorsat`, `ksat`, `ldpc_bec` and `sbm`, which are
-cavity-only: `python3 -m replicant run viana_bray --route cavity`, `python3 -m replicant run xorsat --route cavity`), and `--pdf` (with `--latex`) to
-compile the derivation.
+`--param N=...`), `--route cavity` for the entries that have a cavity route (required for `viana_bray`, `xorsat`,
+`ksat`, `ldpc_bec`, `sbm` and `bethe_ising`, which are cavity-only: `python3 -m replicant run viana_bray --route
+cavity`, `python3 -m replicant run xorsat --route cavity`), `--route exact` for `ising2d` and `ising1d`, `--route
+series` for `series_ising2d`, `--route bound` for `sk_bounds`, and `--pdf` (with `--latex`) to compile the derivation.
 
 ## Layout
 
@@ -78,6 +85,11 @@ compile the derivation.
   and its certified minimum (`guerra.py`), the chain check of the package's own RS / 1RSB / K-RSB
   optimisers (`chain.py`); catalog entry `sk_bounds` (route `bound`), rigor "certified"
   (`catalog_bounds.py`, `latex_bounds.py`).
+- `numerics/` (E11): Monte Carlo and exact enumeration as independent checks of the held-out models
+  (not a catalog route): Gray-code enumeration of +-J SK spectra and Ising-perceptron solution counts
+  (`enumeration.py`), parallel tempering with an equilibration diagnostic (`pt.py`), finite-size
+  extrapolation (`finite_size.py`), exact finite-N moments and the quenched-annealed closure (`moments.py`);
+  used by `tests/test_heldout_mc.py` through `tests/heldout_mc.py`.
 - `catalog*.py`, `compose.py` (+ `compose_result.py`: `Result` and the finality rule), `cli.py`,
   `__main__.py`: the 19-entry catalog (`catalog_ts.py` holds the teacher-student entry,
   `catalog_pspin.py` the two p-spin entries; LaTeX in `latex_pspin.py`), the composer,
@@ -87,9 +99,12 @@ compile the derivation.
 
 ## Test tiers
 
-- Default: `python3 tools/replicant/selftest.py` (334 tests, about 22 s). Also
-  `python3 run_selftests.py replicant` from the repository root.
-- Full: `python3 tools/replicant/selftest.py --full` adds the 111 `@slow` tests (full RSB,
-  population dynamics at reference sizes, solver-based checks); about 12 minutes on a laptop (measured 12 min 7 s).
+- Default: `python3 tools/replicant/selftest.py` (424 tests, about 22 s; measured 21.6 s). Also
+  `python3 run_selftests.py replicant` from the repository root, with the venv activated (it runs
+  the `python3` on PATH; without python-flint the lattice and bounds tests fail, 31 of them).
+- Full: `python3 tools/replicant/selftest.py --full` adds the 131 `@slow` tests (full RSB,
+  population dynamics at reference sizes, the K-SAT and LDPC crossings, Monte Carlo and enumeration
+  held-out routes, solver-based checks); about 18 minutes on a laptop (measured 18 min 2 s, 555 tests).
+- The held-out tests are `tests/test_heldout*.py` (helpers `tests/heldout_common.py`, `tests/heldout_mc.py`).
 - `@slow` is a plain function attribute honoured by `selftest.py` only. pytest ignores the
   marker and would run every test, slow ones included.

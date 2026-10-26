@@ -18,7 +18,8 @@ published pipelines of a catalog of 19 entries, each with a replica route and/or
 `amp` route for `sk` and `teacher_student`; the constraint-satisfaction entries `xorsat` and `ksat`, the code entry `ldpc_bec` and the block model `sbm` are cavity-only; the spiked Wigner model `spiked_wigner` is amp-only; the ridge-regression entry `ridge` is replica-only, its RS saddle point a cited closed form, not a level-(a) derivation; the 2D Ising entry `series_ising2d` has the route `series` only: an exact series and its holonomic operator, no replica or cavity step; the solvable lattice entries `ising2d` and `ising1d` have the route `exact` and `bethe_ising` the route `cavity`, all three certified in ball arithmetic, `rigor` "certified"; the bound entry `sk_bounds` has the route `bound` only: Guerra's rigorous upper bounds on the SK pressure, certified, and a consistency check of the package's own RS / 1RSB / K-RSB optimisers against them). A composer
 matches a model description against the catalog, reuses what applies, adapts what it can through
 registered hooks, and says what it reused, adapted, or could not do. A LaTeX writer turns any run into a
-derivation document. For theoretical physicists and agents who need a published statistical-mechanics
+derivation document. Monte Carlo (parallel tempering) and exact enumeration (`numerics/`) check the
+held-out composed models by routes that share no code with them. For theoretical physicists and agents who need a published statistical-mechanics
 result reproduced with its derivation, or the same calculation for a nearby model.
 
 USE-WHEN:
@@ -30,14 +31,19 @@ USE-WHEN:
 - You need a LaTeX appendix with the steps, equations, citations, check table and honest labels.
 
 NOT-FOR:
-- Rigorous proofs. Every result is physics-level: the n -> 0 continuation and the RS/RSB ansaetze (or the
-  cavity clustering assumptions) are not proved; the results say so (`rigor: "physics-level"`).
-  Nothing here is "certified". The only theorem-level statement is a value flagged
-  `exact-by-literature`, which rests on the cited paper, not on this package.
+- Rigorous proofs. Every result of the replica, cavity, amp and series routes is physics-level: the
+  n -> 0 continuation and the RS/RSB ansaetze (or the cavity clustering assumptions) are not proved; the
+  results say so (`rigor: "physics-level"`). The four entries `ising2d`, `ising1d`, `bethe_ising` and
+  `sk_bounds` are `rigor: "certified"`: ball-arithmetic enclosures (python-flint) of a cited closed
+  form, a cited theorem's formula or a rigorous bound, with the radius in `errors`; that certifies
+  the evaluation, not the cited theorem. A value flagged `exact-by-literature` rests on the cited
+  paper, not on this package.
 - Population-dynamics results are statistical (value +- stderr over independent runs), never certified.
 - Dynamics beyond AMP, DMFT, or quantum models. AMP, state evolution and the TAP free energy exist for
   SK, and GAMP with its state evolution for the Bayes-optimal teacher-student perceptron (gaussian or
-  +-1 prior), in the module `amp/`; the catalog route `amp` exists for `sk` and `teacher_student` only.
+  +-1 prior), in the module `amp/`, and Bayes AMP for the spiked Wigner model in `inference/`; the
+  catalog route `amp` exists for `sk`, `teacher_student` and `spiked_wigner` only. Parallel tempering
+  (`numerics/`) is an equilibrium sampler used as an independent check, not a dynamics.
 - Automatic discovery of the RSB structure: the ansatz is an input; RS stability is computed or reported
   as unknown, and there is no search for the right ansatz.
 - A model with no level-(a) hook (families: `sk`, `perceptron`, `hopfield`; variables `ising`,
@@ -46,14 +52,17 @@ NOT-FOR:
 INVOKE:
 CLI (from `tools/`):
 `python3 -m replicant list` prints the catalog (entry, routes, citation).
-`python3 -m replicant run <entry|spec.json> [--route replica|cavity|amp] [--param k=v ...] [--out result.json]
+`python3 -m replicant run <entry|spec.json> [--route replica|cavity|amp|exact|series|bound] [--param k=v ...] [--out result.json]
 [--latex out.tex [--pdf]]`
 - JSON result to `--out` (default stdout); the rendered step trace to stderr. Exit 0 ok, 2 refusal
   (`REFUSED: <reason>: <detail>` on stderr; with `--latex` the partial derivation and the reason are still
   written), 1 any other error (`ERROR: <type>: <message>`). `--pdf` without `--latex` is refused
   (`precondition:latex-path`).
 - `--param k=v`: integers parse as int; decimals stay DECIMAL STRINGS (mpmath converts them, so `0.1` is
-  not rounded through a binary float); `true`/`false` booleans; a comma list is a tuple (a trailing comma
+  not rounded through a binary float); `true`/`false` booleans (case-insensitive on the CLI: `TRUE`
+  parses as true; at the Python API `ksat`'s `crossing` takes a bool or the exact strings "true" /
+  "false", so `run(crossing="TRUE")` is refused `precondition:known-parameter`); a comma
+  list is a tuple (a trailing comma
   makes a 1-list: `ys=0.3,`); anything else is a string (`learning=bayes`).
 - Worked example, replica route (catalog entry, state point):
   `python3 -m replicant run sk --param beta=2 --out sk.json` -> RS `q`, `f`, `e`, `replicon`; here the
@@ -394,6 +403,33 @@ certified_max=2, package=None)` -> `ChainReport(levels, links, violations, undec
 (K = 1 .. 5, else `precondition:K`; K >= 2 with h != 0 `unsupported:field`). Planted-error hooks:
 `bounds.krsb._HOOKS["inner_exponent_scale"]`, `bounds.guerra._HOOKS["dG_shift"]`. Example: `guerra_rs_best_bound("1/2", 0).render(30)` ->
 0.755647180559945309417232121458.
+`from replicant.numerics import ...` (E11; Monte Carlo and exact enumeration as independent checks of
+the held-out models, not a catalog route; numpy, statistical results with named seeds, never certified;
+SK conventions of families/sk.py, J_ij of variance 1/N, energies per spin unless stated): `random_pm_one_J(N,
+seed)` (J_ij = +-1/sqrt N), `enumerate_pm_one_sk(J)` -> `PmOneSpectrum(N, M, counts)` (the exact integer
+density of states by binary-reflected Gray-code blocks, N <= 26; `.log_Z(beta)`,
+`.mean_energy_per_spin(beta)`, `.ground_energy_total` (TOTAL, not per spin)), `exact_ground_energy(J)`
+(any real symmetric J, N <= 26), `ising_perceptron_counts(N, P, seed)` (exact solution counts after each
+of P nested Gaussian patterns, meet-in-the-middle, N <= 30), `ising_perceptron_log_count(alpha, N, seed)`,
+`ising_perceptron_capacity(counts)` (the largest p with a solution; `no-solution:capacity` if every
+drawn pattern is stored); `pt_sk(J, betas, sweeps, seed)` (J: samples x N x N; parallel tempering,
+Metropolis sweeps plus even/odd neighbour exchanges) -> `PTResult(betas, energy_per_spin_trace,
+min_energy_per_spin, min_sweep, swap_acceptance, round_trips, final_energy_per_spin, ...)`,
+`geometric_betas(lo, hi, R)`, `equilibration(result, beta_index, start=None)` -> `Equilibration(equilibrated,
+drift, half_width, text)` (windows [T/4, T/2) vs [T/2, T), 99% Student-t over samples, >= 2 samples);
+`sk_ground_energy_finite_size(Ns, samples, seed, *, sweeps=None, betas=None, conf=0.99)` -> `FSResult(e_inf,
+band, stat_half_width, systematic, variants, sizes, means, stderrs, ...)` (Gaussian J; two PT runs per
+sample must agree, else `undetermined:ground-states`; fit e_N = e_inf + a N^-2/3, band = 99% t + the
+largest shift over the omega = 3/4 and drop-smallest-N fits); `numerics.finite_size.sk_energy_finite_size(beta,
+Ns, samples, seed, *, law="pm_one", sweeps=None, nbetas=None, conf=0.99)` (thermal energy, beta > 0.5;
+`undetermined:equilibration` when a size fails the diagnostic); `numerics.moments.log_moments(N, beta,
+law)` (exact finite-N ln E Z^k, k <= 3, `pm_one` or `gaussian`, 2 <= N <= 200), `quenched_gap(N, beta,
+order)` (the order-2 / order-3 cumulant closure of E ln Z - ln E Z; |order 2 - order 3| is the stated
+truncation estimate, the closure error is not bounded), `pm_one_gap_limit(beta)` (its N -> oo limit
+-1/4 [-ln(1 - beta^2) - beta^2 - beta^4/2], beta < 1). Planted-error hooks: `pt._HOOKS["acceptance_scale"]`,
+`pt._HOOKS["exchange_sign"]`. Example: `J = random_pm_one_J(16, 0); enumerate_pm_one_sk(J).ground_energy_total
+/ 16` -> -0.59375 (= `exact_ground_energy(J)`); `ising_perceptron_capacity(ising_perceptron_counts(16, 24,
+0))` -> 12; `moments.quenched_gap(12, 0.7, 2)` -> -0.00935 (order 3: -0.00794).
 `from replicant.latex import render_latex, write_latex` (`write_latex(result, path, pdf=False)`; a
 `Refusal` is also accepted and writes its partial derivation).
 
@@ -419,7 +455,9 @@ default 3), `alpha`, `N` (needs `alpha`; N <= 22 exhaustive counts, larger N BP 
 `seeds` (default 0-19 for counts, 0-9 for BP / SP; needs `N`), `pop` (the SP population; needs
 `alpha`), `sweeps` (default 30; needs `pop`), `crossing` (`true` or `false` only: the SP-population root, K = 3;
 any other value, e.g. `yes`, `on`, `2`, is refused `precondition:known-parameter`); `ldpc_bec`
-(cavity): `l`, `r` (integers 2 <= l < r, default 3, 6; the thresholds need l >= 3), `eps` (density
+(cavity): `l`, `r` (integers 3 <= l < r, default 3, 6; the threshold step runs on every call and
+needs l >= 3, so the catalog refuses l = 2 `precondition:variable-degree-at-least-3` even with `eps`;
+density evolution for l = 2 is available as `ldpc.bec_density_evolution(2, r, eps)`), `eps` (density
 evolution), `N` (the peeling decoder; needs `eps`, else `precondition:state-point`; N l divisible by
 r) and `seeds` (default 0-19; needs `N`); `spiked_wigner` (amp): `prior` (`gaussian`|`rademacher`,
 default gaussian), `snr` (lambda >= 0: state evolution), and for finite-N Bayes AMP `N` (needs `snr`
@@ -477,6 +515,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `precondition:order`, `:torus-size`, `:series-length`, `:fit-terms`, `:bounds`, `:exact-series`, `:two-primes`, `:prime`, `unsupported:variable`, `no-operator-within-bounds`, `no-solution:held-out`, `:prime-disagreement`, `:exact-reconstruction`, `:inconsistent-scan`, `:torus-disagreement`, `:critical-point`, `:analytic-point`, `unsupported:irregular-singularity`, `missing-tool:annihilator` | exact series (`series/`): order not an int in range (or odd / < 20 in the entry); torus L outside 3 .. 8; the fit window too short for the maximal ansatz, or no held-out terms; bounds not ints >= 1; a coefficient not int / Fraction; fewer than two primes, or a denominator divisible by one; no operator of theta-order <= max_order and degree <= max_degree on the fit window (the `Certificate`: full column rank mod both primes; a bound, never a proof of non-D-finiteness); the fitted recurrence fails on a held-out term; the two primes pin different (degree, order); the exact Q step fails; the scan and the maximal-ansatz rank disagree; the torus window is not the expected one; no positive singular point; every local solution analytic at the point; Fuchs fails; `tools/annihilator` not importable |
 | `precondition:beta`, `:J`, `:h`, `:size`, `:coordination`, `:branch`, `:ordered-phase`, `:certified-radius`, `ambiguous:branch`, `undetermined:spinodal`, `no-solution:certification`, `:radius-stall`, `:not-an-integer-polynomial`, `:torus-disagreement`, `:ring-identity`, `:audit`, `unsupported:python-flint`, `:baller-integrity` | lattice (`lattice/`): beta not a rational > 0 (bools, nan refused); J <= 0 (ferromagnet only; `beta_c` needs J = 1); h not rational; a torus side outside its range; k not an int >= 2; a branch not among the fixed points; Yang at or below beta_c (m* = 0 there); a certified route returning a value without its radius; the magnetization at h = 0 below T_c without a branch; a fixed-point count or stability sign undecided at 4096 bits; baller.solve could not certify the digits; a radius that does not halve when the precision doubles; Kaufman's coefficient balls (radius < 1/4) containing no integer; Kaufman's polynomial differing from the transfer matrix's; the 1D ring balls not overlapping; the two Bethe free-energy forms disagreeing; python-flint missing (use the project venv, INSTALL.md); `baller.verify()` failing |
 | `precondition:order-parameter`, `:levels`, `:digits`, `:K`, `:temperature-range`, `unsupported:field`, `undetermined:stationary-points`, `ambiguous:minimiser`, `no-solution:certification`, `:radius-stall` | bounds (`bounds/`, `sk_bounds`): q or m outside Guerra's admissible set (q nondecreasing in [0, 1], m nondecreasing in (0, 1]); overlap / Parisi-parameter counts that do not match; digits not an int 1 .. 200; K outside 1 .. 5 (catalog: 1 or 2); K-step staircases outside 1 < beta <= 3 or with h != 0; the stationary points of P_RS not certified complete (a cover or monotone run undecided); two local minima with overlapping values; interval Newton or the precision escalation failing |
+| `precondition:coupling-matrix`, `:pm-one-couplings`, `:enumeration-size`, `:integer-patterns`, `:seed`, `:betas`, `:sweeps`, `:nbetas`, `:windows`, `:sizes`, `:samples`, `:order`, `:supported-disorder-law`, `no-solution:capacity`, `undetermined:ground-states`, `undetermined:equilibration` | Monte Carlo and enumeration (`numerics/`): J not a finite symmetric matrix with zero diagonal (PT: a stack of them), or not +-1/sqrt N for the +-J spectrum; N above the enumeration limit (SK 26, perceptron 30); P not an int >= 0, or alpha N not an integer; a seed not an int >= 0 (or a list of them); betas not positive and strictly increasing (the finite-size thermal route also needs beta > 0.5, `moments.pm_one_gap_limit` 0 <= beta < 1); sweeps / nbetas not an int >= 1 or betas not a sequence (never a silent default); fewer than two samples or a window split that is empty; fewer than three distinct sizes, or a size without >= 2 samples; a closure order other than 2, 3; a law other than `pm_one`, `gaussian`; every drawn pattern stored (draw more); the two PT runs of a sample disagreeing on its ground state (raise sweeps); a size whose late and early energy windows differ beyond the 99% band (raise sweeps) |
 | `unstable:<ansatz>` | `require_final` or `require_stable`: a computed stability is negative (RS replicon or cavity lambda < 0); `unstable:1rsb` also from `pspin_gardner_temperature` when the spherical scan is negative everywhere |
 | `unknown-stability:rs` | `require_final`: an RS value whose stability is not computed |
 | `not-final:<ansatz>` | `require_final`: a non-RS value that is not final |
@@ -490,7 +529,8 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `unbanked:missing-entry`, `:malformed`, `:no-citation`, `:no-independent-route` | a banked reference value is absent or has no citation / no independent route (a value that fed a fit never certifies it) |
 | `tex-engine:failed`, `tex-engine:unavailable` | `--pdf`: the engine ran and failed, or could not reach its offline resources |
 
-CATALOG (v1; `list` shows the live table; values at the default / banked state points):
+CATALOG (19 entries: the 7 of v1 and 12 added by the extensions E4-E10; `list` shows the live table;
+values at the default / banked state points):
 
 | entry | routes | headline values | banked references | finality |
 |---|---|---|---|---|
@@ -514,7 +554,9 @@ CATALOG (v1; `list` shows the live table; values at the default / banked state p
 | `sk_bounds` SK pressure: Guerra's RS and K-step RSB upper bounds, certified | bound | `rs_bound` 1.584786 (beta = 2: min over q of P_RS), `rs_q` 0.530368 and every stationary point; `rsb1_bound` 1.582418 at the package's 1RSB optimiser (`K=2`: `rsb2_bound`); `chain_verdict` | `annealed_pressure_beta_half` (ln 2 + 1/16: Guerra 1992 Thm 3, the annealed value for beta <= 1) | bounds exact-by-literature (Guerra 2003 Thm 3), certified radii; `rs_q` stable iff P_RS''(q*) > 0 certified; the chain verdict is a consistency check (meta), not a theorem |
 | `viana_bray` sparse +-J | cavity | `beta_c` (3-regular) 0.881374; T = 0 RS `p0` 1/3, `e0` -23/18; factorized 1RSB -1.27231, mu* 0.4174 | those, plus slow/statistical population-dynamics RS and 1RSB at k = 5, T = 0.8 | `beta_c` stable; the rest not-computed |
 
-HELD-OUT EVIDENCE (the test of REUSE; `tests/test_heldout.py`). Two models that are not catalog entries
+HELD-OUT EVIDENCE (the test of REUSE; `tests/test_heldout_sk.py`, `tests/test_heldout_perceptron.py`,
+`tests/test_heldout_mc.py` (E11), the positive controls, catalog guards and documents in
+`tests/test_heldout.py`, shared helpers in `tests/heldout_common.py`). Two models that are not catalog entries
 are assembled by `compose()` from level-(a) steps and checked by routes that did not feed them:
 (1) SK with +-J couplings, against enumeration of `ln E Z` at n = 1 (N <= 12), `T_c` = 1, the RS ground
 energy -sqrt(2/pi) and the Gaussian-catalog `q` (universality at leading order in 1/N), and the
@@ -528,11 +570,13 @@ from the spherical entry; its Gardner-Derrida RS endpoint 4/pi and Krauth-Mezard
 banked in `reference/perceptron.json` as independent targets. Honest limits:
 - The 4/pi RS endpoint of the composed Ising perceptron is NOT checked (the composed solver takes
   17-20 s per point at alpha >= 1.1).
-- The small-N enumeration is coarse: its band (about +-0.09) cannot tell quenched from annealed; it
-  catches gross errors only (e.g. the spherical site, -0.18 vs 0.515).
+- The v1 small-N perceptron enumeration (N <= 14) is coarse: its band (about +-0.09) cannot tell
+  quenched from annealed; it catches gross errors only (e.g. the spherical site, -0.18 vs 0.515). It is
+  kept; the E11 route at N <= 24 below is the stronger one.
 - The +-J SK agreement with the Gaussian `q` verifies the ADAPTED second-cumulant step, not universality
-  independently; the only +-J-specific independent check is the n = 1 enumeration. The universality cite
-  (Carmona and Hu) was read from its abstract only.
+  independently. +-J-specific independent checks: the n = 1 enumeration (v1), AMP on sampled +-J
+  matrices (E3b) and the E11 routes (f), (g) below. The universality cite (Carmona and Hu) was read from
+  its abstract only.
 - The annealed bound does not detect the spherical-site swap (the other checks do).
 - Enumeration slack c/N with c = 1 is an assumption of the test.
 - (E3b) An independent finite-N route for (1): AMP run on actually sampled +-J matrices (`amp/`, which
@@ -541,23 +585,85 @@ banked in `reference/perceptron.json` as independent targets. Honest limits:
   the planted doubled +-J variance (0.66054) and naive mean-field AMP (0.82513) fall outside. AMP's SE
   is a theorem for Gaussian J only, so for +-J this is sampled numerical evidence, not a theorem, and
   the band (+-0.019) excludes errors of the size of the planted one (0.053), not small ones (slow).
+- (E11, `numerics/`, `tests/test_heldout_mc.py`, all slow, statistical: named seeds 2026102601..05, 99%
+  Student-t bands plus a stated systematic; none uses the composer to measure, every comparison target is
+  computed after the measurement; about 4.6 min together). What each check can and cannot exclude:
+  (e) Gaussian SK ground energy by parallel tempering, N = 16 / 32 / 64 / 128 (1024 / 400 / 160 / 64
+  samples; two independent PT runs must agree on every sample, and at N = 16 they equal exact
+  enumeration), extrapolated in N^-2/3 (Boettcher 2005, Palassini 2003): e_inf = -0.7610 +- 0.0124
+  (t-band 0.0059 + systematic 0.0066: omega = 3/4 and dropping N = 16). It CONTAINS the banked Parisi
+  value (-0.76317 and its sources_disagree values) and EXCLUDES RS (-0.79788; the positive control); it
+  does NOT resolve 1RSB (-0.76526, 2.1e-3 from Parisi: printed, not asserted; a band near 1e-3 would need
+  N ~ 1000 and ~1e5 samples). (f) +-J SK at beta = 2 by PT, N = 64 / 128 / 256 (equilibration diagnostic
+  passed at each size): at N = 256 the 99% band -0.68818 +- 0.00577 lies above both composed energies
+  (RS -0.71871, 1RSB -0.71167): a finite-size statement only, it does not discriminate RS from 1RSB. The
+  extrapolation -0.7064 +- 0.0186 (omega = 2/3 stressed by 3/4 and 1: no exponent is known deep in the
+  ordered phase) contains the composed 1RSB energy and excludes the planted doubled +-J variance (about
+  20 band widths); it does NOT exclude RS (0.66 band widths) and "1RSB closer than RS" is NOT resolved
+  (printed, not asserted). (g) Exact E ln Z by Gray-code enumeration of +-J samples, N = 12 / 16 / 20 /
+  22, beta = 0.7 and 0.9: the annealed value E ln Z = ln E Z is EXCLUDED at every (N, beta) (the first
+  check here that tells quenched from annealed; at beta = 0.7 the gap is about -0.0095 against bands of
+  0.0023-0.0068); at beta = 0.7 the +-J order-2 moment closure (exact finite-N moments) lies inside the
+  band plus |order 2 - order 3|, asserted only because that tolerance excludes 0 at every N, and the
+  Gaussian-law closure is excluded (the law matters); at beta = 0.9 the truncation estimate (0.03-0.065)
+  is the size of the signal: printed "NOT resolved", not asserted. (Perceptron e) exact counts by
+  meet-in-the-middle at N = 12 / 16 / 20 / 24 (8000 / 8000 / 3000 / 600 pattern sets; N stops at 24 for the
+  budget), estimator E ln(1 + count)/N, 1/N extrapolation with a systematic over (drop N = 12, quadratic
+  in 1/N, the estimator conditioned on count > 0): S = 0.5116 +- 0.0054, 0.3130 +- 0.0231, 0.0811 +- 0.0347
+  at alpha = 0.25, 0.5, 0.75 contain the composed S (0.5128, 0.3144, 0.0865) and exclude the annealed
+  ln 2 (1 - alpha) and the spherical-site entropy; the capacity M_N/N extrapolates to 0.8285 +- 0.0597,
+  which contains the composed zero and the banked 0.8330786 (the same number, so they are not resolved
+  from each other) and excludes the spherical capacity 2 and the annealed capacity 1. At alpha = 0.75 the
+  empty-instance hazard (18-21% of sets) dominates the systematic. Detailed balance of the PT code
+  (default tier): time averages at N = 8 equal the exact spectrum means within 99% bands at four betas,
+  and the planted acceptance rule (x0.8) and the reversed exchange sign are detected at every beta.
 
-ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 334 tests, about 22 s on a
-laptop; also `python3 run_selftests.py replicant`) covers the core and refusal paths, the symbolic
-derivation against independent expressions, level agreement (a)=(b) for every family where both exist,
-every catalog entry against its banked non-slow values, the cavity routes, the composer and the held-out
-models, the CLI and the LaTeX writer (displayed equations re-checked numerically), the 1RSB replicon
-the Gardner transition, random K-XORSAT (closed forms, small-N GF(2) elimination and leaf removal) and random K-SAT (exhaustive small-N counts, BP on trees, the SP-rule audit, small SP populations). `--full` adds 111 `@slow` tests (full-RSB Parisi up to K = 9, population dynamics at reference sizes, the XORSAT GF(2) crossing at N = 400-2000 and leaf removal at N = 100000, the K-SAT SP-population crossing (about 75 s with its planted control) and the BP window, the Hopfield replicon
+ACCEPTANCE GATES: `python3 tools/replicant/selftest.py` (default tier: 424 tests, about 22 s on a laptop, measured 21.6 s wall; also `python3
+run_selftests.py replicant`, which runs the `python3` on PATH; run both from the activated project venv,
+which has python-flint) covers the core and
+refusal paths, the symbolic derivation against independent expressions, level agreement (a)=(b) for
+every family where both exist, every catalog entry against its banked non-slow values, the cavity routes,
+the composer and the held-out models, the CLI and the LaTeX writer (displayed equations re-checked
+numerically), the derived replicon (E1) and 1RSB (E2), AMP / GAMP and state evolution (E3), the 1RSB
+replicon and the Gardner transition (E4), K-XORSAT and K-SAT (closed forms, small-N exact checks, BP on
+trees, the SP-rule audit, small SP populations), LDPC density evolution and small peeling runs, the
+spiked-Wigner and SBM state evolution / KS line, the ridge closed forms and small simulations, the exact
+series and its operator, the certified lattice values and Guerra bounds, and the PT detailed-balance gate
+and exact enumeration (E11). `--full` adds 131 `@slow` tests (full-RSB Parisi up to K = 9,
+population dynamics at reference sizes, the XORSAT GF(2) crossing at N = 400-2000 and leaf removal at
+N = 100000, the K-SAT SP-population crossing and BP window, the LDPC crossing at N = 20000, the spiked
+AMP and SBM bands at reference sizes, the ridge 1/n bands at n = 400, 1000, the 2RSB certified bound and
+the K = 5 chain, the E11 Monte Carlo / enumeration held-out routes (about 4.6 min), the Hopfield replicon
 scans, the p-spin T -> 0 energy, solver-based composed and LaTeX checks, a PDF compile when a TeX engine
-is present) and takes about 12 minutes on a laptop (measured 12 min 7 s); run it before merging a
-change to a family. The `@slow` marker is honoured by
-`selftest.py` only: pytest ignores it and would run everything. Level agreement between the derivation
-and the pipelines is a consistency check, not new evidence for the ansatz; the cavity route reproducing
+is present) and takes about 18 minutes on a laptop (measured 18 min 2 s, 555 tests); run it before merging a change to a family. The `@slow` marker is
+honoured by `selftest.py` only: pytest ignores it and would run everything. Level agreement between the
+derivation and the pipelines is a consistency check, not new evidence for the ansatz; the cavity route reproducing
 the replica RS equations is an independent derivation but NOT independent evidence for the RS ansatz.
 
 KNOWN HAZARDS:
-- Rigor: PHYSICS-LEVEL, not proven. `rigor` says so on every result; the n -> 0 continuation and the
-  RS/RSB ansaetze are assumptions. Do not quote a result as a theorem.
+- Rigor: PHYSICS-LEVEL, not proven, except the four certified entries (`ising2d`, `ising1d`,
+  `bethe_ising`, `sk_bounds`). `rigor` says which on every result; the n -> 0 continuation and the
+  RS/RSB ansaetze are assumptions. Do not quote a physics-level result as a theorem; a certified value
+  is a rigorous enclosure of the cited formula or bound, not a proof of that formula.
+- What the extensions (E1-E11) changed in these limits, stated precisely:
+  (1) RS stability is now COMPUTED at level (a) for the spherical and Ising perceptron and Hopfield
+  (E1: the derived replicon; for Hopfield also the derived m-mode), so composed Ising-perceptron values
+  can be final. It is LOCAL stability in the replicon (and m) direction: the longitudinal / anomalous
+  q-modes are not computed, and the Hopfield m-mode has no error estimate (the absolute quadrature floor
+  1e-12 is amplified through the Schur complement of a near-singular (q, qhat) block: measured 7e-6
+  relative at 0.9 m_fold; its sign was robust at every tested point). Level-(a) 1RSB values (E2) stay
+  `not-computed`.
+  (2) p-spin finality is conditional on the computed 1RSB replicon (E4): Ising p-spin state-point values
+  are `stable` only for T_G < T < T_s (T_G = 0.240260 at p = 3, matching Rizzo 2013) and `unstable`
+  below T_G; spherical pure p-spin 1RSB values are `stable` by the replicon computed at the requested
+  point (1 - (p-1) y = 0.290015 at p = 3 on the static line; no Gardner transition on the 5-point scan). The formula is cited (Crisanti-Leuzzi 2006, Montanari-Ricci-
+  Tersenghi 2003), checked against an explicit integer-n functional at integer m only; FRSB below T_G
+  is not computed; the frozen Ising-perceptron 1RSB stability is refused.
+  (3) Held-out evidence is stronger (E3b AMP on +-J matrices; E11 parallel tempering and exact
+  enumeration; see HELD-OUT EVIDENCE for what each excludes): RS is now excluded for the SK ground
+  energy and annealed is excluded for the +-J SK E ln Z and for the Ising-perceptron entropy and
+  capacity. NOT resolved at the default budgets: 1RSB against Parisi at T = 0, RS against 1RSB for the +-J
+  energy at beta = 2, the moment closure at beta = 0.9, perceptron sizes beyond N = 24.
 - An RS answer whose stability is NOT computed (`stable: null`, `not-computed`) is NOT final. `stable:
   null` means UNKNOWN. Level (a) derives the replicon for SK (pair-separable energy, Ising site), the
   spherical perceptron (Gaussian-integral energy, conjugate-free site), the Ising perceptron and Hopfield
@@ -589,11 +695,13 @@ KNOWN HAZARDS:
   (q0 pinned at 1e-9, its equation audited there); every note and refusal states the seed count and
   the edges searched; an absent root means "not found from these seeds". The x -> 0 and q1 -> 1 edges
   are NOT searched. An edge candidate whose pinned q0 equation fails while the others hold is "no edge
-  root"; one dropped by the polish or an audit is listed as "a root may exist there" and, like any
+  root" (that verdict rests on the trapezoid residuals only, a rule not validated at large beta); one dropped by the polish or an audit is listed as "a root may exist there" and, like any
   dropped nontrivial candidate, blocks the unique label (`ambiguous:several-saddles`). Main-rule window:
   the base rule (32 Gauss-Legendre panels) holds 1e-9 for SK up to about beta = 3; when the audit
   disagrees the candidate is re-polished with 64 and 128 panels (measured: SK beta = 4 needs 64, beta =
-  6 needs 128); beyond that a candidate is dropped on audit (named, blocking), never silently. Roots with q1 - q0 < 1e-4 or
+  6 needs 128); beyond that a candidate is dropped on audit (named, blocking), never silently. Cost: the
+  SK level-(a) 1RSB solve takes about 5.5 s per state point (measured, beta = 2, h = 0, branch max-f,
+  CLI). Roots with q1 - q0 < 1e-4 or
   x > 1 - 1e-4 are `rs-degenerate` (collapse to RS), not 1RSB roots. SK at h = 0 has two nontrivial
   1RSB saddles (q0 > 0 and the q0 = 0 edge, at T = 0 and at beta = 2): without `branch` the solver
   refuses `ambiguous:several-saddles`; `branch="max-f"` takes the root of largest f and requires a
@@ -825,7 +933,9 @@ KNOWN HAZARDS:
   biased low (eps = 0.45: 0.3118 +- 0.0016 vs DE 0.3159). Crossing (seeds 0-59): success 54/60 at
   eps_BP - 0.005 (99% CP [0.759, 0.974]), 28/60 at eps_BP, 6/60 at eps_BP + 0.005 ([0.026, 0.241]):
   the crossing is within +-0.005 of eps_BP, thresholds shifted by +-0.01 are excluded, and so are
-  the planted thresholds 0.3664 and 0.4366. Not implemented: l = 2 (stability-limited) thresholds,
+  the planted thresholds 0.3664 and 0.4366. The DE-against-peeling comparison has no planted error in
+  the DE code itself (its controls shift eps; the planted degree polynomials act on the thresholds).
+  Not implemented: l = 2 (stability-limited) thresholds,
   irregular ensembles in the catalog, the MAP conditional entropy above eps_MAP, finite-length
   scaling laws.
 - Spiked Wigner (E6b, `inference/spiked.py`, entry `spiked_wigner`). Convention Y = (lambda/N) x x^T
@@ -839,7 +949,8 @@ KNOWN HAZARDS:
   1 - mmse = 2 E[X F] - E[F^2] (no cancellation against E X^2 = 1: computing mmse first gave a
   spurious root gamma ~ 1e-7 at lambda = 1 and a crash at 0.99999); roots below 1e-9 lambda^2 are
   not searched: for 1 < lambda < about 1 + 5e-10 the SE reports gamma = 0 with `se_below_floor`
-  true and every SE value `not-computed` (a floor, not the fixed point; LM: q* > 0 for lambda > 1). The code reports the largest
+  true and every SE value `not-computed` (a floor, not the fixed point; LM: q* > 0 for lambda > 1);
+  the numbers in that window still print as gamma_se 0.0 etc. (only the labels say not-computed). The code reports the largest
   root, MV Thm 2 the smallest positive one (gamma_ALG): they coincide because several nontrivial
   roots are refused;
   planting the Gaussian denoiser y/(1 + 2 gamma) moves q out of the bank and makes the root
@@ -851,7 +962,10 @@ KNOWN HAZARDS:
   use the SE gamma_t: a plug-in, so AMP never calls the SE code). At N = 2000 the per-matrix spread
   of q_hat is about 0.03; with seeds 0-31 (slow test) the 99% band at lambda = 1.5 is 0.5524 +- 0.0174
   (bank 0.5556), at 2 0.7514 +- 0.0126 (0.75); without the Onsager term 0.6176 +- 0.0154 and 0.7763
-  +- 0.0117, with it halved 0.5983 +- 0.0155: all three exclude the bank. Rademacher AMP at 1.5:
+  +- 0.0117, with it halved 0.5983 +- 0.0155: all three exclude the bank, the no-Onsager control at
+  lambda = 2 only narrowly (0.7763 - 0.75 = 0.026 against the half-width 0.0117, about 2.2 half-widths).
+  The spectral threshold and the eigenvector overlap (Feral-Peche 2007, Benaych-Georges-Nadakuditi 2011)
+  are cited as stated by Lelarge-Miolane Sec. 2.3; those papers were not fetched. Rademacher AMP at 1.5:
   0.6958 +- 0.0104 (SE 0.6923; the Gaussian 0.5556 is excluded). Not implemented: priors with a
   first-order transition (sparse PCA), several nontrivial SE roots (refused), the spectral threshold
   as a computed eigenvalue statement.
@@ -936,8 +1050,9 @@ KNOWN HAZARDS:
   exact coefficients (u^40 in the run, u^59 in the tests), hence L g = P (given the hypergeometric
   equation). Finality: the operator values are `not-computed` (a proof is not a computed
   stability). Its
-  singular points: u = 0 (exponents 0, 0, 0), 1 (0, 0, 0), -1, 3 + 2 sqrt 2 and u_c = 3 - 2 sqrt 2
-  (0, 2, 2), none apparent. At u_c the logarithm multiplies the exponent-2 solution:
+  finite singular points and local exponents: u = 0 and u = 1, exponents (0, 0, 0) each; u = -1,
+  u = 3 + 2 sqrt 2 and u_c = 3 - 2 sqrt 2, exponents (0, 2, 2) each, with a logarithm at 2; none
+  apparent (`singularities(op)`; u = oo is not analysed). At u_c the logarithm multiplies the exponent-2 solution:
   (u - u_c)^2 ln|u - u_c| in g, 2 - alpha = 2, alpha = 0; a 10% change of the theta^2 coefficient
   moves the exponents off the integers. The ratio method on the exact coefficients gives 3.00 for
   n (1 - u_c b_n / b_(n-1)) (b_n ~ u_c^-n n^-3) and 2.00 for theta g. Local analysis: exact in
@@ -1023,11 +1138,15 @@ KNOWN HAZARDS:
   has no root on it) and a run holds one root when G changes sign across it; each root by interval Newton,
   inside its bracket; several local minima are compared by certified values (`ambiguous:minimiser`).
   `BestBound.certificate` (catalog `rs_certificate`) says which argument was used; a planted shift of G' by
-  -1 (`guerra._HOOKS["dG_shift"]`) is refused `undetermined:stationary-points`. The functional check
+  -1 (`guerra._HOOKS["dG_shift"]`) is refused `undetermined:stationary-points` at beta = 1/2 and 9/10, and
+  a shift of +3 or more at beta = 2 (G'(0) = -3 there). A shift that keeps the sign pattern (-1 or +1 at
+  beta = 2) is NOT detected: the hook perturbs the completeness argument, not G or P_RS, and the
+  minimiser and value come out unchanged. The functional check
   catches only functional errors above the solver's stated accuracy (1e-12 for sk_rs, 2e-11 for sk_1rsb at
   beta = 2); smaller discrepancies pass by design. Normalisation: Guerra 1992 sums over ordered pairs i !=
   j with sqrt(N - 1) (his (2.3)); his log 2 + beta^2/4 with the critical point at beta = 1 is the package's
-  unordered-pair convention (J_ij ~ N(0, 1/N) over i < j), as the annealed computation (2.17) shows.
+  unordered-pair convention (J_ij ~ N(0, 1/N) over i < j), as the annealed computation (2.17) shows
+  (the E10 implementer's reading of Guerra 1992; the E10 review did not re-check it).
   Measured chain at beta = 2, K = 5
   (slow test, about 100 s with the package's own staircase solves): rs 1.5847858902693959 (functional
   gap 1.2e-17), 1rsb 1.5824176847584295 (gap 1.9e-15, tol 2e-11), 2rsb 1.5823642818021404 (certified
@@ -1046,6 +1165,24 @@ KNOWN HAZARDS:
   largest-f selection by 1.9e-4, 6.2e-4, 1.3e-3 in -beta f at beta = 2, 2.5, 3, far above those errors.
   sk.py's docstring claim "validated against 160 x 160 nodes" (to ~1e-11 at beta = 2) holds at the
   selected optimum (where the certified ball agrees to 1.9e-15), not in that sector. (A v1 follow-up.)
+- Monte Carlo and enumeration (E11, `numerics/`). Statistical, never certified, and not a catalog
+  route: they serve the held-out tests. The +-J spectrum is exact (integer counts; the cross term is a
+  float64 product of integers below 2^53); the perceptron counts use float64 Gaussian fields (a tie
+  J.xi = 0, probability zero, counts as not stored). PT ground states: two independent runs per sample
+  must agree (evidence, not proof; checked against exact enumeration at N = 12 in the default tier and
+  for all 1024 samples at N = 16); the default 12N sweeps were raised from 6N after the agreement rule
+  fired at N = 128. Equilibration is a 99% window-drift t-test, so about 1% of passing cases are
+  refused by chance (it fails closed); round trips are reported, not gated. The PT exchange rule
+  (Hukushima-Nemoto 1996, not fetched) is validated numerically against exact enumeration, not by the
+  paper. Finite-size exponents: omega = 2/3 is supported for ground states by Boettcher 2005 (+-J,
+  0.672(5)) and Palassini 2003 (Gaussian, 0.673 +- 0.002 with subleading corrections visible); at finite
+  T deep in the ordered phase no exponent is known (Palassini), so the thermal band adds the omega = 3/4
+  and omega = 1 shifts; omega = 3/4 is a stress test, not a literature exponent. The dropped-N and
+  quadratic variants with four sizes are volatile and dominate several systematics (deliberately not
+  narrowed). The moment closure's error is not bounded; |order 2 - order 3| is only a truncation
+  estimate. Limits: SK enumeration N <= 26 (N = 26 in 0.07-0.1 s), perceptron N <= 30 (N = 24 about
+  0.1 s per pattern set, N = 28 about 1.5 s); the held-out perceptron route stops at N = 24 for the
+  test budget.
 - Banked values often come from secondary open sources where the original is paywalled; each bank
   entry names the source its digits were read from (`reference/*.json`, field `cite`), and where the
   cite says the original was not fetched the digits come from the secondary source named there. Check
@@ -1071,8 +1208,8 @@ RSB analysis of [SK94]; the Viana-Bray model [VB85], the sparse cavity and popul
 [Ple82], universality [BLM15] [CL20] and TAP complexity [BM80]; GAMP and its state evolution follow
 [Ran11] [BKMMZ19] with [JM13], the binary teacher-student thresholds [Gyo90] [BKMMZ19] [LHZH22]. Random K-XORSAT (`csp/`): the cavity / leaf-removal solution [MRZ03] [CDMM03], the proofs of the threshold [DM02] [PS16] and of the 2-core [Mol05], the textbook treatment [MM09] and the solution geometry [IKKM15] [AM15]. Random K-SAT: BP and survey propagation [BMZ05] [MPZ02] [MZ02],
 the SP population dynamics and thresholds [MMZ06] [LM19], the clustering / condensation thresholds
-[KMRSZ07], the first-moment bound [FP83] and the proof for large K [DSS22]. LDPC codes on the BEC (`inference/`): density evolution and the peeling decoder [LMSS01] [MM09], the Maxwell construction and the MAP threshold [MMU08] [KRU10] [RU08], tabulated thresholds [KRU12] [Pfi15]. The universality of the SK free energy used in the held-out test is [CH04]. Solvable lattice models (`lattice/`): Onsager's free energy [Ons44] and Yang's magnetization [Yan52] as printed by [DC22], the critical constant [A242743], Kaufman's torus [Kau49] as printed by [IH02] [Kas06], the Bethe-lattice ferromagnet [DM10], the 1D transfer matrix [WDC19]; ball arithmetic is Arb [Joh17] through tools/baller. Bounds on the SK
-pressure (`bounds/`): the broken-replica bound [Gue03], the high-temperature identity [Gue92] [ALR87]. Reference digits are read
+[KMRSZ07], the first-moment bound [FP83] and the proof for large K [DSS22]. LDPC codes on the BEC (`inference/`): density evolution and the peeling decoder [LMSS01] [MM09], the Maxwell construction and the MAP threshold [MMU08] [KRU10] [RU08], tabulated thresholds [KRU12] [Pfi15]. Spiked Wigner and the block model (`inference/`): the Bayes-optimal limits and state evolution [LeMi19] [MV21] [DAM15] [BDMKLZ16], the spectral threshold [FP07] [BGN11], the block-model BP and thresholds [DKMZ11] [MNS15] [Mas14] [MNS18]. Ridge regression (`learning/`): [HMRT22] [DW18] [AS20] [LGCGKMZ21] with [SS07] [TV04], context [BLLT20]. Exact series (`series/`): Onsager's integral [Ons44] [KW41] as printed by [DC22] [Bax10], the coefficient table [Fin99] [HM87], the hypergeometric identities [DLMF], the susceptibility series and its natural boundary [A002906] [Nic99] [ONGP01], the non-holonomic control [FGS05]. The universality of the SK free energy used in the held-out test is [CH04]. Solvable lattice models (`lattice/`): Onsager's free energy [Ons44] and Yang's magnetization [Yan52] as printed by [DC22], the critical constant [A242743], Kaufman's torus [Kau49] as printed by [IH02] [Kas06], the Bethe-lattice ferromagnet [DM10], the 1D transfer matrix [WDC19] [Bax82] [Wiki-Ising]; ball arithmetic is Arb [Joh17] through tools/baller. Bounds on the SK
+pressure (`bounds/`): the broken-replica bound [Gue03], the high-temperature identity [Gue92] [ALR87]. Monte Carlo and enumeration (`numerics/`): the finite-size exponent and the banked finite-N ground energies [Boe05] [Pal03], the exchange rule of parallel tempering [HN96]. Reference digits are read
 from [Sto25] [OSS07] [CRT03] [SY17] [DM15] [FP16] [Gyo01] [PRGE20] [Cov65] [Bar97] as stated in the bank
 cites. The typed-step architecture, the symbolic level (a), the composer, the refusal and
 finality discipline and the LaTeX writer are ours. Each bank entry names the source its digits were
