@@ -1,0 +1,16 @@
+name = "rem"
+defaultTargets = ["REM"]
+
+# Aponta para o checkout local do Mathlib (já construído em ~/Projects/learn-lean).
+# Versão portátil: troque por
+#   [[require]]
+#   name = "mathlib"
+#   scope = "leanprover-community"
+#   rev = "<rev do lake-manifest de learn-lean>"
+# e rode `lake exe cache get`.
+[[require]]
+name = "mathlib"
+path = "../../../../learn-lean/.lake/packages/mathlib"
+
+[[lean_lib]]
+name = "REM"

@@ -1,0 +1,109 @@
+\documentclass[11pt]{article}
+\usepackage[margin=2cm]{geometry}
+\usepackage{iftex}
+\ifPDFTeX
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\fi
+\usepackage{amsmath,amssymb,graphicx}
+\allowdisplaybreaks
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{4pt}
+\sloppy
+\setlength{\emergencystretch}{3em}
+\title{rem: random energy model: $T_{c}$, frozen 1RSB phase}
+\date{}
+\begin{document}
+\maketitle
+\section{Model}
+family = rem, variables = ising, disorder = gaussian, constraint = None, prior = None.
+
+random energy model: $T_{c}$, frozen 1RSB phase \cite{b1,b2}
+
+\paragraph{Hamiltonian and conventions} \cite{b1,b2}
+\begin{equation}
+2^N \text{ i.i.d. energies } E_i \sim \mathcal{N}(0, N_s N),\quad N_s = 1/2 \text{ (Derrida's } J = 1\text{; default)}
+\end{equation}
+\section{Method and route}
+Route: \textbf{replica} (replica method: replicated partition function $Z^{n}$, disorder average, order parameters $q_{ab}$ (and conjugates), saddle point, RS / 1RSB ansatz, continuation n $\to$ 0). Rigor: \textbf{physics-level}. physics-level: replica $n \to 0$ continuation and RS/1RSB ansatz (Parisi), not proven; numbers carry quadrature error only
+\section{Derivation}
+No step-by-step symbolic derivation is available in this package for this model; the governing equations implemented by the code are shown below, each in sympy form (checked against the code by \texttt{tests/test\_latex.py}) or cited.  No intermediate step the code does not perform is shown.
+\subsection{Equations implemented by the family code}
+\paragraph{Conventions}
+e = E/N, $N_{s}$ = s (energy variance per spin); entropy, $\beta _{c}$ and the free energy as in \texttt{families/rem.py}
+\paragraph{Microcanonical entropy} \cite{b1,b2} (sympy form; checked against the code by \texttt{tests/test\_latex.py})
+\begin{equation}
+s{\left(e \right)} = - \frac{e^{2}}{2 s} + \log{\left(2 \right)}
+\end{equation}
+\paragraph{Critical inverse temperature $(s(e_{0}) = 0, \beta _{c} = s'(e_{0}))$} (sympy form; checked against the code by \texttt{tests/test\_latex.py})
+\begin{equation}
+\beta_{c} = \frac{\sqrt{2} \sqrt{\log{\left(2 \right)}}}{\sqrt{s}}
+\end{equation}
+\paragraph{Paramagnet, beta $\leq$ $\beta _{c}$ (annealed = quenched)} (sympy form; checked against the code by \texttt{tests/test\_latex.py})
+\begin{equation}
+- \beta f = \frac{\beta^{2} s}{2} + \log{\left(2 \right)}
+\end{equation}
+\paragraph{1RSB functional (blocks of m replicas share a configuration; n $\to$ 0)} (sympy form; checked against the code by \texttt{tests/test\_latex.py})
+\begin{equation}
+- \beta f = \frac{\beta^{2} m^{2} s + \log{\left(4 \right)}}{2 m}
+\end{equation}
+\paragraph{Frozen phase, beta $>$ $\beta _{c}$ $(m = \beta _{c} / \beta )$} (sympy form; checked against the code by \texttt{tests/test\_latex.py})
+\begin{equation}
+f = - \sqrt{2} \sqrt{s} \sqrt{\log{\left(2 \right)}}
+\end{equation}
+\section{Calculation at the requested parameters}
+The run's trace, in order (skipped steps say why).
+\subsection{Step 1: rem-critical-temperature}
+Source: \cite{b1,b2}. Trace: set errors, \texttt{step\_note}, values; computed \texttt{N\_scale}, $\beta _{c}$, $T_{c}$
+
+\subsection{Step 2: rem-saddle}
+Source: \cite{b1,b2,b3}. Trace: set \texttt{step\_note}; skipped: no beta given
+
+\section{Solution}
+Values at the requested parameters (none), each with its finality: only stable and exact-by-literature values are final.
+\begin{center}
+\begin{tabular}{llll}
+key & value & finality (ansatz) & final \\
+\hline
+beta\_c & 1.6651092223154 & exact-by-literature (1rsb) \cite{b4,b2,b5} & yes \\
+T\_c & 0.600561204393225 & exact-by-literature (1rsb) \cite{b4,b2,b5} & yes \\
+\end{tabular}
+\end{center}
+Other outputs (parameters, labels, diagnostics): \texttt{N\_scale} = 0.5.
+
+\section{Stability}
+No stability quantity (replicon / AT) is computed by this run.
+
+exact-by-literature: $\beta _{c}$, $T_{c}$.
+
+\section{Reference check}
+Banked values (reference/*.json) against this pipeline's output; numbers are shown to 16 significant digits, the comparison uses them in full; slow and statistical rows run only with --full (\texttt{render\_latex(slow=True)}).
+\begin{center}\footnotesize
+\setlength{\tabcolsep}{4pt}
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{\begin{tabular}{llllll}
+key & computed & banked & tolerance & verdict & source \\
+\hline
+tc\_derrida & 0.6005612043932249 & 0.6005612043932249 & 1e-20 & agrees & \cite{b4,b6,b7} \\
+ground\_energy\_derrida & -0.8325546111576978 & -0.8325546111576978 & 1e-20 & agrees & \cite{b4,b8} \\
+m\_times\_beta\_over\_beta\_c & 1.0 & 1 & 1e-20 & agrees & \cite{b9,b10} \\
+\end{tabular}}
+\end{center}
+\section{Labels}
+Rigor: \textbf{physics-level}. Route: \textbf{replica}.
+
+physics-level: replica $n \to 0$ continuation and RS/1RSB ansatz (Parisi), not proven; numbers carry quadrature error only
+
+
+\begin{thebibliography}{99}
+\bibitem{b1} Derrida, PRL 45, 79 (1980)
+\bibitem{b2} Derrida, Phys. Rev. B 24, 2613 (1981) (exact solution: microcanonical entropy s(e))
+\bibitem{b3} 1RSB form: Mezard, Parisi \& Virasoro (1987)
+\bibitem{b4} Derrida, The random energy model, Physics Reports 67, 29-35 (1980), Sec. 4: 'T\_c = J/2 sqrt(log 2)' with P(E) = (pi N J\^{}2)\^{}(-1/2) exp(-E\^{}2/(N J\^{}2)), Eq. (2)
+\bibitem{b5} Derrida \& Mottishaw, arXiv:1410.1432 (m = T/T\_c)
+\bibitem{b6} read from the copy at thp.uni-koeln.de/krug/teaching-Dateien/WS2011/Derrida1980.pdf. Same statement in Derrida \& Mottishaw, J. Stat. Mech. (2015) P01021, doi:10.1088/1742-5468/2015/01/P01021, arXiv:1410.1432, Eq. (2). Full paper Derrida, Phys. Rev. B 24, 2613 (1981), doi:10.1103/PhysRevB.24.2613 (not fetched). The paper states the closed form
+\bibitem{b7} value = its decimal at J = 1 (replicant N\_scale = J\^{}2/2 = 1/2)
+\bibitem{b8} also Derrida \& Mottishaw, arXiv:1410.1432, Eq. (3). Closed form, decimal at J = 1. In the frozen phase f = E\_ground / N (entropy 0)
+\bibitem{b9} Derrida \& Mottishaw, J. Stat. Mech. (2015) P01021, arXiv:1410.1432, Eqs. (4)-(6): Parisi q(x) = Theta(x - 1 + \textless{}P2\textgreater{}) with \textless{}P2\textgreater{} = 1 - mu, mu = T/T\_c below T\_c, so the 1RSB breakpoint is m = T/T\_c = beta\_c/beta
+\bibitem{b10} same in Derrida \& Mottishaw, J. Phys. A 55 (2022), doi:10.1088/1751-8121/ac71e9, arXiv:2202.12584, Eq. (5) (\textless{}Y\_2\textgreater{} = 1 - beta\_c/beta). Meaning: m * beta / beta\_c = 1 for beta \textgreater{}= beta\_c
+\end{thebibliography}
+\end{document}

@@ -1,0 +1,490 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.3cm]{geometry}
+\usepackage[brazilian]{babel}
+\usepackage{iftex}
+\ifPDFTeX
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\fi
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{booktabs}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.17}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,citecolor=blue!50!black]{hyperref}
+
+\newtheorem{proposicao}{Proposição}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\dd}{\mathrm{d}}
+
+\title{O Modelo de Energias Aleatórias (REM):\\ solução exata, solução por réplicas e verificação numérica}
+\author{Gerado com \texttt{replicant} (BootLoops, \texttt{tools/replicant})}
+\date{26 de outubro de 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+O Modelo de Energias Aleatórias de Derrida \cite{derrida80,derrida81} é o vidro de spin mais simples
+que exibe uma transição de congelamento e quebra de simetria de réplicas em um passo (1RSB). Este texto
+apresenta a sua solução em três rotas independentes: (i) a contagem microcanônica direta, que é um
+teorema; (ii) o método de réplicas com o ansatz 1RSB, que é um cálculo de nível físico; (iii) a
+avaliação numérica de $\frac1N\E\ln Z_N$ em $N$ finito, sem réplicas. Os valores numéricos citados
+foram produzidos por \texttt{python3 -m replicant run rem} e conferidos contra o banco de referências do
+pacote (\texttt{reference/rem.json}).
+\end{abstract}
+
+\tableofcontents
+
+%======================================================================
+\section{Definição do modelo}
+
+Considere $N$ spins de Ising, $\sigma\in\{-1,+1\}^N$, e portanto $M=2^N$ configurações. O REM atribui a cada
+configuração $i=1,\dots,2^N$ uma energia $E_i$ \emph{independente} das demais:
+\begin{equation}
+  E_i \stackrel{\text{i.i.d.}}{\sim} \mathcal N\!\left(0,\; sN\right),
+  \qquad
+  P(E)=\frac{1}{\sqrt{2\pi s N}}\,e^{-E^2/(2sN)} .
+  \label{eq:modelo}
+\end{equation}
+O parâmetro $s$ (chamado \texttt{N\_scale} no código) é a variância da energia por spin. Derrida escreve
+$P(E)\propto e^{-E^2/(NJ^2)}$, isto é, $s=J^2/2$; com $J=1$ temos $s=\tfrac12$, que é a normalização
+padrão do pacote e a usada em todos os números deste texto.
+
+\paragraph{Por que este modelo?} O REM é o limite $p\to\infty$ do modelo de $p$-spins: para $p$ finito
+as energias de duas configurações com sobreposição $q=\frac1N\sum_k\sigma_k\sigma'_k$ têm covariância
+$sN q^p$, que para $p\to\infty$ vai a $sN\,\delta_{q,1}$. Toda a estrutura geométrica do espaço de
+configurações desaparece; o que resta é um problema puramente estatístico: \emph{o mínimo e a soma de
+$2^N$ exponenciais de gaussianas independentes}. É por isso que tudo pode ser calculado
+exatamente, e por isso o REM é o caso-teste natural do método de réplicas.
+
+A função de partição e a energia livre por spin são
+\begin{equation}
+  Z_N(\beta)=\sum_{i=1}^{2^N} e^{-\beta E_i},
+  \qquad
+  f(\beta)=-\lim_{N\to\infty}\frac{1}{\beta N}\,\E\ln Z_N(\beta).
+\end{equation}
+O objetivo é a energia livre \emph{temperada} (\emph{quenched}), a média de $\ln Z$, e não a
+\emph{recozida} (\emph{annealed}), o logaritmo de $\E Z$.
+
+%======================================================================
+\section{A energia livre recozida e por que ela falha}
+
+A média de $Z$ é imediata:
+\begin{equation}
+  \E Z_N = 2^N\,\E e^{-\beta E}=2^N e^{\beta^2 sN/2}
+  \quad\Longrightarrow\quad
+  -\beta f_{\text{ann}}=\frac1N\ln\E Z_N=\ln 2+\frac{s\beta^2}{2}.
+  \label{eq:annealed}
+\end{equation}
+A entropia correspondente é $s_{\text{ann}}(\beta)=\beta^2\partial_\beta f_{\text{ann}}=\ln2-\tfrac{s\beta^2}{2}$,
+que fica \emph{negativa} para $\beta>\sqrt{2\ln2/s}$. Um sistema com um número finito de estados por spin
+não pode ter entropia negativa; a energia livre recozida, portanto, não pode estar certa em baixa
+temperatura. A razão é que $\E Z$ é dominada por eventos raros (amostras de desordem com energias
+excepcionalmente baixas) que pesam exponencialmente em $\E Z$ mas têm probabilidade exponencialmente
+pequena. Pela desigualdade de Jensen, $\E\ln Z\le\ln\E Z$, de modo que $-\beta f_{\text{ann}}$ é sempre um
+limite superior de $-\beta f$; a pergunta é onde a igualdade deixa de valer.
+
+%======================================================================
+\section{Rota 1: a solução microcanônica exata}
+\label{sec:micro}
+
+\subsection{Contagem de níveis}
+Seja $\mathcal N(e)\,\dd e$ o número de configurações com energia por spin em $[e,e+\dd e]$, isto é,
+com $E_i\in[Ne,N(e+\dd e)]$. Como as $2^N$ energias são independentes, $\mathcal N(e)\,\dd e$ é uma soma
+de $2^N$ variáveis de Bernoulli, e
+\begin{equation}
+  \E\,\mathcal N(e)\,\dd e = 2^N\,P(E\in[Ne,N(e+\dd e)])
+  \asymp \exp\!\Big\{N\Big[\ln2-\frac{e^2}{2s}\Big]\Big\}
+  \equiv e^{N s_a(e)} .
+  \label{eq:media-nivel}
+\end{equation}
+Chamamos $s_a(e)=\ln2-e^2/(2s)$ de entropia recozida microcanônica. Ela se anula em
+\begin{equation}
+  e_0=-\sqrt{2s\ln2}\qquad(\text{e em } -e_0).
+\end{equation}
+
+\subsection{Concentração: o argumento do primeiro e do segundo momento}
+\begin{proposicao}
+Com probabilidade que tende a $1$ quando $N\to\infty$:
+\begin{itemize}
+\item se $|e|<|e_0|$, então $\frac1N\ln\mathcal N(e)\to s_a(e)$;
+\item se $|e|>|e_0|$, então $\mathcal N(e)=0$ (não há nenhum nível).
+\end{itemize}
+\end{proposicao}
+\begin{proof}[Esboço]
+Para $|e|>|e_0|$, $\E\mathcal N(e)\dd e=e^{Ns_a(e)}\to0$ exponencialmente; pela desigualdade de
+Markov, $P(\mathcal N(e)\dd e\ge1)\le e^{Ns_a(e)}\to0$. Para $|e|<|e_0|$, como $\mathcal N$ é uma soma de
+Bernoullis independentes, $\mathrm{Var}\,\mathcal N\le\E\mathcal N$, e pela desigualdade de Chebyshev
+\[
+  P\Big(\big|\mathcal N-\E\mathcal N\big|>\tfrac12\E\mathcal N\Big)\le\frac{4}{\E\mathcal N}=4e^{-Ns_a(e)}\to0 .
+\]
+\end{proof}
+A entropia microcanônica \emph{típica} é portanto
+\begin{equation}
+  s(e)=\begin{cases}\ln2-\dfrac{e^2}{2s}, & |e|\le|e_0|,\\[2mm] -\infty, & |e|>|e_0|.\end{cases}
+  \label{eq:entropia}
+\end{equation}
+Esta é a diferença essencial em relação ao cálculo recozido: a média $\E\mathcal N(e)$ continua positiva
+para $e<e_0$, mas é carregada por amostras raras; numa amostra típica o espectro termina em $e_0$.
+A energia do estado fundamental por spin é exatamente $e_0$:
+\begin{equation}
+  \lim_{N\to\infty}\frac{\min_i E_i}{N}=e_0=-\sqrt{2s\ln2}
+  \;\stackrel{s=1/2}{=}\;-\sqrt{\ln2}=-0.8325546111576977\ldots
+\end{equation}
+
+\subsection{Energia livre por ponto de sela}
+Agora
+\begin{equation}
+  Z_N=\int\dd e\;\mathcal N(e)\,e^{-N\beta e}\asymp\int_{e_0}^{-e_0}\dd e\;e^{N[s(e)-\beta e]},
+\end{equation}
+e o método de Laplace dá $-\beta f=\max_{e\in[e_0,-e_0]}[s(e)-\beta e]$. A condição de estacionariedade
+$s'(e)=\beta$ dá $e^*=-s\beta$, que está dentro do intervalo enquanto $s\beta\le|e_0|$, isto é,
+enquanto $\beta\le\beta_c$ com
+\begin{equation}
+  \boxed{\;\beta_c=s'(e_0)=\frac{|e_0|}{s}=\sqrt{\frac{2\ln2}{s}}\;}
+  \qquad\stackrel{s=1/2}{\Longrightarrow}\qquad
+  \beta_c=2\sqrt{\ln2}=1.6651092223\ldots,\quad T_c=0.6005612044\ldots
+\end{equation}
+Para $\beta>\beta_c$ o máximo de $s(e)-\beta e$ fica preso na borda $e=e_0$, onde $s=0$. O resultado é
+\begin{equation}
+  \boxed{\;
+  f(\beta)=
+  \begin{cases}
+    -\dfrac{1}{\beta}\Big(\ln2+\dfrac{s\beta^2}{2}\Big), & \beta\le\beta_c\quad\text{(fase paramagnética)},\\[3mm]
+    e_0=-\sqrt{2s\ln2}, & \beta>\beta_c\quad\text{(fase congelada)}.
+  \end{cases}\;}
+  \label{eq:f-exata}
+\end{equation}
+
+\subsection{Leitura física}
+\begin{itemize}
+\item \textbf{Alta temperatura} ($T>T_c$): energia $e=-s\beta$, entropia $s(e^*)=\ln2-s\beta^2/2>0$. Um número
+exponencial de configurações contribui para $Z$; a energia livre temperada coincide com a recozida.
+\item \textbf{Baixa temperatura} ($T<T_c$): a energia fica parada em $e_0$ e a entropia extensiva é zero.
+O sistema está \emph{congelado} num número $O(1)$ de configurações de energia mais baixa; $f$ não depende
+mais de $T$.
+\item \textbf{Ordem da transição}: em $\beta_c$, $f$ e $e$ são contínuas
+($-s\beta_c=e_0$). O calor específico por spin é $c=s\beta^2$ para $T>T_c$ e $0$ para $T<T_c$; ele
+\emph{salta} de $\Delta c=s\beta_c^2=2\ln2$. Termodinamicamente é uma transição de segunda ordem com salto
+de $c$, sem calor latente e sem singularidade divergente: é o protótipo da transição vítrea
+``descontínua no parâmetro de ordem, contínua na termodinâmica'' que reaparece nos modelos de $p$-spin.
+\end{itemize}
+
+%======================================================================
+\section{Rota 2: o método de réplicas}
+\label{sec:replicas}
+
+A rota microcanônica explorou a independência total das energias. O método de réplicas não usa esse
+atalho: ele é o mesmo cálculo que se faz no modelo SK ou no modelo de $p$-spin, e o REM é onde podemos
+conferir cada passo contra a resposta exata.
+
+\subsection{O truque das réplicas}
+Usa-se $\E\ln Z=\lim_{n\to0}\frac{1}{n}\ln\E Z^n$. Para $n$ inteiro,
+\begin{equation}
+  \E Z^n=\sum_{i_1,\dots,i_n=1}^{2^N}\E\exp\Big(-\beta\sum_{a=1}^n E_{i_a}\Big).
+\end{equation}
+Para uma $n$-upla fixa de configurações, defina a sobreposição entre réplicas como
+$q_{ab}=\delta_{i_a,i_b}\in\{0,1\}$ (no REM não há sobreposição parcial: duas configurações ou são a mesma
+ou suas energias são independentes). Como $\sum_aE_{i_a}$ é gaussiana de média zero e variância
+$sN\sum_{a,b}q_{ab}$,
+\begin{equation}
+  \E\exp\Big(-\beta\sum_aE_{i_a}\Big)=\exp\Big(\frac{s\beta^2N}{2}\sum_{a,b=1}^nq_{ab}\Big).
+  \label{eq:media-gauss}
+\end{equation}
+Toda a dependência na desordem foi absorvida; o problema virou a soma sobre as matrizes $q_{ab}$ de
+um peso de Boltzmann vezes o número de $n$-uplas compatíveis com cada matriz.
+
+\paragraph{A conta intermediária.} Para uma $n$-upla fixa, seja $c_j=\#\{a:\,i_a=j\}$ o número de
+réplicas na configuração $j$. Então $\sum_aE_{i_a}=\sum_jc_jE_j$, e como os $E_j$ são independentes,
+\[
+  \ln\E\,e^{-\beta\sum_jc_jE_j}=\sum_j\ln\E\,e^{-\beta c_jE_j}=\sum_j\frac{sN\beta^2c_j^2}{2},
+  \qquad
+  \sum_jc_j^2=\sum_j\sum_{a,b}\delta_{i_a,j}\,\delta_{i_b,j}=\sum_{a,b}\delta_{i_a,i_b}=\sum_{a,b}q_{ab}.
+\]
+A primeira igualdade usa a função geradora gaussiana $\E e^{tE_j}=e^{sNt^2/2}$; a segunda é uma
+identidade de contagem. O \texttt{replicant} faz cada uma dessas passagens em sympy e confere a
+identidade de contagem sobre todas as $n$-uplas de $3$ e $4$ réplicas em $3$ configurações
+(Passo~2 de \texttt{derive\_rem.py}).
+
+\subsection{O ansatz simétrico (RS) e sua falha}
+Há duas matrizes ``simétricas'' óbvias:
+\begin{itemize}
+\item $q_{ab}=\delta_{ab}$ (todas as réplicas em configurações distintas): $\approx 2^{Nn}$ $n$-uplas,
+$\sum_{ab}q_{ab}=n$, e $\frac{1}{nN}\ln\E Z^n\to\ln2+s\beta^2/2$. É a solução recozida/paramagnética.
+\item $q_{ab}=1$ para todo $a,b$ (todas na mesma configuração): $2^N$ $n$-uplas, $\sum_{ab}q_{ab}=n^2$,
+e $\frac{1}{nN}\ln\E Z^n=\frac{\ln2}{n}+\frac{s\beta^2n}{2}$, que diverge quando $n\to0$. Não é física.
+\end{itemize}
+Com simetria de réplicas só resta a solução paramagnética, que dá entropia negativa abaixo de $T_c$.
+É preciso quebrar a simetria.
+
+\subsection{O ansatz 1RSB}
+Seguindo Parisi (na forma de Mézard, Parisi e Virasoro \cite{mpv}), divide-se as $n$ réplicas em
+$n/m$ blocos de $m$ réplicas cada. Réplicas no mesmo bloco ocupam a \emph{mesma} configuração
+($q_1=1$); réplicas em blocos distintos ocupam configurações distintas ($q_0=0$):
+\begin{equation}
+  q_{ab}=\begin{cases}1,& a,b\text{ no mesmo bloco},\\0,&\text{caso contrário}.\end{cases}
+\end{equation}
+Os dois ingredientes ficam:
+\begin{itemize}
+\item \textbf{Entropia combinatória.} Escolhem-se $n/m$ configurações distintas entre $K=2^N$:
+$K(K-1)\cdots(K-n/m+1)=K^{n/m}\big[1-\binom{n/m}{2}K^{-1}+O(K^{-2})\big]$ maneiras, contribuindo
+$\frac{n}{m}N\ln2+O(2^{-N})$ ao expoente; a correção do fatorial decrescente some em $\frac1N\ln$.
+\item \textbf{Energia.} Cada réplica tem exatamente $m$ parceiras com $q_{ab}=1$ (incluindo ela mesma),
+logo $\sum_{a,b}q_{ab}=nm$, e (\ref{eq:media-gauss}) contribui $\frac{s\beta^2N}{2}nm$.
+\end{itemize}
+Dividindo por $nN$ e tomando $n\to0$ (a dependência em $n$ já é linear, então o limite é trivial):
+\begin{equation}
+  \boxed{\;\Phi(m)\equiv-\beta f(m)=\frac{\ln2}{m}+\frac{s\beta^2m}{2}\;}
+  \label{eq:funcional}
+\end{equation}
+Este é exatamente o funcional que o \texttt{replicant} constrói simbolicamente
+(\texttt{rem\_1rsb\_functional}, via \texttt{ansatz.sum\_offdiag\_power} e \texttt{ansatz.n\_to\_zero}).
+A rota de réplicas do pacote agora mostra a derivação inteira em sete passos
+(\texttt{tools/replicant/derive\_rem.py}): identidade das réplicas, média sobre a desordem, os dois
+ansätze RS, os blocos 1RSB, o limite $n\to0$, a extremização em $m$ e a comparação com a entropia
+de Derrida. Cada equação exibida é calculada em sympy a partir do passo anterior e conferida por
+uma rota independente; um erro plantado (contagem de pares $\sum q_{ab}=nm^2$) é recusado no
+Passo~4. As saídas estão em \texttt{rem\_replicant\_b1.0.pdf} e \texttt{rem\_replicant\_b2.5.pdf}.
+
+\subsection{Extremização e a inversão de sentido}
+Para $n<1$ o número de pares fora da diagonal, $n(n-1)/2$, é negativo, e o ponto de sela que domina passa
+a ser um \emph{mínimo} de $-\beta f$ com respeito aos parâmetros de ordem, não um máximo. O parâmetro
+$m$ deve ser tomado em $0<m\le1$ (é o que sobra do intervalo $n\le m\le1$ quando $n\to0$). Então
+\begin{equation}
+  -\beta f=\min_{0<m\le1}\Phi(m),\qquad
+  \Phi'(m)=-\frac{\ln2}{m^2}+\frac{s\beta^2}{2}=0
+  \;\Longrightarrow\;
+  \boxed{\;m^*=\frac{1}{\beta}\sqrt{\frac{2\ln2}{s}}=\frac{\beta_c}{\beta}=\frac{T}{T_c}\;}
+\end{equation}
+\begin{itemize}
+\item Se $\beta\le\beta_c$, então $m^*\ge1$ cai fora do intervalo; $\Phi$ é decrescente em $(0,1]$ e o
+mínimo está em $m=1$: $\Phi(1)=\ln2+s\beta^2/2$. Recupera-se a fase paramagnética (com $m=1$ os blocos
+têm o tamanho máximo e a estrutura 1RSB é equivalente à RS com $q=0$).
+\item Se $\beta>\beta_c$, então $0<m^*<1$ e
+\begin{equation}
+  \Phi(m^*)=\frac{\ln2\,\beta}{\beta_c}+\frac{s\beta\beta_c}{2}
+  =\beta\Big(\frac{\ln2}{\beta_c}+\frac{s\beta_c}{2}\Big)=\beta\sqrt{2s\ln2},
+\end{equation}
+isto é, $f=-\sqrt{2s\ln2}=e_0$. É exatamente a fase congelada de (\ref{eq:f-exata}).
+\end{itemize}
+A energia na fase congelada, calculada com $m$ fixo no valor estacionário, é
+$e=\partial_\beta(\beta f)=-s\beta m^*=-s\beta_c=e_0$, e a entropia é zero, como na rota microcanônica.
+
+\subsection{O que $m$ significa: a distribuição de sobreposições}
+No ansatz 1RSB, a distribuição de sobreposições entre duas réplicas reais é
+\begin{equation}
+  P(q)=m\,\delta(q)+(1-m)\,\delta(q-1),\qquad
+  \E\sum_i w_i^2=1-m=1-\frac{T}{T_c}\quad(T<T_c),
+\end{equation}
+onde $w_i=e^{-\beta E_i}/Z$ são os pesos de Gibbs. A quantidade $Y=\sum_iw_i^2$ é a probabilidade de duas
+cópias independentes do sistema, na mesma amostra de desordem, estarem na mesma configuração. Acima de
+$T_c$, $Y\to0$ (o peso está espalhado por exponencialmente muitas configurações); abaixo, $Y$ é $O(1)$ e
+flutua de amostra para amostra (falta de auto-média), com média $1-T/T_c$ \cite{derrida-mottishaw}.
+Este é o conteúdo físico da quebra de simetria de réplicas: um número finito de estados carrega o peso
+de Gibbs, com pesos aleatórios (distribuição de Poisson--Dirichlet de parâmetro $m=T/T_c$).
+
+%======================================================================
+\section{Rota 3: verificação em $N$ finito, sem réplicas}
+\label{sec:finito}
+
+A terceira rota é numérica e não usa nem a contagem assintótica nem réplicas. Usa-se a identidade
+\begin{equation}
+  \ln Z=\int_0^\infty\frac{\dd t}{t}\big(e^{-t}-e^{-tZ}\big),
+  \qquad
+  \E e^{-tZ}=\Big[\E\,e^{-t\,e^{-\beta E}}\Big]^{2^N},
+\end{equation}
+em que a segunda igualdade usa só a independência das $2^N$ energias. Assim $\E\ln Z_N$ reduz-se a uma
+integral dupla unidimensional, calculada por quadratura (\texttt{rem\_quenched\_finite\_n}, em
+\texttt{float64}, não certificada; o refinamento da malha muda o resultado em menos de $10^{-12}$ para
+$N\le80$ e em $1.8\times10^{-7}$ para $N=320$).
+
+\begin{table}[h]
+\centering
+\begin{tabular}{rcccc}
+\toprule
+ & \multicolumn{2}{c}{$\beta=1<\beta_c$} & \multicolumn{2}{c}{$\beta=2.5>\beta_c$} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+$N$ & $f_N$ & $f_N-f_\infty$ & $f_N$ & $(f_N-f_\infty)\,N/\ln N$ \\
+\midrule
+ 10 & $-0.9393895198$ & $3.8\times10^{-3}$ & $-0.7518136252$ & $0.3507$ \\
+ 20 & $-0.9429191509$ & $2.3\times10^{-4}$ & $-0.7850089545$ & $0.3174$ \\
+ 40 & $-0.9431452120$ & $2.0\times10^{-6}$ & $-0.8046381938$ & $0.3027$ \\
+ 80 & $-0.9431471802$ & $3.3\times10^{-10}$& $-0.8163281569$ & $0.2962$ \\
+160 & $-0.9431471806$ & $<10^{-13}$        & $-0.8232418458$ & $0.2936$ \\
+320 & $-0.9431471806$ & $<10^{-13}$        & $-0.8272777572$ & $0.2927$ \\
+\midrule
+$\infty$ & $-0.9431471806$ & & $-0.8325546112$ & $0.300$ (previsto) \\
+\bottomrule
+\end{tabular}
+\caption{$f_N=-\frac{1}{\beta N}\E\ln Z_N$ em $s=\tfrac12$. A linha $N=\infty$ é a fórmula
+(\ref{eq:f-exata}). Note que $f_\infty(\beta=1)=-(\ln2+1/4)$.}
+\label{tab:finito}
+\end{table}
+
+As duas fases se distinguem claramente pela forma da convergência:
+\begin{itemize}
+\item \textbf{Fase paramagnética}: convergência exponencialmente rápida em $N$, como esperado quando
+$Z$ é soma de exponencialmente muitos termos e se concentra em torno de $\E Z$.
+\item \textbf{Fase congelada}: correção $O(\ln N/N)$. Ela vem da estatística de extremos: o mínimo de $M=2^N$
+gaussianas de desvio $\sigma=\sqrt{sN}$ é $-\sigma\big[\sqrt{2\ln M}-\frac{\ln\ln M+\ln4\pi}{2\sqrt{2\ln M}}\big]+O(1)$,
+o que dá $e_{\min}=e_0+\frac{\sqrt s}{2\sqrt{2\ln2}}\frac{\ln N}{N}+O(1/N)$. Em $s=\tfrac12$ o coeficiente é
+$\frac{1}{4\sqrt{\ln2}}=0.300$; a tabela mostra $(f_N-f_\infty)N/\ln N$ aproximando-se de $0.293$ em
+$N=320$, com o resíduo compatível com termos $O(1/N)$. Abaixo de $T_c$, $\ln Z=-\beta E_{\min}+O(1)$,
+porque a soma dos pesos relativos ao mínimo converge (processo de Poisson), logo a mesma correção
+aparece em $f_N$.
+\end{itemize}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.82\textwidth, height=7cm,
+  xlabel={$T$}, ylabel={$f(T)$},
+  xmin=0, xmax=1.6, ymin=-1.7, ymax=-0.6,
+  legend pos=south west, legend cell align=left,
+  grid=major, grid style={gray!20}]
+  % exata: f = -(ln2 + s/(2T^2)) T = -T ln2 - 1/(4T) para T >= Tc (s = 1/2)
+  \addplot[domain=0.6005612:1.6,samples=120,thick,blue] {-x*ln(2)-1/(4*x)};
+  \addlegendentry{exata, $T\ge T_c$}
+  \addplot[domain=0:0.6005612,samples=2,thick,red] {-0.8325546112};
+  \addlegendentry{exata, $T<T_c$ (congelada, $f=e_0$)}
+  \addplot[domain=0.12:0.6005612,samples=80,dashed,gray] {-x*ln(2)-1/(4*x)};
+  \addlegendentry{recozida (continuação errada)}
+  \addplot[only marks,mark=*,mark size=1.6pt,black] coordinates
+    {(1.0,-0.9431471806) (0.4,-0.8272777572)};
+  \addlegendentry{$N=320$, quadratura}
+  \draw[dotted] (axis cs:0.6005612,-1.7) -- (axis cs:0.6005612,-0.6);
+  \node[anchor=south west,font=\small] at (axis cs:0.61,-1.68) {$T_c$};
+\end{axis}
+\end{tikzpicture}
+\caption{Energia livre do REM em $s=\tfrac12$. A curva recozida ($-T\ln2-1/(4T)$) passa \emph{abaixo}
+do valor congelado para $T<T_c$, o que corresponde a entropia negativa. Os pontos são $f_{N=320}$ em
+$T=1$ e $T=0.4$; o ponto de baixa temperatura está acima do limite pela correção $\ln N/N$.}
+\end{figure}
+
+%======================================================================
+\section{Rota 4: demonstração formal em Lean}
+\label{sec:lean}
+
+O teorema de Derrida está demonstrado em Lean~4 com Mathlib, em \texttt{docs/rem/lean/}
+(\texttt{lake build}). As únicas dependências axiomáticas são as três padrão do Mathlib
+(\texttt{propext}, \texttt{Classical.choice}, \texttt{Quot.sound}); não há \texttt{sorry}.
+O arquivo \texttt{Check.lean} imprime essa lista.
+
+\paragraph{Formulação.} Para cada $N$ há um espaço de probabilidade $(\Omega_N,P_N)$ e $2^N$ variáveis
+$g_{N,i}$ mensuráveis com lei $\mathcal N(0,1)$, \emph{duas a duas} independentes (não se usa
+independência conjunta). Com $a\ge0$,
+\[
+  Z_N=\sum_{i}e^{a\sqrt N\,g_{N,i}},\qquad
+  \frac1N\,\E\ln Z_N\;\xrightarrow[N\to\infty]{}\;
+  \mathrm{pressure}(a)=\begin{cases}\ln2+a^2/2,&a\le\sqrt{2\ln2},\\ a\sqrt{2\ln2},&a>\sqrt{2\ln2}.\end{cases}
+\]
+Com $E_i=-\sqrt{sN}\,g_i$ e $a=\beta\sqrt s$ isto é $-\beta f$ de (\ref{eq:f-exata}); o lema
+\texttt{pressure\_beta} reescreve $\mathrm{pressure}(\beta\sqrt s)$ com $\beta_c=\sqrt{2\ln2/s}$.
+
+\paragraph{Estrutura da prova.}
+\begin{enumerate}
+\item \texttt{upper\_bound} (\texttt{REM/Upper.lean}): para \emph{todo} $N$ e todo $m\in(0,1]$,
+\[
+  \E\ln Z\le\frac{\ln M}{m}+\frac{mt^2}{2},\qquad M=\#\text{configurações},
+\]
+isto é, $\frac1N\E\ln Z_N\le\Phi(m)$: o funcional 1RSB das réplicas é uma cota superior rigorosa em
+$N$ finito, que é a forma que a cota de Guerra para quebra de simetria de réplicas toma no REM. Aqui ela
+é provada pelo caminho elementar, não pela interpolação: $m\ln Z=\ln Z^m\le Z^m/K-1+\ln K$
+(reta tangente do logaritmo), $Z^m\le\sum_ie^{mtg_i}$ (subaditividade de $x\mapsto x^m$, $m\le1$) e
+$\E e^{mtg}=e^{m^2t^2/2}$ (função geradora gaussiana do Mathlib), com $K=Me^{m^2t^2/2}$. Esta metade não
+usa independência.
+\item \texttt{freeEntropy\_le} (\texttt{REM/Limit.lean}): com $m=1$ se $a\le\sqrt{2\ln2}$ e
+$m=\sqrt{2\ln2}/a=\beta_c/\beta$ caso contrário, a cota vira $\frac1N\E\ln Z_N\le\mathrm{pressure}(a)$ para
+todo $N\ge1$. A escolha de $m$ é o ponto de quebra 1RSB.
+\item \texttt{lower\_bound} (\texttt{REM/Lower.lean}): para o limiar $\theta$, seja
+$K=\#\{i:g_i\ge\theta\}$, $q=\E K=M\,\gamma[\theta,\infty)$. A independência dois a dois dá
+$\mathrm{Var}\,K\le q$; Chebyshev dá $P(K\le q/2)\le4/q$; fora desse conjunto $Z\ge Ke^{t\theta}$, e em todo
+lugar $\ln Z\ge tg_{i_0}$. Resulta
+\[
+  \E\ln Z\ge\Big(\ln\frac q2+t\theta\Big)\Big(1-\frac4q\Big)-t\,\E|g|.
+\]
+A cauda é limitada por baixo pela densidade em $[\theta,\theta+1]$:
+$\gamma[\theta,\infty)\ge e^{-(\theta+1)^2/2}/\sqrt{2\pi}$ (\texttt{tail\_ge}).
+\item \texttt{freeEntropy\_ge\_eventually}: com $\theta=x\sqrt N$ e $0\le x<\sqrt{2\ln2}$, o lado direito
+dividido por $N$ converge para $\psi(x)=\ln2-x^2/2+ax$, e o número esperado de níveis
+$b_N=2^Ne^{-(x\sqrt N+1)^2/2}/\sqrt{2\pi}$ diverge. É o argumento de primeiro e segundo momento da
+Seção~\ref{sec:micro}, sem o método de Laplace.
+\item \texttt{tendsto\_freeEntropy}: $\mathrm{pressure}(a)=\sup_{0\le x<\sqrt{2\ln2}}\psi(x)$ (atingido em
+$x=a$ na fase paramagnética, aproximado por $x\uparrow\sqrt{2\ln2}$ na fase congelada), o que fecha o
+limite.
+\item \texttt{tendsto\_freeEntropy\_canonical} (\texttt{REM/Model.lean}): as hipóteses não são vazias;
+o teorema vale no modelo canônico $\Omega_N=\mathbb R^{2^N}$ com a medida produto de gaussianas.
+\end{enumerate}
+
+%======================================================================
+\section{Resultados do \texttt{replicant} e conferência}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lll}
+\toprule
+grandeza & valor ($s=\tfrac12$) & rótulo \\
+\midrule
+$\beta_c=2\sqrt{\ln2}$ & $1.6651092223153955127$ & exact-by-literature \\
+$T_c=1/(2\sqrt{\ln2})$ & $0.60056120439322489743$ & exact-by-literature \\
+$e_0=f(T<T_c)=-\sqrt{\ln2}$ & $-0.83255461115769775635$ & exact-by-literature \\
+$f(\beta=1)=-(\ln2+\tfrac14)$ & $-0.94314718055994530942$ & exact-by-literature (RS, $q=0$) \\
+$m(\beta=2.5)=\beta_c/2.5$ & $0.66604368892615820508$ & exact-by-literature (1RSB) \\
+$q_0,\;q_1$ ($\beta>\beta_c$) & $0,\;1$ & exact-by-literature (1RSB) \\
+\bottomrule
+\end{tabular}
+\caption{Saída de \texttt{python3 -m replicant run rem --param beta=1.0} e \texttt{--param beta=2.5}.}
+\end{table}
+
+O pacote compara a sua saída com três valores do banco de referências, todos concordando com tolerância
+$10^{-20}$:
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+chave & calculado & banco & fonte \\
+\midrule
+\texttt{tc\_derrida} & $0.6005612043932249$ & $0.6005612043932249$ & Derrida 1980, Sec.~4 \\
+\texttt{ground\_energy\_derrida} & $-0.8325546111576978$ & $-0.8325546111576978$ & Derrida--Mottishaw, Eq.~(3) \\
+\texttt{m\_times\_beta\_over\_beta\_c} & $1.0$ & $1$ & Derrida--Mottishaw, Eqs.~(4)--(6) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Estatuto de cada afirmação.}
+\begin{itemize}
+\item A energia livre (\ref{eq:f-exata}) é um \textbf{teorema}: a rota microcanônica da
+Seção~\ref{sec:micro} é rigorosa (completada por argumentos de primeiro e segundo momento), e o
+enunciado está \textbf{verificado formalmente} em Lean (Seção~\ref{sec:lean}).
+\item A rota de réplicas da Seção~\ref{sec:replicas} é de \textbf{nível físico}: a continuação $n\to0$
+e a escolha do ansatz 1RSB não são provadas. O REM é justamente o caso em que ela pode ser conferida
+contra um teorema, e ela acerta $f$, $\beta_c$, $e_0$ e o ponto de quebra $m=T/T_c$.
+\item A verificação em $N$ finito (Seção~\ref{sec:finito}) é \textbf{numérica} em \texttt{float64}, não
+certificada; sua função é mostrar, independentemente das duas rotas analíticas, a convergência para
+(\ref{eq:f-exata}) e a correção $\ln N/N$ na fase congelada.
+\end{itemize}
+
+\section{Como reproduzir}
+\begin{verbatim}
+cd tools
+python3 -m replicant run rem                    # beta_c, T_c e checagens do banco
+python3 -m replicant run rem --param beta=1.0   # fase paramagnetica
+python3 -m replicant run rem --param beta=2.5   # fase congelada, 1RSB
+python3 -m replicant run rem --latex rem.tex --pdf
+python3 -c "from replicant.families.rem import rem_quenched_finite_n as F; \
+            print(-F(2.5, 320, 0.5)/2.5)"
+cd ../docs/rem/lean
+lake build && lake env lean Check.lean          # prova formal; imprime os axiomas
+\end{verbatim}
+
+\begin{thebibliography}{9}
+\bibitem{derrida80} B.~Derrida, \emph{Random-energy model: limit of a family of disordered models},
+Phys.\ Rev.\ Lett.\ \textbf{45}, 79 (1980); \emph{The random energy model}, Phys.\ Rep.\ \textbf{67}, 29 (1980).
+\bibitem{derrida81} B.~Derrida, \emph{Random-energy model: an exactly solvable model of disordered systems},
+Phys.\ Rev.\ B \textbf{24}, 2613 (1981).
+\bibitem{mpv} M.~Mézard, G.~Parisi e M.~A.~Virasoro, \emph{Spin Glass Theory and Beyond}, World Scientific (1987).
+\bibitem{derrida-mottishaw} B.~Derrida e P.~Mottishaw, \emph{Finite size corrections in the random energy
+model and the replica approach}, J.\ Stat.\ Mech.\ (2015) P01021, arXiv:1410.1432.
+\end{thebibliography}
+
+\end{document}

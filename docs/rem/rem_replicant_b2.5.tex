@@ -1,0 +1,267 @@
+\documentclass[11pt]{article}
+\usepackage[margin=2cm]{geometry}
+\usepackage{iftex}
+\ifPDFTeX
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\fi
+\usepackage{amsmath,amssymb,graphicx}
+\allowdisplaybreaks
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{4pt}
+\sloppy
+\setlength{\emergencystretch}{3em}
+\title{rem: random energy model: $T_{c}$, frozen 1RSB phase}
+\date{}
+\begin{document}
+\maketitle
+\section{Model}
+family = rem, variables = ising, disorder = gaussian, constraint = None, prior = None.
+
+random energy model: $T_{c}$, frozen 1RSB phase \cite{b1,b2}
+
+\paragraph{Hamiltonian and conventions} \cite{b1,b2}
+\begin{equation}
+2^N \text{ i.i.d. energies } E_i \sim \mathcal{N}(0, N_s N),\quad N_s = 1/2 \text{ (Derrida's } J = 1\text{; default)}
+\end{equation}
+\section{Method and route}
+Route: \textbf{replica} (replica method: replicated partition function $Z^{n}$, disorder average, order parameters $q_{ab}$ (and conjugates), saddle point, RS / 1RSB ansatz, continuation n $\to$ 0). Rigor: \textbf{physics-level}. physics-level: replica $n \to 0$ continuation and RS/1RSB ansatz (Parisi), not proven; numbers carry quadrature error only
+\section{Derivation}
+Level (a): each step is rendered from the sympy objects that step put in the State (sympy.latex); nothing is retyped.
+The level-(a) steps below derive the same model symbolically (\texttt{derive\_rem.py} checks each step by an independent route and against families/rem.py; \texttt{tests/test\_rem\_pspin.py} runs them with a planted-error control); method as in Derrida, PRL 45, 79 (1980); Phys. Rev. B 24, 2613 (1981).
+\subsection{Step 1: rem-replicate}
+Source: \cite{b3,b4}. Trace: set \texttt{rem\_identity}, \texttt{rem\_tuples}
+
+\paragraph{Replicas}
+$2^{N}$ configurations j with \texttt{i.i.d}. energies $E_{j}$ \~{} N(0, s N) (s = \texttt{N\_scale}); n replicas a = 1..n each pick a configuration $i_{a}$.  The identity below is $(Z^{n} - 1)/n$ $\to$ ln Z, evaluated by \texttt{sympy.limit}; the tuple sum is checked by expanding $(\sum _{j} w_{j})^{n}$ at n = 2, 3
+\paragraph{Replica limit (sympy.limit)}
+\begin{equation}
+\lim_{n \to 0^+}\left(\frac{Z^{n} - 1}{n}\right) = \log{\left(Z \right)}
+\end{equation}
+\paragraph{Replica identity (n $\to$ 0 continuation, physics level)}
+\begin{equation}
+\mathbb{E}{\left(\log{\left(Z \right)} \right)} = \lim_{n \to 0^+}\left(\frac{\log{\left(\mathbb{E}{\left(Z^{n} \right)} \right)}}{n}\right)
+\end{equation}
+\paragraph{Partition function}
+\begin{equation}
+Z = \sum_{j=1}^{2^{N}} e^{- \beta {E}_{j}}
+\end{equation}
+\paragraph{Replicated partition function: a sum over n-tuples $(i_{1}, ..., i_{n})$}
+\begin{equation}
+Z^{n} = \sum_{{i}_{1}=1}^{2^{N}} \sum_{{i}_{n}=1}^{2^{N}} e^{- \beta \sum_{a=1}^{n} {E}_{{i}_{a}}}
+\end{equation}
+\subsection{Step 2: rem-average-disorder}
+Source: \cite{b3,b4}. Trace: set \texttt{rem\_avg}, \texttt{rem\_weight}
+
+\paragraph{Disorder average}
+for a fixed tuple the energy sum over the replicas is $\sum _{j}$ $c_{j}$ $E_{j}$ with $c_{j}$ = \#\{a: $i_{a}$ = j\}; the $E_{j}$ are independent Gaussians, so the log-average is $\sum _{j}$ $K(-\beta  c_{j})$, quadratic in $c_{j}$, and $\sum _{j}$ $c_{j}^{2}$ = $\sum _{a,b}$ $q_{ab}$ with $q_{ab}$ = 1 if $i_{a}$ = $i_{b}$ and 0 otherwise (checked over every tuple of 3 and 4 replicas on 3 configurations)
+\paragraph{Gaussian moment generating function (sympy.integrate)}
+\begin{equation}
+\mathbb{E}{\left(e^{t {E}_{j}} \right)} = e^{\frac{N s t^{2}}{2}}
+\end{equation}
+\paragraph{One configuration chosen by $c_{j}$ replicas}
+\begin{equation}
+\log{\left(\mathbb{E}{\left(e^{- \beta c_{j} {E}_{j}} \right)} \right)} = \frac{N \beta^{2} c_{j}^{2} s}{2}
+\end{equation}
+\paragraph{Fixed tuple: the overlaps $q_{ab}$ in \{0, 1\}}
+\begin{equation}
+\mathbb{E}{\left(e^{- \beta \sum_{a=1}^{n} {E}_{{i}_{a}}} \right)} = e^{\frac{N \beta^{2} s \sum_{a=1}^{n} \sum_{b=1}^{n} {q}_{a,b}}{2}}
+\end{equation}
+\paragraph{Averaged replicated partition function}
+\begin{equation}
+\mathbb{E}{\left(Z^{n} \right)} = \sum_{{i}_{1}=1}^{2^{N}} \sum_{{i}_{n}=1}^{2^{N}} e^{\frac{N \beta^{2} s \sum_{a=1}^{n} \sum_{b=1}^{n} {q}_{a,b}}{2}}
+\end{equation}
+\subsection{Step 3: rem-rs-ansatz}
+Source: \cite{b3,b4}. Trace: set \texttt{rem\_rsym}
+
+\paragraph{Replica-symmetric ansaetze}
+$q_{ab}$ = $\delta _{ab}$: every replica on its own configuration ($2^{N}$ $(2^{N} - 1)$ ... \~{} $(2^{N})^{n}$ tuples); $q_{ab}$ = 1: all replicas on one configuration ($2^{N}$ tuples).  $\sum _{a,b}$ $q_{ab}$ = n + \texttt{ansatz.sum\_offdiag\_power}
+\paragraph{$q_{ab}$ = $\delta _{ab}$: pair sum}
+\begin{equation}
+\sum_{a=1}^{n} \sum_{b=1}^{n} {q}_{a,b} = n
+\end{equation}
+\paragraph{$q_{ab}$ = $\delta _{ab}$: (1/N) ln E $Z^{n}$}
+\begin{equation}
+\Phi_{n} = \frac{\beta^{2} n s}{2} + n \log{\left(2 \right)}
+\end{equation}
+\paragraph{$q_{ab}$ = $\delta _{ab}$, n $\to$ 0 \texttt{(ansatz.n\_to\_zero)}: the paramagnet}
+\begin{equation}
+- \beta f = \frac{\beta^{2} s}{2} + \log{\left(2 \right)}
+\end{equation}
+\paragraph{$q_{ab}$ = 1: pair sum}
+\begin{equation}
+\sum_{a=1}^{n} \sum_{b=1}^{n} {q}_{a,b} = n^{2}
+\end{equation}
+\paragraph{$q_{ab}$ = 1: (1/N) ln E $Z^{n}$}
+\begin{equation}
+\Phi_{n} = \frac{\beta^{2} n^{2} s}{2} + \log{\left(2 \right)}
+\end{equation}
+\paragraph{$q_{ab}$ = 1, per replica (\texttt{sympy.limit} n $\to$ 0+ diverges)}
+\begin{equation}
+\lim_{n \to 0^+}\left(\frac{\Phi_{n}}{n}\right) = \infty
+\end{equation}
+\paragraph{$q_{ab}$ = 1 refused}
+\texttt{ansatz.n\_to\_zero} refuses it (precondition:polynomial-divisible-by-n: expr = $\beta ^{2}\,n^{2}\,s/2$ + log(2)): ln 2 / n diverges as n $\to$ 0, so the single-configuration RS saddle is unphysical; the frozen phase needs the block ansatz below
+\subsection{Step 4: rem-1rsb-blocks}
+Source: \cite{b3,b4}. Trace: set \texttt{rem\_blocks}
+
+\paragraph{One-step replica symmetry breaking}
+n/m blocks of m replicas; the replicas of a block share one configuration (q1 = 1), different blocks different ones (q0 = 0).  The n/m configurations give $2^{N}$ $(2^{N} - 1)$ ... \~{} $(2^{N})^{n/m}$ tuples; the falling-factorial correction is $O(2^-N)$ (shown for 3 blocks, K = $2^{N}$; checked for 2 to 5 blocks) and drops out of (1/N) ln.  The pair sum is checked against \texttt{ansatz.rsb\_matrix} at integer n
+\paragraph{Falling-factorial correction, 3 blocks (sympy series in 1/K)}
+\begin{equation}
+\log{\left(\frac{\left(K - 2\right) \left(K - 1\right)}{K^{2}} \right)} = - \frac{3}{K} + O\left(\frac{1}{K^{2}}; K\rightarrow \infty\right)
+\end{equation}
+\paragraph{1RSB pair sum (n + \texttt{ansatz.sum\_offdiag\_power})}
+\begin{equation}
+\sum_{a=1}^{n} \sum_{b=1}^{n} {q}_{a,b} = m n
+\end{equation}
+\paragraph{1RSB: (1/N) ln E $Z^{n}$}
+\begin{equation}
+\Phi_{n} = \frac{\beta^{2} m n s}{2} + \frac{n \log{\left(2 \right)}}{m}
+\end{equation}
+\subsection{Step 5: rem-replica-limit}
+Source: \cite{b3,b4}. Trace: set \texttt{rem\_Phim}
+
+\paragraph{Continuation n $\to$ 0}
+Phi(m) = $\lim _{n \to 0}$ $\Phi _{n}$ / n by \texttt{ansatz.n\_to\_zero}; equal (sympy) to \texttt{families/rem.py} \texttt{rem\_1rsb\_functional}, and Phi(1) is the $q_{ab}$ = $\delta _{ab}$ paramagnet of step 3
+\paragraph{1RSB functional per replica and spin}
+\begin{equation}
+\Phi{\left(m \right)} = \frac{\beta^{2} m s}{2} + \frac{\log{\left(2 \right)}}{m}
+\end{equation}
+\subsection{Step 6: rem-extremize}
+Source: \cite{b3,b5}. Trace: set \texttt{rem\_ext}
+
+\paragraph{Extremization over 0 $<$ m $\leq$ 1}
+for n $<$ 1 the 1RSB -beta f is the MINIMUM of Phi(m) over 0 $<$ m $\leq$ 1 (the n $\to$ 0 inversion of the saddle); Phi is convex in m, so the minimum is the stationary point m* when m* $\leq$ 1 (frozen phase) and m = 1 when m* $\geq$ 1 (paramagnet).  e = -dPhi/dbeta at fixed m (stationarity in m), entropy = Phi + beta e
+\paragraph{Stationarity}
+\begin{equation}
+\frac{d}{d m} \Phi{\left(m \right)} = \frac{\beta^{2} s}{2} - \frac{\log{\left(2 \right)}}{m^{2}}
+\end{equation}
+\paragraph{Stationary block size $(\beta _{c} = \sqrt{2 \ln  2 / s})$}
+\begin{equation}
+m^{*} = \frac{\sqrt{2} \sqrt{\log{\left(2 \right)}}}{\beta \sqrt{s}} = \frac{\beta_{c}}{\beta}
+\end{equation}
+\paragraph{Convexity}
+\begin{equation}
+\frac{d^{2}}{d m^{2}} \Phi{\left(m \right)} = \frac{2 \log{\left(2 \right)}}{m^{3}}
+\end{equation}
+\paragraph{Frozen phase (m* $<$ 1): -beta f = Phi(m*)}
+\begin{equation}
+- \beta f = \sqrt{2} \beta \sqrt{s} \sqrt{\log{\left(2 \right)}}
+\end{equation}
+\paragraph{Frozen phase: energy, free energy and entropy per spin}
+\begin{align}
+e &= - \sqrt{2} \sqrt{s} \sqrt{\log{\left(2 \right)}} \\
+f &= - \sqrt{2} \sqrt{s} \sqrt{\log{\left(2 \right)}} \\
+S &= 0
+\end{align}
+\paragraph{Paramagnet $(m\,\geq  1, m = 1)$: -beta f, energy, entropy}
+\begin{align}
+- \beta f &= \frac{\beta^{2} s}{2} + \log{\left(2 \right)} \\
+e &= - \beta s \\
+S &= - \frac{\beta^{2} s}{2} + \log{\left(2 \right)}
+\end{align}
+\paragraph{At the requested beta}
+branch: frozen, m = 0.666043688926158
+\subsection{Step 7: rem-derrida-check}
+Source: \cite{b3,b1,b2}. Trace: set \texttt{rem\_derrida}
+
+\paragraph{Derrida's direct solution}
+microcanonical entropy (\texttt{families/rem.py} \texttt{rem\_entropy}): its negative root e0 is the ground-state energy and $\beta _{c}$ = s'(e0) (the slope where the entropy vanishes).  sympy checks both equal the replica $\beta _{c}$ and the frozen f of step 6
+\paragraph{Microcanonical entropy}
+\begin{equation}
+s{\left(e \right)} = - \frac{e^{2}}{2 s} + \log{\left(2 \right)}
+\end{equation}
+\paragraph{Ground-state energy and critical inverse temperature}
+\begin{align}
+e_{0} &= - \sqrt{2} \sqrt{s} \sqrt{\log{\left(2 \right)}} \\
+\beta_{c} &= \frac{\sqrt{2} \sqrt{\log{\left(2 \right)}}}{\sqrt{s}}
+\end{align}
+\paragraph{Agreement at the requested parameters}
+beta = 2.5, \texttt{N\_scale} = 0.5: branch frozen, m = 0.666043688926158; replica f = -0.83255461115769775635, Derrida \texttt{rem\_free\_energy} = -0.83255461115769775635, \textbar{}difference\textbar{} = 2.96e-31 (30-digit evaluation, tolerance 1e-25)
+\subsection{Equations implemented by the family code}
+\paragraph{Conventions}
+e = E/N, $N_{s}$ = s (energy variance per spin); entropy, $\beta _{c}$ and the free energy as in \texttt{families/rem.py}
+\paragraph{Microcanonical entropy} \cite{b1,b2} (sympy form; checked against the code by \texttt{tests/test\_latex.py})
+\begin{equation}
+s{\left(e \right)} = - \frac{e^{2}}{2 s} + \log{\left(2 \right)}
+\end{equation}
+\paragraph{Critical inverse temperature $(s(e_{0}) = 0, \beta _{c} = s'(e_{0}))$} (sympy form; checked against the code by \texttt{tests/test\_latex.py})
+\begin{equation}
+\beta_{c} = \frac{\sqrt{2} \sqrt{\log{\left(2 \right)}}}{\sqrt{s}}
+\end{equation}
+\paragraph{Paramagnet, beta $\leq$ $\beta _{c}$ (annealed = quenched)} (sympy form; checked against the code by \texttt{tests/test\_latex.py})
+\begin{equation}
+- \beta f = \frac{\beta^{2} s}{2} + \log{\left(2 \right)}
+\end{equation}
+\paragraph{1RSB functional (blocks of m replicas share a configuration; n $\to$ 0)} (sympy form; checked against the code by \texttt{tests/test\_latex.py})
+\begin{equation}
+- \beta f = \frac{\beta^{2} m^{2} s + \log{\left(4 \right)}}{2 m}
+\end{equation}
+\paragraph{Frozen phase, beta $>$ $\beta _{c}$ $(m = \beta _{c} / \beta )$} (sympy form; checked against the code by \texttt{tests/test\_latex.py})
+\begin{equation}
+f = - \sqrt{2} \sqrt{s} \sqrt{\log{\left(2 \right)}}
+\end{equation}
+\section{Calculation at the requested parameters}
+The run's trace, in order (skipped steps say why).
+\subsection{Step 1: rem-critical-temperature}
+Source: \cite{b1,b2}. Trace: set errors, \texttt{step\_note}, values; computed \texttt{N\_scale}, $\beta _{c}$, $T_{c}$
+
+\subsection{Step 2: rem-saddle}
+Source: \cite{b1,b2,b6}. Trace: set errors, \texttt{step\_note}, values; frozen 1RSB, m = $\beta _{c}/\beta$
+
+\section{Solution}
+Values at the requested parameters (beta = 2.5), each with its finality: only stable and exact-by-literature values are final.
+\begin{center}
+\begin{tabular}{llll}
+key & value & finality (ansatz) & final \\
+\hline
+beta\_c & 1.6651092223154 & exact-by-literature (1rsb) \cite{b7,b2,b5} & yes \\
+T\_c & 0.600561204393225 & exact-by-literature (1rsb) \cite{b7,b2,b5} & yes \\
+q0 & 0.0 & exact-by-literature (1rsb) \cite{b7,b2,b5} & yes \\
+q1 & 1.0 & exact-by-literature (1rsb) \cite{b7,b2,b5} & yes \\
+m & 0.666043688926158 & exact-by-literature (1rsb) \cite{b7,b2,b5} & yes \\
+f & -0.832554611157698 & exact-by-literature (1rsb) \cite{b7,b2,b5} & yes \\
+e & -0.832554611157698 & exact-by-literature (1rsb) \cite{b7,b2,b5} & yes \\
+\end{tabular}
+\end{center}
+Other outputs (parameters, labels, diagnostics): \texttt{N\_scale} = 0.5; ansatz = 1rsb; stable = None; beta = 2.5.
+
+\section{Stability}
+Computed stability quantities (replicon / AT / cavity susceptibility): stable = None.
+
+exact-by-literature: $\beta _{c}$, $T_{c}$, q0, q1, m, f, e.
+
+\section{Reference check}
+Banked values (reference/*.json) against this pipeline's output; numbers are shown to 16 significant digits, the comparison uses them in full; slow and statistical rows run only with --full (\texttt{render\_latex(slow=True)}).
+\begin{center}\footnotesize
+\setlength{\tabcolsep}{4pt}
+\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{\begin{tabular}{llllll}
+key & computed & banked & tolerance & verdict & source \\
+\hline
+tc\_derrida & 0.6005612043932249 & 0.6005612043932249 & 1e-20 & agrees & \cite{b7,b8,b9} \\
+ground\_energy\_derrida & -0.8325546111576978 & -0.8325546111576978 & 1e-20 & agrees & \cite{b7,b10} \\
+m\_times\_beta\_over\_beta\_c & 1.0 & 1 & 1e-20 & agrees & \cite{b11,b12} \\
+\end{tabular}}
+\end{center}
+\section{Labels}
+Rigor: \textbf{physics-level}. Route: \textbf{replica}.
+
+physics-level: replica $n \to 0$ continuation and RS/1RSB ansatz (Parisi), not proven; numbers carry quadrature error only
+
+
+\begin{thebibliography}{99}
+\bibitem{b1} Derrida, PRL 45, 79 (1980)
+\bibitem{b2} Derrida, Phys. Rev. B 24, 2613 (1981) (exact solution: microcanonical entropy s(e))
+\bibitem{b3} replicant level (a) derivation (this package)
+\bibitem{b4} Mezard, Parisi \& Virasoro, Spin Glass Theory and Beyond (1987)
+\bibitem{b5} Derrida \& Mottishaw, arXiv:1410.1432 (m = T/T\_c)
+\bibitem{b6} 1RSB form: Mezard, Parisi \& Virasoro (1987)
+\bibitem{b7} Derrida, The random energy model, Physics Reports 67, 29-35 (1980), Sec. 4: 'T\_c = J/2 sqrt(log 2)' with P(E) = (pi N J\^{}2)\^{}(-1/2) exp(-E\^{}2/(N J\^{}2)), Eq. (2)
+\bibitem{b8} read from the copy at thp.uni-koeln.de/krug/teaching-Dateien/WS2011/Derrida1980.pdf. Same statement in Derrida \& Mottishaw, J. Stat. Mech. (2015) P01021, doi:10.1088/1742-5468/2015/01/P01021, arXiv:1410.1432, Eq. (2). Full paper Derrida, Phys. Rev. B 24, 2613 (1981), doi:10.1103/PhysRevB.24.2613 (not fetched). The paper states the closed form
+\bibitem{b9} value = its decimal at J = 1 (replicant N\_scale = J\^{}2/2 = 1/2)
+\bibitem{b10} also Derrida \& Mottishaw, arXiv:1410.1432, Eq. (3). Closed form, decimal at J = 1. In the frozen phase f = E\_ground / N (entropy 0)
+\bibitem{b11} Derrida \& Mottishaw, J. Stat. Mech. (2015) P01021, arXiv:1410.1432, Eqs. (4)-(6): Parisi q(x) = Theta(x - 1 + \textless{}P2\textgreater{}) with \textless{}P2\textgreater{} = 1 - mu, mu = T/T\_c below T\_c, so the 1RSB breakpoint is m = T/T\_c = beta\_c/beta
+\bibitem{b12} same in Derrida \& Mottishaw, J. Phys. A 55 (2022), doi:10.1088/1751-8121/ac71e9, arXiv:2202.12584, Eq. (5) (\textless{}Y\_2\textgreater{} = 1 - beta\_c/beta). Meaning: m * beta / beta\_c = 1 for beta \textgreater{}= beta\_c
+\end{thebibliography}
+\end{document}

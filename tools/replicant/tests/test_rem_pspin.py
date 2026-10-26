@@ -132,6 +132,71 @@ def test_rem_finite_n_log_n_correction():
     assert abs(steps[-1] + (b / (2 * bc)) * mp.log(2)) < 0.05
 
 
+# ---- REM level (a): the replica derivation step by step (derive_rem.py) -------
+REM_STEPS = ("rem-replicate", "rem-average-disorder", "rem-rs-ansatz", "rem-1rsb-blocks",
+             "rem-replica-limit", "rem-extremize", "rem-derrida-check")
+
+
+def test_rem_level_a_derivation_agrees_with_family_and_derrida():
+    from replicant.core import State, run_pipeline
+    from replicant.derive_rem import rem_level_a, rem_steps
+    st, tr = rem_level_a({"beta": "2.5"})                       # catalog default N_scale 1/2
+    assert tuple(e.step for e in tr.entries) == REM_STEPS
+    m, beta, s, n = sp.symbols("m beta s n", positive=True)
+    # step 2: Gaussian average of a fixed tuple, weight s beta^2 N/2 per unit of sum q_ab
+    N = sp.Symbol("N", positive=True, integer=True)
+    assert sp.simplify(st["rem_weight"] - s * beta**2 * N / 2) == 0
+    # step 3: q_ab = delta_ab is the annealed paramagnet; q_ab = 1 is refused by n_to_zero
+    R = st["rem_rsym"]
+    assert sp.simplify(R["para"] - (sp.log(2) + s * beta**2 / 2)) == 0
+    assert R["why"].startswith("precondition:polynomial-divisible-by-n") and R["div"] == sp.oo
+    # step 4: sum_ab q_ab = n m; step 5: Phi(m) is the family functional
+    assert sp.expand(st["rem_blocks"]["pairs"] - n * m) == 0
+    assert sp.simplify(st["rem_Phim"] - rem_1rsb_functional()) == 0
+    # step 6: m* = beta_c / beta, frozen f = e = e0, entropy 0
+    X = st["rem_ext"]
+    assert sp.simplify(X["mstar"] * beta - sp.sqrt(2 * sp.log(2) / s)) == 0
+    assert X["s_fr"] == 0 and X["branch"] == "frozen"
+    # step 7: at the requested beta the derived f is Derrida's, and the banked values hold
+    u = st["rem_derrida"]["num"]
+    assert u["branch"] == "frozen" and u["diff"] < mp.mpf("1e-25")
+    with mp.workdps(30):
+        assert abs(u["m"] - rem_1rsb("2.5", N_scale=HALF).m) < mp.mpf("1e-25")
+        assert check(REM["ground_energy_derrida"], u["f"], label="REM level-a f").ok
+        assert check(REM["m_times_beta_over_beta_c"],
+                     u["m"] * mp.mpf("2.5") / rem_critical_beta(N_scale=HALF), label="REM level-a m").ok
+    # the paramagnet branch (beta < beta_c) and another N_scale
+    st1, _ = run_pipeline(rem_steps("1.0", "1"), State())
+    v = st1["rem_derrida"]["num"]
+    assert st1["rem_ext"]["branch"] == "paramagnet" and v["m"] == 1
+    assert abs(v["f"] - rem_free_energy(1, N_scale=1)) < mp.mpf("1e-25")
+    # no beta: the symbolic steps run, the numerical comparison is skipped
+    st0, _ = rem_level_a({})
+    assert st0["rem_derrida"]["num"] is None and st0["rem_ext"]["branch"] is None
+    _refuses(lambda: rem_steps("-1"), "precondition:positive-beta")
+
+
+def test_rem_level_a_planted_errors_are_caught():
+    """Positive controls: a wrong pair count sum_ab q_ab = n m^2 (the hook) is refused at
+    step 4 by the integer-n brute force; the same wrong functional, if it got past, is
+    refused by step 5 (family functional) and differs from Derrida's f at step 7."""
+    from replicant import derive_rem as R
+    from replicant.core import State, run_pipeline
+    m, beta, s, n = sp.symbols("m beta s n", positive=True)
+    r = _refuses(lambda: run_pipeline(R.rem_steps("2.5", pair_sum=lambda n_, m_: n_ * m_**2),
+                                      State()), "check:pair-count")
+    assert r.step == "rem-1rsb-blocks" and "rsb_matrix" in r.detail
+    good, _ = R.rem_level_a({"beta": "2.5"})
+    wrong = sp.log(2) / m + s * beta**2 * m**2 / 2            # what n m^2 would give
+    bad = good.with_(rem_blocks={**good["rem_blocks"], "phin": sp.expand(n * wrong)})
+    _refuses(lambda: R._limit(bad), "check:family-functional")
+    (mw,) = [x for x in sp.solve(sp.diff(wrong, m), m) if x.is_positive]
+    f, fd, _, _ = R.compare_derrida(wrong, mw, "2.5", "0.5")
+    assert abs(f - fd) > mp.mpf("1e-3"), (f, fd)
+    f, fd, _, _ = R.compare_derrida(good["rem_Phim"], good["rem_ext"]["mstar"], "2.5", "0.5")
+    assert abs(f - fd) < mp.mpf("1e-25")                      # the control's control
+
+
 # ---- spherical p-spin -------------------------------------------------------
 def test_pspin_tc_matches_reference_p3():
     ts = pspin_critical_temperature(3)

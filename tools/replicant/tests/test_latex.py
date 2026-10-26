@@ -94,6 +94,30 @@ def test_sk_latex_contains_steps_in_order():
     assert "\\begin{thebibliography}" in doc and doc.rstrip().endswith("\\end{document}")
 
 
+def test_rem_latex_has_the_level_a_replica_derivation():
+    """The REM document derives -beta f step by step (derive_rem.py), each step with
+    displayed sympy equations, before the run's own trace; at beta = 2.5 the derived f is
+    printed next to Derrida's, and the reference rows still agree."""
+    for params, branch in (({"beta": "2.5"}, "frozen"), ({"beta": "1.0"}, "paramagnet"),
+                           ({}, None)):
+        doc = render_latex(compose(catalog()["rem"].spec, "replica").run(**params))
+        assert "No step-by-step symbolic derivation" not in doc
+        subs = _subsections(doc)
+        titles = [t for t, _ in subs]
+        steps = ("rem-replicate", "rem-average-disorder", "rem-rs-ansatz", "rem-1rsb-blocks",
+                 "rem-replica-limit", "rem-extremize", "rem-derrida-check")
+        idx = [next(k for k, t in enumerate(titles) if escape(st) in t) for st in steps]
+        assert idx == sorted(idx) and all(_has_math(subs[k][1]) for k in idx), idx
+        assert idx[-1] < titles.index(next(t for t in titles
+                                           if escape("rem-critical-temperature") in t))
+        body = "".join(subs[k][1] for k in idx)
+        assert "\\Phi{\\left(m \\right)} = \\frac{\\beta^{2} m s}{2} + " in body
+        assert "= m n" in body and "= \\infty" in body               # 1RSB pairs; q = 1 diverges
+        if branch:
+            assert f"branch {branch}" in body and "Derrida \\texttt{rem\\_free\\_energy}" in body
+        assert "DISAGREES" not in doc
+
+
 def test_every_catalog_entry_has_derivation():
     for name, route in _routes():
         e = catalog()[name]

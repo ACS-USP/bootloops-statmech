@@ -158,6 +158,9 @@ def _derivation(res):
         return rows + ([(None, rep_title, rep)] if rep else []), LEVEL_A_CITE, None
     trace, rep, why = (None, [], f"{res.route} route") if res.route != "replica" else \
         _level_a(_spec_key(res.entry.spec))
+    if res.route == "replica" and res.entry.spec.family == "rem":   # its own level (a)
+        from .derive_rem import rem_level_a
+        trace, why = rem_level_a(res.params)[1], None
     rows = [(e, None, e.tex) for e in trace.entries] if trace else []
     if rep:
         rows.append((None, rep_title, rep))
@@ -251,9 +254,12 @@ def _result_body(res, bib, extra, slow):
                  "cited.  No intermediate step the code does not perform is shown.")
     out.append("\\section{Derivation}\n" + prose(intro) + "\n")
     if not composed and rows[0][0] is not None:
+        checked = ("derive_rem.py checks each step by an independent route and against "
+                   "families/rem.py; tests/test_rem_pspin.py runs them with a planted-error "
+                   "control" if spec.family == "rem" else
+                   "tests/test_agree.py checks them against the family equations")
         out.append(prose("The level-(a) steps below derive the same model symbolically "
-                          "(tests/test_agree.py checks them against the family equations); "
-                          f"method as in {res.entry.cite}.") + "\n")
+                          f"({checked}); method as in {res.entry.cite}.") + "\n")
     for k, (e, title, blocks) in enumerate(rows, 1):
         out.append(_entry(k, e, bib, blocks, a_cite) if e is not None else
                    f"\\subsection{{{escape(title)}}}\n" + _blocks(blocks, bib))
