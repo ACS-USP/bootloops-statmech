@@ -85,14 +85,16 @@ class Ball:
             return mp.mpf(self.arb.rad().str(15, radius=False)) * (1 + mp.mpf("1e-12"))
 
     def value_and_error(self, dps=40):
-        """(v, e): v an mpf at `dps` digits and e >= |v - x| for every x in the ball (the radius
-        plus the rounding of the midpoint to v), rounded up."""
-        v = self.mid(dps)
-        with mp.workdps(dps + 10), baller().hygiene.ctx_guard(prec=max(self._prec(), 4 * dps + 64)):
-            d = (self.arb - _arb()(mp.nstr(v, dps + 5))).abs_upper()
-            e = mp.mpf(d.str(15, radius=False)) * (1 + mp.mpf("1e-12")) + abs(v) * mp.mpf(10)**(-dps - 3)
+        """(v, e) as decimal strings: v the midpoint to `dps` significant digits, e >= |v - x| for
+        every x in the ball (computed in arb against the exact decimal v, rounded up).  Printing v
+        and e in full therefore prints an enclosure; the entries store these strings."""
+        v = self.arb.mid().str(dps, radius=False)
+        with baller().hygiene.ctx_guard(prec=max(self._prec(), 4 * dps + 64)):
+            exact = _arb()(v)                       # the decimal v, to the working precision
+            bound = (self.arb - exact).abs_upper() + exact.rad()
         with mp.workdps(20):
-            return v, +e
+            e = mp.mpf(bound.str(15, radius=False)) * (1 + mp.mpf("1e-6"))
+            return v, _round_up(e)
 
     def contains(self, x):
         """x (Fraction, int, mpf or decimal string) inside the ball?  An mpf/str is taken as the
@@ -117,6 +119,17 @@ class Ball:
         return f"Ball({self.render()} +/- {mp.nstr(self.rad(), 3)})"
 
 
+def _round_up(e):
+    """A 3-significant-digit decimal string >= e (e > 0, an mpf), e.g. 1.7625e-41 -> '1.77e-41'."""
+    if not e:
+        return "0"
+    ex = int(mp.floor(mp.log10(e)))
+    m = int(mp.ceil(e / mp.mpf(10) ** (ex - 2)))
+    if m >= 1000:
+        m, ex = (m + 9) // 10, ex + 1
+    return f"{m // 100}.{m % 100:02d}e{ex}"
+
+
 def _to_arb(x):
     arb = _arb()
     if isinstance(x, (int, Fraction)):
@@ -135,10 +148,24 @@ def ball_of(a):
 
 
 def certify(thunk, digits=DIGITS):
-    """Ball of thunk() with `digits` certified digits (baller.solve over baller.run)."""
+    """Ball of thunk() with `digits` certified digits (baller.solve over baller.run).  Fail fast:
+    when doubling the precision does not at least halve the radius (an integrator at its limits, a
+    cancellation that precision cannot cure), the refusal no-solution:radius-stall names the two
+    radii instead of escalating to baller's 4096-digit cap."""
     b = baller()
+    seen = []
+
+    def attempt(dps):
+        r = b.run(thunk, dps=dps)
+        rad = r.value.rad() if r.value.is_finite() else None
+        if seen and seen[-1][1] is not None and rad is not None and not rad < seen[-1][1] / 2:
+            raise Refusal("no-solution:radius-stall", f"radius {seen[-1][1].str(3, radius=False)} at "
+                          f"dps {seen[-1][0]}, {rad.str(3, radius=False)} at dps {dps}: more precision "
+                          "does not shrink the enclosure")
+        seen.append((dps, rad))
+        return r
     try:
-        res = b.solve(lambda dps: b.run(thunk, dps=dps), digits)
+        res = b.solve(attempt, digits)
     except b.SolveRefused as exc:
         raise Refusal("no-solution:certification", f"baller.solve could not certify {digits} "
                       f"digits: {exc}")

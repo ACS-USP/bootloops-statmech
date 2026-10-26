@@ -202,7 +202,7 @@ def bethe_ising_fixed_points(k, beta, h):
                         stable = False
                     else:
                         balls = None
-                    if balls is None or min(bb.digits for bb in balls[2:4]) < DIGITS:
+                    if balls is None or min(bb.digits for bb in balls) < DIGITS:
                         break
                     if not balls[2].overlaps(balls[3]):
                         raise Refusal("no-solution:audit", f"Bethe phi {balls[2]} and Dembo-Montanari "

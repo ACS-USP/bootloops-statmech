@@ -12,7 +12,8 @@ Conventions (Duminil-Copin, arXiv:2208.00864 (2022), Sec. 3; J = 1 there): K = b
   a - S >= C^2 - 2S = (1 - S)^2, so off beta_c (S != 1) a^2 - S^2 > 0 on [0, pi]: the integrand
   is analytic on a neighbourhood of the path and Arb's rigorous integrator (acb.integral, acb_calc:
   Johansson, "Numerical integration in arbitrary-precision ball arithmetic", ICMS 2018, not
-  fetched; baller's battery leg L15) returns an enclosure.  At beta_c (the sentinel BETA_C, K_c = (1/2) ln(1 + sqrt 2)) the
+  fetched; baller's battery leg L15) returns an enclosure.  At beta_c (the sentinel BETA_C,
+  K_c = (1/2) ln(1 + sqrt 2)) the
   value is the closed form (1/2) ln 2 + 2G/pi (G Catalan's constant; OEIS A242743, the bank).
   Yang (Duminil-Copin Eq. (3.7)): m*(beta) = (1 - sinh(2K)^-4)^(1/8) for beta >= beta_c.
   yang_magnetization refuses beta <= beta_c (precondition:ordered-phase: there m* = 0), decided by a
@@ -26,7 +27,9 @@ Conventions (Duminil-Copin, arXiv:2208.00864 (2022), Sec. 3; J = 1 there): K = b
   yang_magnetization(beta, J=1) -> Ball
   yang_loglog_slope(d1, d2) -> Ball             d ln m* / d ln(beta - beta_c) between beta_c + d1
       and beta_c + d2: a consistency check of the implemented formula (exponent 1/8 + O(d))
-_HOOKS["catalan_coefficient"] (2): planted-error hook of the closed form (tests).
+_HOOKS["catalan_coefficient"] (2): planted-error hook of the closed form; _HOOKS["naive_integrand"]
+(False): the cancelling integrand, whose radius stalls near beta_c (tests: refused
+no-solution:radius-stall, see lattice/ball.certify).
 """
 from fractions import Fraction
 
@@ -36,7 +39,7 @@ from ..core import Refusal
 from .ball import DIGITS, Ball, arb_q, baller, certify, rational
 from .coupling import BETA_C, coupling
 
-_HOOKS = {"catalan_coefficient": 2}
+_HOOKS = {"catalan_coefficient": 2, "naive_integrand": False}
 _MAX_PREC = 1 << 13
 
 
@@ -56,15 +59,25 @@ def _critical_closed_form():
 
 
 def _single_integral(K):
-    """ln 2 + (1/(2 pi)) int_0^pi ln[(a + sqrt(a^2 - S^2))/2] dt, enclosed by acb.integral."""
+    """ln 2 + (1/(2 pi)) int_0^pi ln[(a + sqrt(a^2 - S^2))/2] dt, enclosed by acb.integral.
+
+    Cancellation-free form: a - S = (1 - S)^2 + 2 S sin^2(t/2), a + S = (a - S) + 2S, so
+    a^2 - S^2 = (a - S)(a + S) is never formed as a difference.  The naive a*a - S*S, evaluated on
+    the complex boxes of the integrator, loses everything near beta_c (radius stuck at 4e-6 at
+    beta = 0.4407, the integrator at its limits); this form certifies 40 digits in < 0.06 s from
+    beta = 0.3 to within 1e-22 of beta_c (measured, tests/test_lattice.py)."""
     from flint import acb, arb
-    C, S = (2 * K).cosh(), (2 * K).sinh()
-    C2 = C * C
+    S = (2 * K).sinh()
+    d2 = (1 - S) * (1 - S)
 
     def f(t, analytic):
-        a = C2 - S * t.cos()
-        root = (a * a - S * S).sqrt(analytic=analytic)
-        return ((a + root) / 2).log(analytic=analytic)
+        if _HOOKS["naive_integrand"]:                  # planted: the cancelling form
+            a = (2 * K).cosh() ** 2 - S * t.cos()
+            return ((a + (a * a - S * S).sqrt(analytic=analytic)) / 2).log(analytic=analytic)
+        s = (t / 2).sin()
+        am = d2 + 2 * S * s * s
+        root = (am * (am + 2 * S)).sqrt(analytic=analytic)
+        return ((am + S + root) / 2).log(analytic=analytic)
 
     integral = acb.integral(f, 0, arb.pi())
     return arb(2).log() + integral.real / (2 * arb.pi())

@@ -367,15 +367,13 @@ def derivation(name, route):
     if name == "series_ising2d":
         from .latex_series import series_ising2d
         return series_ising2d(route)
-    if name in ("ising2d", "ising1d", "bethe_ising"):
-        from . import latex_lattice
-        return getattr(latex_lattice, name)(route)
     if name == "ridge":
         from .latex_learning import ridge
         return ridge(route)
-    if name in ("spiked_wigner", "sbm"):
-        from . import latex_spiked_sbm
-        return getattr(latex_spiked_sbm, name)(route)
+    if name in ("spiked_wigner", "sbm", "ising2d", "ising1d", "bethe_ising"):
+        from importlib import import_module
+        mod = "latex_spiked_sbm" if name in ("spiked_wigner", "sbm") else "latex_lattice"
+        return getattr(import_module(f".{mod}", __package__), name)(route)
     if name not in _ENTRIES:
         raise Refusal(f"missing-step:derivation:{name}", "no displayed derivation for "
                       f"catalog entry {name!r} (latex_entries.py)")

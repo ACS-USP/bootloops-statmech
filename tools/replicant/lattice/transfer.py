@@ -9,7 +9,8 @@ gives P = Tr T^Lx.  It is computed exactly in Python integers by Kronecker subst
 with B = N + 1 > log2 max c_j (sum c_j = 2^N), so the base-2^B digits of Tr T^Lx are the c_j.
 Ly <= 7 (128 states) and Lx <= 16.
 
-1D Ising ring (J > 0, field h; Wikipedia 'Ising model', Sec. One dimension): with a = e^K, b = e^{beta h},
+1D Ising ring (J > 0, field h; Wang, Diaz-Mendez & Capdevila, arXiv:1907.11701, Eqs. (4)-(9), (12);
+Baxter, Exactly Solved Models (1982), Ch. 2, not fetched): with a = e^K, b = e^{beta h},
   T = [[a b, 1/a], [1/a, a/b]],  lambda_+- = e^K cosh(beta h) +- sqrt(e^{2K} sinh^2(beta h) + e^{-2K}),
   Z_N = Tr T^N = lambda_+^N + lambda_-^N,  -beta f = ln lambda_+.
 ising1d_ring_identity checks Z_N three ways in exact rationals: brute force over the 2^N

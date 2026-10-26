@@ -18,7 +18,7 @@ _YANG = f"{_DC}, Eq. (3.7) (Yang, Phys. Rev. 85, 808 (1952))"
 _OEIS = "OEIS A242743"
 _KAUF = ("Izmailian & Hu, Phys. Rev. E 65 (2002), arXiv:cond-mat/0009024, Eqs. (10)-(16); Kastner, "
          "arXiv:cond-mat/0605568, Eq. (8b) (Kaufman, Phys. Rev. 76, 1232 (1949))")
-_ONE_D = "Wikipedia, 'Ising model', Sec. One dimension"
+_ONE_D = "Wang, Diaz-Mendez & Capdevila, arXiv:1907.11701, Eqs. (7), (9), (12)"
 _DM = "Dembo & Montanari, Ann. Appl. Probab. 20, 565 (2010), arXiv:0804.4726"
 
 
@@ -30,8 +30,10 @@ def ising2d(route):
     return [
         text("Exact route", "Square-lattice Ising model, zero field, K = beta J; -beta f = ln Z / N. "
              "Each value is a ball enclosure (python-flint arb through tools/baller)", source=_DC),
-        cited("Onsager's free energy", r"-\beta f = \ln 2 + \frac{1}{8\pi^2}\int_0^{2\pi}\!\!\int_0^{2\pi}"
-              r"\ln\left[\cosh^2 2K - \sinh 2K\,(\cos\theta_1 + \cos\theta_2)\right]d\theta_1\, d\theta_2",
+        cited("Onsager's free energy",
+              r"-\beta f = \ln 2 + \frac{1}{8\pi^2}\int_0^{2\pi}\!\!\int_0^{2\pi}"
+              r"\ln\left[\cosh^2 2K - \sinh 2K\,(\cos\theta_1 + \cos\theta_2)\right]"
+              r"d\theta_1\, d\theta_2",
               _ONS),
         cited("The inner angle in closed form (certified by acb.integral off beta_c)",
               r"-\beta f = \ln 2 + \frac{1}{2\pi}\int_0^{\pi}\ln\frac{a + \sqrt{a^2 - S^2}}{2}\,d\theta,"
@@ -47,10 +49,12 @@ def ising2d(route):
         cited("Kaufman's torus (M = Lx, N = Ly; g_0 signed)",
               r"Z = \tfrac12 (2\sinh 2K)^{MN/2}\sum_{i=1}^4 Z_i,\ Z_{1,2} = \prod_{r=0}^{N-1}"
               r"2\{\cosh,\sinh\}\tfrac{M\gamma_{2r+1}}{2},\ Z_{3,4} = \prod_{r=0}^{N-1}2\{\cosh,\sinh\}"
-              r"\tfrac{M\gamma_{2r}}{2},\ \cosh\gamma_r = \frac{\cosh^2 2K}{\sinh 2K} - \cos\frac{r\pi}{N},"
+              r"\tfrac{M\gamma_{2r}}{2},\ \cosh\gamma_r = \frac{\cosh^2 2K}{\sinh 2K}"
+              r" - \cos\frac{r\pi}{N},"
               r"\ \gamma_0 = 2K + \ln\tanh K", _KAUF),
         cited("Transfer matrix (exact integers, x = e^{-2K})",
-              r"Z = e^{2NK}\,\mathrm{Tr}\,T^{L_x},\quad T_{s s'} = x^{u(s) + |s \oplus s'|}", _DC + ", Frame 2"),
+              r"Z = e^{2NK}\,\mathrm{Tr}\,T^{L_x},\quad T_{s s'} = x^{u(s) + |s \oplus s'|}",
+              _DC + ", Frame 2"),
     ]
 
 
@@ -60,9 +64,10 @@ def ising1d(route):
     return [
         text("Exact route", "1D Ising ring, J = 1, K = beta, H = beta h; Z_N = Tr T^N = lambda_+^N + "
              "lambda_-^N", source=_ONE_D),
-        sym("Free energy (largest transfer-matrix eigenvalue)", sp.Eq(sp.Symbol(r"-\beta f"), sp.log(lam)),
-            source=_ONE_D, check=Check((K, H), lambda k, h: ising1d_free_energy(
-                k, Fraction(h) / Fraction(k)).mid(), (("0.7", "0.21"), ("1", "0"), ("2", "-0.5")), "rhs")),
+        sym("Free energy (largest transfer-matrix eigenvalue)",
+            sp.Eq(sp.Symbol(r"-\beta f"), sp.log(lam)), source=_ONE_D,
+            check=Check((K, H), lambda k, h: ising1d_free_energy(k, Fraction(h) / Fraction(k)).mid(),
+                        (("0.7", "0.21"), ("1", "0"), ("2", "-0.5")), "rhs")),
     ]
 
 
@@ -96,7 +101,8 @@ def bethe_ising(route):
     pts = (_bethe_point(3, "1", "0.02", "upper"), _bethe_point(3, "1", "0.02", "lower"),
            _bethe_point(4, "0.5", "0.1", "upper"))
     return [
-        text("Cavity route on the Bethe lattice", "coordination k, J = 1, B = beta h; x the cavity field "
+        text("Cavity route on the Bethe lattice",
+             "coordination k, J = 1, B = beta h; x the cavity field "
              "(times beta); every fixed point is enclosed by interval Newton", source=_DM),
         cited("Cavity (BP) fixed point and its stability",
               r"x = B + (k-1)\,\xi(x),\ \ \xi(x) = \operatorname{atanh}(\tanh\beta\,\tanh x),\qquad"

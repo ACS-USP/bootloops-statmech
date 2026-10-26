@@ -4,7 +4,8 @@ Conventions: J = 1 unless stated, K = beta J; values are -beta f = ln Z / N.  Ce
 lattice.Ball (python-flint arb through tools/baller: baller.solve / baller.run), radius < 1e-30 at
 the default 40 digits.  Independent checks: mpmath quadrature (a different rule and formula) for
 Onsager, the exact integer transfer matrix for Kaufman, brute-force enumeration for the 1D ring,
-the sparse cavity code (cavity/sparse.py: BP on sampled graphs, population dynamics) for Bethe.
+the sparse cavity code (cavity/sparse.py: BP on sampled graphs, population dynamics) for Bethe
+(deterministic implementation agreement there, not a statistical estimate).
 Planted errors go through each module's _HOOKS registry, restored in try/finally.
 """
 import os
@@ -92,7 +93,63 @@ def test_onsager_double_integral_trapezoid_and_large_torus():
         for L in (8, 16, 24):
             z = kaufman_partition_function(L, L, "0.3")
             gaps.append(abs(mp.log(z.mid()) / L**2 - b.mid()))
-        assert gaps[0] > gaps[1] > gaps[2] and gaps[2] < mp.mpf("1e-8"), gaps     # measured 2e-4, 4e-7, 1.4e-9
+        # measured 2e-4, 4e-7, 1.4e-9
+        assert gaps[0] > gaps[1] > gaps[2] and gaps[2] < mp.mpf("1e-8"), gaps
+
+
+def test_onsager_certifies_near_critical():
+    """Within 1e-4 .. 1e-22 of beta_c the cancellation-free integrand certifies 40 digits quickly;
+    the -beta f values bracket the critical constant (energy continuous at beta_c)."""
+    from replicant.lattice import BETA_C, onsager_free_energy
+    crit = onsager_free_energy(BETA_C)
+    for beta in ("0.4407", "0.44068", "0.44069", "0.4406867935097715126163"):
+        b = onsager_free_energy(beta)
+        assert b.rad() < mp.mpf("1e-40") and b.digits >= 40, (beta, b)
+        with mp.workdps(40):
+            gap = abs(b.mid() - crit.mid())
+            assert gap < 2 * abs(mp.mpf(beta) - mp.mpf("0.44068679350977151262")), (beta, gap)
+
+
+@slow
+def test_onsager_naive_integrand_stalls_and_is_refused_fast():
+    import time
+    from replicant.lattice import onsager, onsager_free_energy
+    t = time.time()
+    r = _refusal(lambda: _planted(onsager, "naive_integrand", True,
+                                  lambda: onsager_free_energy("0.4407")))
+    assert r.reason == "no-solution:radius-stall" and time.time() - t < 10, (r, time.time() - t)
+
+
+def test_printed_certified_values_are_enclosures():
+    """The value +- error printed in the JSON (cli.result_json) and in the LaTeX solution table
+    contains the ball, for every physical value of a certified run."""
+    import re
+    from replicant.catalog import catalog
+    from replicant.cli import result_json
+    from replicant.compose import compose
+    from replicant.latex import render_latex
+    from replicant.lattice import BETA_C, onsager_free_energy
+    from replicant.tex import escape
+    from flint import arb
+    e = catalog()["ising2d"]
+    res = compose(e.spec, "exact").run()
+    doc, js = render_latex(res), result_json("ising2d", e.spec, res)
+    ball = onsager_free_energy(BETA_C).arb
+    rows = 0
+    for k in res.values:
+        if k in e.meta:
+            continue
+        row = next(l for l in doc.splitlines() if l.startswith(escape(k) + " &"))
+        v, err = re.search(r"& ([-0-9.e]+) \$\\pm\$ ([-0-9.e]+) \(certified ball\)", row).groups()
+        assert v == js["values"][k] and err == js["errors"][k], (k, row, js["values"][k])
+        rows += 1
+    v, err = js["values"]["minus_beta_f"], js["errors"]["minus_beta_f"]
+    with __import__("replicant.lattice.ball", fromlist=["baller"]).baller().hygiene.ctx_guard(prec=300):
+        lo, hi = arb(v) - arb(err), arb(v) + arb(err)
+        assert lo.upper() < ball.lower() and ball.upper() < hi.lower(), (v, err)
+        bad = arb(v[:22]) + arb("1e-42")          # a 20-digit print with the ball's radius
+        assert not (bad - arb("1e-42") <= ball.lower() and ball.upper() <= bad + arb("1e-42"))
+    assert rows >= 4
 
 
 # ---- Kaufman versus the transfer matrix ------------------------------------------------------
@@ -148,6 +205,12 @@ def test_yang_magnetization_exponent_one_eighth():
     assert s.rad() < mp.mpf("1e-25")
     with mp.workdps(30):
         assert abs(s.mid() - mp.mpf(want.value)) < mp.mpf(want.tol), s
+        # the derived correction: M^8 = 8 sqrt2 d (1 - (9/sqrt2) d + O(d^2)), so the slope is
+        # 1/8 - (9/(8 sqrt2)) (d2 - d1)/ln(d2/d1) + O(d^2) = 1/8 - 1.71013e-7
+        d1, d2 = mp.mpf("1e-6"), mp.mpf("1e-8")
+        corr = 9 / (8 * mp.sqrt(2)) * (d2 - d1) / mp.log(d2 / d1)
+        assert abs(s.mid() - (mp.mpf(1) / 8 - corr)) < mp.mpf("1e-11"), (s, corr)
+        assert abs(s.mid() - mp.mpf(1) / 8) < mp.mpf("2e-7")
         # positive control: the slope of m^2 (exponent 1/4) is outside the band
         assert abs(2 * s.mid() - mp.mpf(want.value)) > mp.mpf(want.tol)
     # refused at and below beta_c (the paramagnet, m* = 0): a certified comparison decides
@@ -214,11 +277,13 @@ def test_bethe_fixed_points_certified_and_branches():
 
 
 def test_bethe_ising_matches_viana_bray_regular():
-    """Comparison targets from the earlier sparse code (statistical, Student-t bands)."""
+    """Comparison targets from the earlier sparse code.  Both are deterministic implementation
+    agreement, not statistical estimates: the paramagnetic population collapses exactly to h = 0
+    (stderr 0), and BP reaches the homogeneous fixed point on every regular instance (spread at
+    float rounding).  Tolerances: 1e-12 and 1e-9 (float64 arithmetic of cavity/sparse.py)."""
     import numpy as np
     from replicant.cavity import graphs as G
     from replicant.cavity import sparse as S
-    from replicant.cavity._stats import t_quantile
     from replicant.catalog import catalog
     from replicant.lattice import bethe_ising_free_energy
     # (a) viana_bray (cavity, regular +-J, k = 2 excess degree = coordination 3): above both
@@ -228,8 +293,7 @@ def test_bethe_ising_matches_viana_bray_regular():
     f_vb, err = vb["values"]["f"], vb["errors"]["f"]
     assert vb["values"]["phase"] == "paramagnet", vb["values"]      # every run collapsed to h = 0
     phi = bethe_ising_free_energy(3, "0.4", 0).phi
-    band = t_quantile(0.995, 3) * float(np.hypot(err, 1e-12))     # float64 rounding of the PD
-    assert abs(float(f_vb) + float(phi.mid()) / 0.4) <= band, (f_vb, phi, band)
+    assert err == 0 and abs(float(f_vb) + float(phi.mid()) / 0.4) <= 1e-12, (f_vb, err, phi)
     # (b) BP (cavity/sparse.bp_fixed_point) on sampled ferromagnetic 3-regular graphs, named seeds
     beta, h = 1.0, 0.1
     res = bethe_ising_free_energy(3, 1, "0.1")
@@ -241,10 +305,8 @@ def test_bethe_ising_matches_viana_bray_regular():
         bp = S.bp_fixed_point(g, beta, None, seed=seed, field=h, require_converged=True)
         got.append((bp.log_z / 200, float(np.mean(bp.marginals))))
     a = np.array(got)
-    se = a.std(axis=0, ddof=1) / np.sqrt(len(a))
-    t = t_quantile(0.995, len(a) - 1)
-    assert abs(a[:, 0].mean() - float(res.phi.mid())) <= t * np.hypot(se[0], 1e-9), (a, res.phi)
-    assert abs(a[:, 1].mean() - float(res.magnetization.mid())) <= t * np.hypot(se[1], 1e-9)
+    assert np.all(np.abs(a[:, 0] - float(res.phi.mid())) <= 1e-9), (a, res.phi)       # every seed
+    assert np.all(np.abs(a[:, 1] - float(res.magnetization.mid())) <= 1e-9), a
 
 
 # ---- refusals --------------------------------------------------------------------------------
@@ -296,8 +358,11 @@ def test_lattice_entries_are_certified_with_radii_and_others_unchanged():
     r = _refusal(lambda: calc.run())
     assert r.reason == "precondition:certified-radius" and "v" in r.detail, r
     m = compose(cat["ising2d"].spec, "exact").run(beta="0.6")
-    assert m.finality["magnetization"].state == "exact-by-literature" and m.finality["magnetization"].final
+    mag = m.finality["magnetization"]
+    assert mag.state == "exact-by-literature" and mag.final
     assert not m.final and not m.finality["yang_exponent_loglog"].final     # the slope: a check only
     bp = compose(cat["bethe_ising"].spec, "cavity").run(beta=1, h=0)
     assert "magnetization" not in bp.values and "phi" in bp.values      # h = 0: m not chosen
+    assert bp.finality["beta_c"].state == "not-computed"            # a closed-form threshold
+    assert "Frame 2" in m.finality["torus_minus_beta_f_tm"].cite   # exact by construction (TM)
     assert bp.finality["phi_upper"].state == "stable" and bp.finality["phi_middle"].state == "unstable"

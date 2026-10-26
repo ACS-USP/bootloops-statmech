@@ -32,8 +32,9 @@ OEIS = "OEIS A242743 ((1/2) ln 2 + 2G/pi; Onsager (1944) Eq. (121) via OEIS)"
 KAUF = ("Kaufman, Phys. Rev. 76, 1232 (1949) (not fetched), as printed by Izmailian & Hu, Phys. Rev. "
         "E 65 (2002), arXiv:cond-mat/0009024, Eqs. (10)-(16), and Kastner, arXiv:cond-mat/0605568, "
         "Eqs. (6)-(8)")
-ONE_D = ("Wikipedia, 'Ising model', Sec. One dimension (secondary; Ising, Z. Phys. 31, 253 (1925), "
-         "not fetched)")
+ONE_D = ("Wang, Diaz-Mendez & Capdevila, arXiv:1907.11701, Eqs. (1), (4)-(12) (read; journal "
+         "reference not checked); Baxter, Exactly Solved Models (1982), Ch. 2 (not fetched)")
+TM = "Duminil-Copin, arXiv:2208.00864 (2022), Frame 2 (Z of the torus = Tr V^N)"
 DM = "Dembo & Montanari, Ann. Appl. Probab. 20, 565 (2010), arXiv:0804.4726"
 ARB = "python-flint arb through tools/baller (baller.solve / baller.run; acb.integral)"
 CAVEAT_2D = ("exact route, certified: Onsager's free energy, Yang's magnetization and Kaufman's "
@@ -84,7 +85,8 @@ def _crit(p):
 
 def _onsager(p):
     v, e = _put(minus_beta_f=onsager_free_energy(_beta2(p)))
-    how = "closed form (1/2) ln 2 + 2G/pi" if _beta2(p) == BETA_C else "acb.integral of the single integral"
+    how = ("closed form (1/2) ln 2 + 2G/pi" if _beta2(p) == BETA_C
+           else "acb.integral of the single integral")
     return Out(v, f"-beta f by {how}, certified", errors=e)
 
 
@@ -121,7 +123,8 @@ def ising2d():
                    skip="beta <= beta_c: m* = 0 (paramagnet)"),
              fstep("ising2d-yang-exponent", YANG, _slope),
              fstep("ising2d-kaufman-vs-transfer-matrix", KAUF, _torus)]
-    refs = [RefCheck("lattice", "onsager_critical_minus_beta_f", lambda v: v["minus_beta_f"], route="exact"),
+    refs = [RefCheck("lattice", "onsager_critical_minus_beta_f", lambda v: v["minus_beta_f"],
+                     route="exact"),
             RefCheck("lattice", "beta_c_square", lambda v: v["beta_c"], route="exact"),
             RefCheck("lattice", "yang_exponent", lambda v: v["yang_exponent_loglog"], route="exact")]
     lit = lambda cite, note: Stability("exact-by-literature", "exact", cite, note)
@@ -132,8 +135,9 @@ def ising2d():
                                              "log-log slope of the cited formula at beta - beta_c = "
                                              "1e-6, 1e-8: |slope - 1/8| < 2e-7 by the O(d) correction"),
            "torus_minus_beta_f": lit(KAUF, "Kaufman's finite-torus Z, certified ball"),
-           "torus_minus_beta_f_tm": Stability("exact-by-literature", "exact", KAUF, "the exact "
-                                              "transfer-matrix polynomial (equal to Kaufman's)")}
+           "torus_minus_beta_f_tm": Stability("exact-by-literature", "exact", TM, "exact by "
+                                              "construction: the transfer-matrix trace in exact "
+                                              "integers (equal to Kaufman's polynomial)")}
     spec = ModelSpec("ising2d", "ising", "none", constraint="square lattice, exact solution")
     return entry("ising2d", spec, f"{ONSAGER}; {YANG}; {KAUF}", {"exact": steps}, refs,
                  {"exact": CAVEAT_2D}, "2D Ising model (square lattice, zero field): Onsager's free "
@@ -200,14 +204,18 @@ def _bethe(p):
                errors=e)
 
 
+def _fp_stability(stable):
+    return Stability("stable" if stable else "unstable", "bethe", DM,
+                     f"computed BP Jacobian (k - 1) xi'(x) {'<' if stable else '>'} 1")
+
+
 def _bethe_finality():
-    fin = {"beta_c": Stability("stable", "bethe", f"{DM}, Eq. (2.5)", "computed linear-stability "
-                               "limit of the paramagnetic BP fixed point, (k - 1) tanh beta_c = 1")}
+    fin = {"beta_c": Stability("not-computed", "bethe", f"{DM}, Eq. (2.5)", "closed-form threshold "
+                               "(k - 1) tanh beta_c = 1, stated by DM as the statistical-physics "
+                               "prediction (their theorems do not locate it); not a computed stability")}
     for b in _BRANCHES:
         for o in _OBS:
-            fin[f"{o}_{b}"] = (lambda v, b=b: Stability("stable" if v.get(f"stable_{b}") else "unstable",
-                                                        "bethe", DM, "computed BP Jacobian "
-                                                        f"(k - 1) xi'(x) {'<' if v.get(f'stable_{b}') else '>'} 1"))
+            fin[f"{o}_{b}"] = lambda v, b=b: _fp_stability(v.get(f"stable_{b}"))
     sel = lambda v: Stability("stable" if v.get("selected_stable") else "unstable", "bethe",
                               f"{DM}, Lemma 2.3, Thm 2.4", "the thermodynamic fixed point (B > 0: the "
                               "unique one on [0, oo); B = 0: the limit B -> 0)")
