@@ -4,8 +4,9 @@ latex_entries.py: each sympy block carries a tex.Check against online/ at three 
 """
 import math
 
-import mpmath as mp
+import numpy as np
 import sympy as sp
+from scipy.special import log_ndtr
 
 from .tex import Check, cited, sym, text
 
@@ -15,9 +16,12 @@ _CKC = "Copelli, Kinouchi & Caticha, Phys. Rev. E 53, 6341 (1996) (abstract)"
 
 
 def _kappa_formula():
-    with mp.workdps(25):
-        H = lambda x: mp.erfc(x / mp.sqrt(2)) / 2
-        return 2 / mp.quad(lambda x: mp.npdf(x) * mp.e ** (-x * x / 2) / H(x), [-mp.inf, 0, 5, mp.inf])
+    """CC95 Eq. (32) as printed, 2 / int Dx e^{-x^2/2} / H(x), by Gauss-Legendre on [-9, 0] and [0, 12] in
+    log space (the integrand is ~e^{-x^2} on the left, ~x e^{-x^2/2} on the right)."""
+    t, w = np.polynomial.legendre.leggauss(200)
+    xs = np.concatenate([4.5 * (t - 1), 6 * (t + 1)])
+    ws = np.concatenate([4.5 * w, 6 * w])
+    return 2 / float(np.sum(ws * np.exp(-xs * xs - 0.5 * math.log(2 * math.pi) - log_ndtr(-xs))))
 
 
 def online_tcm(route):
@@ -48,9 +52,9 @@ def online_tcm(route):
             source="derived here from " + _CC,
             check=Check((AL, KS), lambda a, k: hebb_rho(a, k, 1.0), (("2", "1"), ("5", "5"), ("1", "9")), "rhs",
                         tol="1e-8")),
-        sym("Mapped noise of local learning (derived here; CKC96's epsilon(K) not read): branch k sees its "
+        sym("Mapped noise epsilon_K of local learning (CKC96's symbol; derived here, their epsilon(K) not read): branch k sees its "
             "teacher unit through a label flipped with probability (1 - P0)/2, on N/K inputs, at alpha_p = K alpha",
-            sp.Eq(sp.Symbol("lambda_K"), (1 - p0) / 2), source="derived here from " + _CKC,
+            sp.Eq(sp.Symbol("epsilon_K"), (1 - p0) / 2), source="derived here from " + _CKC,
             check=Check((KS,), lambda k: T.effective_noise(int(k)), (("3",), ("5",), ("11",)), "rhs")),
         cited("Optimal weight (CC95 Eqs. (9)-(12), (19)-(20); optimal only in tcm.OPTIMALITY_CLASS: greedy, true rho): F_k = K J_k (<b_k>/rho_k - h_k), the teacher field "
               "averaged over its posterior given sigma_B and all student fields (nonlocal); lambda_k = sqrt(1 - "
@@ -62,10 +66,10 @@ def online_tcm(route):
               r"\frac{e^{-x^2/2}}{H(x)}\Big]^{-1} \approx 0.88", _CC,
               check=Check((), lambda: TF.rate_limit_constant(TF.tcm_flow("optimal", 3)), ((),),
                           display=_kappa_formula, tol="1e-4")),
-        cited("CKC96 (abstract): local TCM learning equals noisy-perceptron learning; here kappa_loc(K) = P0 "
-              "C(lambda_K), C = 2/I(lambda) (O1), which grows with K (2.665 at K = 3) while the nonlocal rule "
-              "keeps 0.88", r"\rho_{TCM}(\alpha) = \rho_{perc}\big(K\alpha;\ \lambda_K\big),\quad "
-              r"e_g \simeq \frac{P_0\,C(\lambda_K)}{\alpha}", _CKC),
+        cited("CKC96 (abstract): local TCM learning equals noisy-perceptron learning at the noise epsilon_K; here kappa_loc(K) = P0 "
+              "C(epsilon_K), C = 2/I (O1), which grows with K (2.665 at K = 3) while the nonlocal rule "
+              "keeps 0.88 (K = 3)", r"\rho_{TCM}(\alpha) = \rho_{perc}\big(K\alpha;\ \epsilon_K\big),\quad "
+              r"e_g \simeq \frac{P_0\,C(\epsilon_K)}{\alpha}", _CKC),
         text("Finite-N checks", "online TCM learning in the simulation (online/simulate_tcm.py: CC95 Eqs. (19)-(20) as "
              "printed for the nonlocal rule; no code shared with the ODEs), 99% Student-t bands; an ODE with a wrong "
              "1/K in the eta^2 term falls outside them"),

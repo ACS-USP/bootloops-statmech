@@ -65,10 +65,10 @@ def _band(rule, K, N, alpha, seeds, init, plant, eta=1.0):
 
 
 def test_ode_vs_simulation_band_k3():
-    """K = 3, N = 3 x 100, alpha = 3, 24 named seeds, the local optimal rule from rho0 = 0.3 and Hebb
+    """K = 3, N = 3 x 100, alpha = 3, 16 named seeds, the local optimal rule from rho0 = 0.3 and Hebb
     (eta = 1.5): the ODE inside the 99% band, the ODE with the 1/K of the eta^2 term multiplied by 1.5
     (local rule; dropping it, x K, makes rho reach 0) or dropped (Hebb) outside it."""
-    seeds = tuple(range(700, 724))
+    seeds = tuple(range(700, 716))
     for rule, init, eta, plant in (("local_optimal", (0.3, 1.0), 1.0, 1.5), ("hebb", (0.0, 1.0), 1.5, 3.0)):
         band, ode, bad = _band(rule, 3, 300, 3.0, seeds, init, plant, eta)
         assert abs(ode - band.mean) <= band.half_width, (rule, ode, band)

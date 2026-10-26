@@ -19,10 +19,11 @@ import sys
 from contextlib import contextmanager
 from pathlib import Path
 
-import mpmath as mp
 import numpy as np
+from scipy.special import log_ndtr
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from replicant.catalog import catalog, run_cached
 from replicant.core import Refusal
 from replicant.online import odes
 from replicant.online import optimal as OPT
@@ -128,9 +129,17 @@ def test_ckc96_equivalence_local_learning_is_a_noisy_perceptron():
     with a corresponding noise level.  Two routes: the TCM ODE (tcm_flow: its own field averages over the
     other branches' internal representations) and O1's perceptron ODE with output noise at the mapped
     noise effective_noise(K) and time K alpha.  A planted wrong mapping (noise or time) breaks the
-    identity; the TCM trajectory itself does not move under the mapping plant (K = 5, 7: slow test)."""
+    identity; the TCM trajectory itself does not move under the mapping plant.  K = 5 tells (1 - P0)/2 =
+    5/16 from P0/2 = 3/16 (equal at K = 3): the plant P0/(1 - P0) = 0.6 turns the one into the other.
+    The identity is near-structural: _local_grid is the noisy-perceptron posterior written with p0, so
+    what it checks is the reduction and the mapping; the committee physics (the majority vote of real
+    teacher units) is checked by the finite-N simulation (test_online_tcm_sim.py)."""
     g, tr0 = _gap(3)
     assert g < 1e-8, g
+    a5 = (0.5, 1.5)
+    assert _gap(5, alphas=a5)[0] < 1e-8
+    with planted(T, mapping=T.tie_probability(5) / (1 - T.tie_probability(5))):    # lambda -> P0/2
+        assert abs(T.effective_noise(5) - 3 / 16) < 1e-15 and _gap(5, alphas=a5)[0] > 1e-3
     g, _ = _gap(3, rule="hebb", eta=1.5)                    # any local rule: F_TCM = K F_perceptron
     assert g < 1e-8, g
     with planted(T, mapping=0.8):
@@ -202,13 +211,12 @@ def test_cc95_pseudo_hebb_closed_form():
 
 def test_cc95_asymptotic_constant_of_the_nonlocal_rule():
     """CC95 Eq. (32): eps ~ kappa / alpha, kappa = 2 [int Dx e^{-x^2/2} / H(x)]^{-1} ~ 0.88 (the
-    printed integral evaluated by mpmath here: 0.883400).  TCM route: the rate limit -dtheta/dalpha /
+    printed integral evaluated here by Gauss-Legendre: 0.883400).  TCM route: the rate limit -dtheta/dalpha /
     theta^2 at theta = 1e-3, 5e-4 (Richardson) with eps/theta -> K P0 / pi.  Positive control: the local
     rule's constant at K = 3 (0.5 C(1/4) = 2.665) is far from it."""
-    with mp.workdps(20):
-        H = lambda x: mp.erfc(x / mp.sqrt(2)) / 2
-        integ = mp.quad(lambda x: mp.npdf(x) * mp.e ** (-x * x / 2) / H(x), [-mp.inf, 0, 5, mp.inf])
-        formula = float(2 / integ)
+    t, w = np.polynomial.legendre.leggauss(200)              # the printed integral, Gauss-Legendre in log space
+    xs, ws = np.concatenate([4.5 * (t - 1), 6 * (t + 1)]), np.concatenate([4.5 * w, 6 * w])
+    formula = 2 / float(np.sum(ws * np.exp(-xs * xs - 0.5 * math.log(2 * math.pi) - log_ndtr(-xs))))
     assert _ok("cc95_kappa_formula", formula)
     kappa = TF.rate_limit_constant(TF.tcm_flow("optimal", 3))
     assert _ok("cc95_kappa", kappa) and _ok("cc95_kappa_formula", kappa), kappa
@@ -224,17 +232,19 @@ def _local_constant(K):
 
 
 def test_asymptotic_constant_against_K():
-    """Local learning: eps ~ kappa_loc(K) / alpha.  TCM route: its ODE at alpha = 1e4 (eps alpha, and
-    the log-slope, CKC96 abstract: exponent 1 at finite K).  Perceptron route: P0(K) C(lambda_K) with
-    O1's C = 2 / I(lambda) at the mapped noise.  At K = 3 kappa_loc = 2.665, three times the nonlocal
-    0.88 (K = 1, 5 and the growth with K: the slow test).  Hebb: exponent 1/2 (CKC96 abstract),
-    constant sqrt(K / 2 pi) (derived; K = 3 is CC95's)."""
-    slope, const, perc = _local_constant(3)
-    assert abs(const / perc - 1) < 2e-3 and _ok("ckc96_optimal_exponent", slope), (slope, const, perc)
-    assert abs(TF.rate_limit_constant(TF.tcm_flow("local_optimal", 3)) / perc - 1) < 1e-4
-    slope, const = TF.asymptote_tcm(TF.tcm_flow("hebb", 3), (0.0, 1.0))
-    assert _ok("ckc96_hebb_exponent", slope) and not _ok("ckc96_optimal_exponent", slope)
-    assert abs(const - math.sqrt(3 / (2 * math.pi))) < 2e-2
+    """Local learning: eps ~ kappa_loc(K) / alpha.  TCM route (the catalog run the RefChecks share): the
+    ODE log-slope at alpha = 1e4 (CKC96 abstract: exponent 1 at finite K) and the rate limit; perceptron
+    route: P0(K) C(lambda_K) with O1's C = 2 / I(lambda) at the mapped noise.  At K = 3 kappa_loc = 2.665,
+    three times the nonlocal 0.88 (the ODE's alpha eps at 1e4, K = 1, 5, 7 and the growth with K: the slow
+    test).  Hebb: exponent 1/2 (CKC96 abstract), constant sqrt(K / 2 pi) (derived; K = 3 is CC95's)."""
+    e = catalog()["online_tcm"]
+    v = run_cached(e, "online", {"rule": "local_optimal"})[0]
+    perc = T.tie_probability(3) * OPT.asymptotic_constant(T.effective_noise(3))
+    assert abs(v["eps_constant"] / perc - 1) < 1e-4 and _ok("ckc96_optimal_exponent", v["eps_exponent"]), v
+    assert abs(v["eps_constant_perceptron"] - perc) < 1e-15
+    h = run_cached(e, "online", {"rule": "hebb"})[0]
+    assert _ok("ckc96_hebb_exponent", h["eps_exponent"]) and not _ok("ckc96_optimal_exponent", h["eps_exponent"])
+    assert abs(h["eps_constant"] - math.sqrt(3 / (2 * math.pi))) < 1e-4
 
 
 @slow

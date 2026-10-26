@@ -249,7 +249,7 @@ CLI (from `tools/`):
   only its own field) -> `noise_equivalent` 0.250000 (the mapped output noise (1 - P0)/2, P0 = 1/2 the
   tie probability of the other two hidden units), `eps` 0.211221 (the TCM ODE),
   `rho_perceptron_mapped` 0.868537 (O1's noisy-perceptron ODE at alpha_p = 3 alpha; `equivalence_gap`
-  6e-13), `eps_constant` 2.665178 against `eps_constant_perceptron` 2.665178 (P0 C(1/4)).  `--param
+  <~ 1e-12), `eps_constant` 2.665178 against `eps_constant_perceptron` 2.665178 (P0 C(1/4)).  `--param
   rule=hebb --param alpha=3
   --param N=300` -> `eps_exponent` 0.497367 (alpha = 1e4), `eps_constant` 0.690985 (CC95: sqrt(3/2pi)),
   `eps` 0.321157, `eps_sim` 0.321281 (`eps_sim_halfwidth99` 0.0036, 20 named seeds at N = 3 x 100).
@@ -1408,10 +1408,10 @@ KNOWN HAZARDS:
   rule is NONLOCAL (branch k reads every student field) and is implemented at K = 3 only; it is optimal
   only in `tcm.OPTIMALITY_CLASS["optimal"]` (greedy, true rho, eta = 1). `local_optimal` reads only the
   branch's own field; it is the CKC96 "local learning", identical (derived here) to O1's optimal noisy
-  perceptron at lambda_K = (1 - P0)/2 (P0 the tie probability of the other K - 1 hidden units: 1/4 at K =
-  3, 5/16 at K = 5) on N/K inputs at alpha_p = K alpha. The TCM route computes its own field averages
+  perceptron at lambda_K = (1 - P0)/2 (P0 the tie probability of the other K - 1 hidden units: P0 = 1/2, lambda_K =
+  1/4 at K = 3; P0 = 3/8, lambda_K = 5/16 at K = 5) on N/K inputs at alpha_p = K alpha. The TCM route computes its own field averages
   (the posterior over the other units' internal representations) and never calls the mapping; the
-  identity holds to 1e-12 and fails under a planted wrong noise or time map. CC95's Eq. (32) integral
+  identity holds to <~ 1e-12 measured (1e-8 asserted) and fails under a planted wrong noise or time map. CC95's Eq. (32) integral
   gives 0.883400, the perceptron's C(0), which also supports O1's reading of Copelli et al. 1997 Eq. (8)
   as a typo. CC95's Eq. (21) as printed agrees with the TCM route to 2e-7 (quadrature), and their Eqs.
   (19)-(20), typed into the simulator, reproduce the nonlocal ODE at N = 3 x 300. CC95's pseudo-Hebb

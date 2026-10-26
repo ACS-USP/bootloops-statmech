@@ -69,12 +69,11 @@ def test_latex_blocks_checked_and_a_wrong_one_caught():
 
 def test_guide_is_true():
     """The GUIDE's online_tcm rows: every refusal reason listed is raised by the code, and the worked
-    example's numbers are what the entry returns (one through the CLI)."""
-    import io
-    import json
+    example's numbers are what the entry returns (the default through the CLI's build_result, the path of
+    `replicant run` without result_json's reference checks)."""
     from pathlib import Path
 
-    from replicant.cli import main
+    from replicant.cli import build_result
     root = Path(__file__).resolve().parent.parent
     guide = (root / "GUIDE.md").read_text()
     assert "| `online_tcm`" in guide and "`online_tcm` (online): `rule`" in guide
@@ -85,9 +84,7 @@ def test_guide_is_true():
                    "precondition:alpha", "precondition:overlap", "precondition:asymptote", "precondition:size",
                    "precondition:known-parameter", "undetermined:asymptote", "undetermined:rho-sign"):
         assert f'"{reason}"' in code, reason
-    out = io.StringIO()
-    assert main(["run", "online_tcm", "--route", "online"], out, io.StringIO()) == 0
-    v = json.loads(out.getvalue())["values"]
+    v = build_result("online_tcm", "online", {})[1].values
     assert f"`eps_constant` {v['eps_constant']:.6f}" in guide, v["eps_constant"]
     v = run_cached(catalog()["online_tcm"], "online", {"rule": "local_optimal", "K": "3", "alpha": "5"})[0]
     for key in ("noise_equivalent", "eps", "rho_perceptron_mapped", "eps_constant", "eps_constant_perceptron"):

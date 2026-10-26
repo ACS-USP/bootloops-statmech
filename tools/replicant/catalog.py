@@ -304,8 +304,8 @@ UNCLAIMED.update({("online_drift", k): (
     "tests/test_online_drift.py") for k in ("random_perceptron_exponent", "det_perceptron_exponent")})
 UNCLAIMED.update({("online_tcm", f"cc95_fig1_es_a{a}"): (
     "CC95 Fig. 1 read off the figure: the nonlocal K = 3 ODE (a 3D field average per step) to alpha = 16.5 costs "
-    "about 1.5 s, so it is checked in the slow test tests/test_online_tcm.py "
-    "test_cc95_figure1_and_the_integrated_asymptote") for a in ("3p3", "6p7", "10", "16p5")})
+    "about 3.5 s at rtol 1e-9 (measured by the O4 reviewer), so it is checked in the slow test "
+    "tests/test_online_tcm.py test_cc95_figure1_and_the_integrated_asymptote") for a in ("3p3", "6p7", "10", "16p5")})
 
 def _freeze(p):
     return tuple(sorted((k, tuple(v) if isinstance(v, list) else v) for k, v in p.items()))
