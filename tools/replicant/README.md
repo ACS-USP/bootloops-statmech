@@ -106,8 +106,13 @@ series` for `series_ising2d`, `--route bound` for `sk_bounds`, and `--pdf` (with
   and optimal modulations, their averages, closed-form stationary states and KC93's I(lambda)),
   `simulate_drift.py` (finite-N with the teacher drifting); catalog entry `online_drift`
   (`catalog_online_drift.py`, `latex_online_drift.py`).
+  O4: `tcm.py` (the tree committee machine: the other hidden units' internal-representation average,
+  the committee error, the branch field averages for Hebb, the local and CC95's nonlocal optimal rules, and
+  the CKC96 noise mapping), `tcm_flow.py` (its ODEs, integration, closed forms and asymptotic constants),
+  `simulate_tcm.py` (finite-N TCM learning); catalog entry `online_tcm` (`catalog_online_tcm.py`,
+  `latex_online_tcm.py`).
 - `catalog*.py`, `compose.py` (+ `compose_result.py`: `Result` and the finality rule), `cli.py`,
-  `__main__.py`: the 22-entry catalog (`catalog_ts.py` holds the teacher-student entry,
+  `__main__.py`: the 23-entry catalog (`catalog_ts.py` holds the teacher-student entry,
   `catalog_pspin.py` the two p-spin entries; LaTeX in `latex_pspin.py`), the composer,
   the command line.
 - `latex*.py`, `tex*.py`, `derive_tex.py`: the LaTeX derivation writer.

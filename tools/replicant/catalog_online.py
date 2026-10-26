@@ -211,7 +211,8 @@ def online_perceptron():
 def online_entries():
     from .catalog_online_drift import online_drift
     from .catalog_online_linear import online_linear
-    return [online_perceptron(), online_linear(), online_drift()]
+    from .catalog_online_tcm import online_tcm
+    return [online_perceptron(), online_linear(), online_drift(), online_tcm()]
 
 
 __all__ = ["online_entries", "online_perceptron"]

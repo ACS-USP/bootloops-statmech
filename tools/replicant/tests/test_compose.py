@@ -293,6 +293,7 @@ _DOCUMENTED = {
     ("online_linear", "online"): {"rule", "constraint", "eta", "M", "R0", "Q0", "alpha", "N", "seeds"},
     ("online_drift", "online"): {"rule", "drift", "D", "eta", "noise", "noise_estimate", "R0", "Q0", "alpha", "N",
                                  "seeds"},
+    ("online_tcm", "online"): {"rule", "K", "eta", "R0", "Q0", "alpha", "N", "seeds"},
     ("viana_bray", "cavity"): {"graph", "k", "c", "J", "beta", "ansatz", "m", "ys", "pop",
                                "inner", "sweeps", "burn_in", "runs", "seed",
                                "require_equilibrated"},

@@ -241,6 +241,20 @@ CLI (from `tools/`):
   (|J| settles under drift), `eps` 0.247551, `eps_sim` 0.243858 (`eps_sim_halfwidth99` 0.0116: 20 named
   seeds at N = 200).  `--param rule=hebb --param D=0.1` is refused `no-solution:no-tracking` (plain Hebb:
   R -> eta a / D while Q grows, eps -> 1/2).  No value is final.
+- Worked example, the tree committee machine (`online_tcm`, route `online`; K odd non-overlapping branches,
+  majority vote, Copelli & Caticha 1995 (CC95) and Copelli, Kinouchi & Caticha 1996 (CKC96, abstract
+  only); about 1 s each, measured): `python3 -m replicant run online_tcm --route online` (the defaults:
+  CC95's nonlocal optimal rule at K = 3) -> `eps_constant` 0.883400 (CC95 Eq. (32): 0.88, the perceptron's
+  constant), from the rate at theta -> 0.  `--param rule=local_optimal --param alpha=5` (the branch sees
+  only its own field) -> `noise_equivalent` 0.250000 (the mapped output noise (1 - P0)/2, P0 = 1/2 the
+  tie probability of the other two hidden units), `eps` 0.211221 (the TCM ODE),
+  `rho_perceptron_mapped` 0.868537 (O1's noisy-perceptron ODE at alpha_p = 3 alpha; `equivalence_gap`
+  6e-13), `eps_constant` 2.665178 against `eps_constant_perceptron` 2.665178 (P0 C(1/4)).  `--param
+  rule=hebb --param alpha=3
+  --param N=300` -> `eps_exponent` 0.497367 (alpha = 1e4), `eps_constant` 0.690985 (CC95: sqrt(3/2pi)),
+  `eps` 0.321157, `eps_sim` 0.321281 (`eps_sim_halfwidth99` 0.0036, 20 named seeds at N = 3 x 100).
+  `--param K=5` with the default rule is refused `unsupported:K` (the nonlocal rule is written for K = 3;
+  `local_optimal` and `hebb` take any odd K).  No value is final.
 - Worked example, amp route (`sk`, `teacher_student`; under 1 s each, measured):
   `python3 -m replicant run sk --route amp --param beta=1.5` -> `q_se` 0.352602 (the SE fixed point,
   `exact-by-literature`: Bayati-Montanari Thm 4 proves SE for AMP on Gaussian J; it is the AMP limit,
@@ -455,6 +469,18 @@ term, "coupling" adds a W-dependent one). `drift_rules.vkc_modulation(rule, delt
 `kc93_stationary(D, kind)`. `simulate_drift.simulate_drift(rule, N, alpha_max, seeds, D, drift, eta, noise,
 noise_estimate, init, alphas, jumps, jump_overlap)` -> `SimResult`. Example:
 `drift.stationary(drift.drift_flow("optimal", D=0.1)).eps` -> 0.195856.
+`from replicant.online import tcm, tcm_flow, simulate_tcm` (O4; floats): `tcm.tie_distribution(K)`,
+`tcm.tie_probability(K)` (P0), `tcm.eps_committee(e, K)` (e a number or K branch errors; CC95 Eq. (5) at
+K = 3), `tcm.averages(rule, theta, K)` -> `Averages(ay, ax, a2, drive)` (rule hebb | local_optimal |
+optimal), `tcm.OPTIMALITY_CLASS`; the mapping, which the TCM route never calls: `tcm.effective_noise(K)`
+(lambda_K = (1 - P0)/2), `tcm.perceptron_alpha(alpha, K)` (K alpha); `_PLANT` (private: "mapping",
+"time"). `tcm_flow.tcm_flow(rule, K=3, eta=1.0)` -> `TcmFlow` (`.rates(alpha, R, Q)`,
+`.theta_rate(theta, Q)`); `tcm_flow.integrate_tcm(flow, alpha_max, init=(R0, Q0), alphas=None)` ->
+`TcmTrajectory(alpha, R, Q, rho, eps_branch, eps)`; `tcm_flow.hebb_closed_form(alpha, K, eta, init)`;
+`tcm_flow.asymptote_tcm(flow, init, alpha_big=1e4)`; `tcm_flow.rate_limit_constant(flow)`; `_PLANT`
+(private: "inv_k" multiplies the 1/K of the eta^2 term). `simulate_tcm.simulate_tcm(rule, K, N, alpha_max,
+seeds, eta, init)` -> `TcmSimResult(alpha, eps_mean, band, eps_seeds, K, N, seeds)`. Example:
+`tcm_flow.integrate_tcm(tcm_flow.tcm_flow("local_optimal", 3), 5, (0.01, 1), alphas=(5,)).eps[0]` -> 0.211221.
 `from replicant.series import ...` (E8; exact `Fraction` coefficients; needs `tools/` on the path for
 `tools/annihilator`): `ising2d_free_energy_series(order, variable="v")` -> [a_0 .. a_order] in v =
 tanh K (`variable="u"`: [b_0 .. b_order] in u = v^2; anything else `unsupported:variable`; order <=
@@ -598,7 +624,12 @@ simulation; needs `alpha`) and `seeds` (default 0-19; needs `N`); `online_drift`
 deterministic), `D` (>= 0; without it the small-drift law, noiseless rules only), `eta` (O1 rules; the
 optimal and VKC rules need 1), `noise`, `noise_estimate` (optimal rule only), `R0`, `Q0` (default R0 = 0.01
 for the rules that read rho, else 0; Q0 = 1), `alpha` (the learning curve and its KC93 bound), `N`
-(finite-N simulation with the teacher drifting; needs `alpha`) and `seeds` (default 0-19; needs `N`).
+(finite-N simulation with the teacher drifting; needs `alpha`) and `seeds` (default 0-19; needs `N`);
+`online_tcm` (online): `rule` (optimal (default; CC95's nonlocal rule, K = 3) | local_optimal | hebb),
+`K` (odd, default 3), `eta` (Hebb; the optimal rules need 1), `R0`, `Q0` (default R0 = 0.01 for the
+optimal rules, else 0; Q0 = 1), `alpha` (the learning curve and, for the local rules, the mapped
+perceptron), `N` (finite-N simulation; a multiple of K with N/K >= 10, needs `alpha`) and `seeds`
+(default 0-19; needs `N`).
 Without `beta` an entry returns its T = 0 / critical headline values. A composed spec
 (not a catalog entry) does not refuse an unknown name: its notes list "unused parameters [...]".
 
@@ -641,6 +672,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `unsupported:rule`, `precondition:eta`, `:noise`, `:optimal-eta`, `:initial-overlap`, `:alpha`, `:overlap`, `:averages`, `:asymptote`, `undetermined:asymptote`, `:rho-sign`, `no-solution:rho-zero`, `:step-size`, `:overflow` | online (`online/`, `online_perceptron`): a rule that is not hebb / perceptron / adatron / optimal or a callable; eta not a finite number > 0 (also a schedule turning non-positive); a flip probability outside [0, 1/2); the optimal rule with eta != 1 or a schedule; (R0, Q0) with Q0 <= 0 or rho0 >= 1, or R0 <= 0 for the optimal rule; alpha <= 0; rho <= 0 for the optimal modulation; a measured log-slope further than 0.01 from the derived exponent; a simulated seed of the optimal rule reaching rho <= 0; the optimal flow reaching rho = 0 at finite alpha (below the no-learning line); the step-size or ln Q > 700 guards |
 | `unsupported:rule`, `unsupported:algorithm`, `precondition:eta`, `:optimal-eta`, `:constraint`, `:teacher-norm`, `:averages`, `:state-point`, `:initial-overlap`, `:alpha`, `:asymptote`, `:offline-window`, `:method`, `undetermined:asymptote`, `:crossing`, `:descent`, `no-solution:rho-zero` | online (`online/linear*.py`, `simulate_linear.py`, `online_linear`): a rule other than standard / optimal or a callable F(b, h, Q, R); an offline algorithm other than standard / optimal; eta not > 0 nor `greedy`; the optimal rule with eta != 1 or greedy; a constraint other than sphere / none; M <= 0; (R0, Q0) with Q0 < 0 (or = 0 on the sphere, for the optimal or greedy rule), R0^2 > Q0 M, J0 = B, or R0 <= 0 for the optimal rule or the greedy eta; alpha <= 0; an asymptote off the sphere or not converged to 1e-9 between 45 and 60; the standard offline algorithm on an unrealizable sphere (alpha > Q/M, or alpha >= 1 with Q != M); no single crossing on the grid; R <= 0 under the optimal modulation or the greedy eta; `simulate_offline` with method descent for the optimal algorithm (its finite-N zero-error set is degenerate) or descent not converged in 20000 steps |
 | `unsupported:rule`, `unsupported:stationary`, `precondition:drift`, `:drift-kind`, `:optimal-eta`, `:known-parameter`, `:noise`, `:initial-overlap`, `:alpha`, `:averages`, `:overlap`, `undetermined:stationary`, `:small-drift`, `:rho-sign`, `no-solution:no-tracking` | online with drift (`online/drift*.py`, `simulate_drift.py`, `online_drift`): an unknown rule; a stationary state for a callable F(h, b, Q); D < 0 or a schedule where a constant D > 0 is needed (stationary, small drift); a drift other than random / deterministic; a VKC rule at eta != 1 or with noise_estimate; R0 <= 0 or jump_overlap <= 0 for a rule that reads rho (optimal, VKC); jumps outside (0, alpha_max); several stable stationary states; a small-drift log-slope more than 0.01 from the derived exponent; a simulated seed reaching rho <= 0 under a rule that reads rho; plain Hebb under drift (R -> eta a / D while Q grows: no stationary state) |
+| `unsupported:rule`, `unsupported:K`, `precondition:K`, `:eta`, `:optimal-eta`, `:initial-overlap`, `:state-point`, `:alpha`, `:overlap`, `:asymptote`, `:size`, `:known-parameter`, `undetermined:asymptote`, `:rho-sign`, `no-solution:step-size` | tree committee machine (`online/tcm*.py`, `simulate_tcm.py`, `online_tcm`): a rule other than hebb / local_optimal / optimal; the nonlocal rule at K != 3; K not an odd integer >= 1 (or K branch errors missing); eta not > 0, or != 1 for an optimal rule; Q0 <= 0, rho0 >= 1, or R0 <= 0 for an optimal rule; integrating without a state or with alpha <= 0; theta outside (0, pi) (or rho <= 0 for an optimal rule); a rate-limit constant for Hebb; N not a multiple of K with N/K >= 10; seeds without N; a log-slope more than 0.01 from the derived exponent; a simulated branch reaching rho <= 0; the shared integrator's step underflow (e.g. ln Q overshooting from a tiny Q0) |
 | `precondition:order-parameter`, `:levels`, `:digits`, `:K`, `:temperature-range`, `unsupported:field`, `undetermined:stationary-points`, `ambiguous:minimiser`, `no-solution:certification`, `:radius-stall` | bounds (`bounds/`, `sk_bounds`): q or m outside Guerra's admissible set (q nondecreasing in [0, 1], m nondecreasing in (0, 1]); overlap / Parisi-parameter counts that do not match; digits not an int 1 .. 200; K outside 1 .. 5 (catalog: 1 or 2); K-step staircases outside 1 < beta <= 3 or with h != 0; the stationary points of P_RS not certified complete (a cover or monotone run undecided); two local minima with overlapping values; interval Newton or the precision escalation failing |
 | `precondition:coupling-matrix`, `:pm-one-couplings`, `:enumeration-size`, `:integer-patterns`, `:seed`, `:betas`, `:sweeps`, `:nbetas`, `:windows`, `:sizes`, `:samples`, `:order`, `:supported-disorder-law`, `no-solution:capacity`, `undetermined:ground-states`, `undetermined:equilibration` | Monte Carlo and enumeration (`numerics/`): J not a finite symmetric matrix with zero diagonal (PT: a stack of them), or not +-1/sqrt N for the +-J spectrum; N above the enumeration limit (SK 26, perceptron 30); P not an int >= 0, or alpha N not an integer; a seed not an int >= 0 (or a list of them); betas not positive and strictly increasing (the finite-size thermal route also needs beta > 0.5, `moments.pm_one_gap_limit` 0 <= beta < 1); sweeps / nbetas not an int >= 1 or betas not a sequence (never a silent default); fewer than two samples or a window split that is empty; fewer than three distinct sizes, or a size without >= 2 samples; a closure order other than 2, 3; a law other than `pm_one`, `gaussian`; every drawn pattern stored (draw more); the two PT runs of a sample disagreeing on its ground state (raise sweeps); a size whose late and early energy windows differ beyond the 99% band (raise sweeps) |
 | `unstable:<ansatz>` | `require_final` or `require_stable`: a computed stability is negative (RS replicon or cavity lambda < 0); `unstable:1rsb` also from `pspin_gardner_temperature` when the spherical scan is negative everywhere |
@@ -656,7 +688,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `unbanked:missing-entry`, `:malformed`, `:no-citation`, `:no-independent-route` | a banked reference value is absent or has no citation / no independent route (a value that fed a fit never certifies it) |
 | `tex-engine:failed`, `tex-engine:unavailable` | `--pdf`: the engine ran and failed, or could not reach its offline resources |
 
-CATALOG (21 entries: the 7 of v1, 12 added by the extensions E4-E10 and 2 by the online-learning tasks O1, O2; `list` shows the live table;
+CATALOG (23 entries: the 7 of v1, 12 added by the extensions E4-E10 and 4 by the online-learning tasks O1-O4; `list` shows the live table;
 values at the default / banked state points):
 
 | entry | routes | headline values | banked references | finality |
@@ -682,6 +714,7 @@ values at the default / banked state points):
 | `online_perceptron` online learning of a perceptron teacher (Hebb, perceptron, AdaTron, optimal; output noise) | online | `eps_exponent`, `eps_constant` (alpha = 1e4; noiseless or Hebb), optimal `eps_constant_formula`; at `alpha`: `eps`, `R`, `Q`, `rho` (Hebb: `eps_hebb_closed_form`); optimal with noise: `no_learning_boundary`, `robust_boundary`; with `N`: `eps_sim` | exponents and constants for the four rules (Biehl-Riegler Eqs. (7), (8), (15); 0.88 from VKC 1998 Tables I-II, Kinouchi-Caticha 1992 not fetched); no-learning line 2 lam - 1/2 at lam = 0.3, 0.4 (Copelli et al. p. 5); robust line at lam = 0.2, 0.3, 0.4 READ OFF Copelli et al. Fig. 1a (tol 0.003) | all not-computed (physics-level ODE limit, self-averaging assumed); `eps_sim` statistical |
 | `online_linear` online versus offline learning of a linear teacher (standard F = b - h and the optimal F = (Q/R) b - h; sphere or unconstrained; greedy eta) | online | at `alpha`: `rho`, `eg`, `R`, `Q`, `eps_sign`, optimal `gamma_temperature`, greedy `eta_greedy`, `rho_offline_standard` / `_optimal`, `eg_offline_*`, `rho_offline_optimal_ridge`, `eg_pinv_ridge`; on the sphere at eta = 1: `rho_inf`, `eg_inf`, optimal `tail_constant`, `alpha_cross`; with `N`: `eg_sim`, `rho_sim` | Kinouchi-Caticha 1995 (preprint IFUSP/P-1157 read): rho_opt = sqrt(1 - e^-alpha) at alpha = 1, 3 (Eq. (19)), rho_std = 1 - e^-1 (Eq. (26)), rho_max 0.8 at M/Q = 4 (Eq. (24)), e_g^oo 0.9 / 0.5 at Q = 4 (Eq. (25)), tail 1/2 (Eq. (31)), offline rho = alpha, sqrt(alpha) and e_g = 1 - alpha, 1 - sqrt(alpha) (Eqs. (27), (49), (53), (54)), the crossing 0.71 (p. 11, tol 0.005) | all not-computed (physics-level ODE limit; offline from the derived zero-energy geometry); `eg_sim` statistical |
 | `online_drift` online learning of a drifting perceptron teacher (random or deterministic drift; the O1 rules and VKC's annealed Hebb, step, symmetric and optimal modulations) | online | without `D`: `eps_exponent`, `eps_coefficient` (small-drift law); with `D`: `eps_inf`, `theta_inf`, perceptron `Q_inf`, the KC93 bound `eps_inf_bound`, annealed Hebb `eps_inf_closed`, optimal `eps_inf_kc93`; at `alpha`: `eps`, `R`, `Q`, `rho`, `eps_bound`; with `N`: `eps_sim` | VKC 1998 (arXiv read): Tables I-II small-drift coefficients and exponents of the four rules (random and deterministic; the deterministic optimal formula as printed is inconsistent with its 0.63, the number is banked), Figs. 4 and 6 read off at two D each (tol 0.003); KC93 (preprint IFUSP/P-1044 read) C = 0.447 (Eq. (25)); VKC p. 15's perceptron delta = 5, 8 banked but UNCLAIMED (replicant derives 3, 4) | all not-computed (physics-level ODE limit); `eps_sim` statistical |
+| `online_tcm` online learning in the tree committee machine (K odd non-overlapping branches, majority vote; CC95's nonlocal optimal rule, the local optimal rule, Hebb) | online | `eps_constant` (optimal rules: the rate limit; Hebb: closed form), `eps_exponent` (local rules, alpha = 1e4), local `eps_constant_perceptron`; local rules: `noise_equivalent`, `time_factor`, at `alpha` `rho_perceptron_mapped`, `equivalence_gap`; at `alpha`: `eps`, `eps_branch`, `R`, `Q`, `rho`; with `N`: `eps_sim` | CC95 (preprint IFUSP/P-1126 read): kappa 0.88 (Eq. (32)) and its printed integral, pseudo-Hebb rho(alpha) (Eq. (30)) at alpha = 1, 5, 20 and sqrt(3/2pi); Fig. 1 read off at four alpha (tol 0.003; UNCLAIMED, slow test); CKC96 (abstract only): exponents 1 (local learning) and 1/2 (Hebb) at finite K | all not-computed (physics-level ODE limit); `eps_sim` statistical |
 | `viana_bray` sparse +-J | cavity | `beta_c` (3-regular) 0.881374; T = 0 RS `p0` 1/3, `e0` -23/18; factorized 1RSB -1.27231, mu* 0.4174 | those, plus slow/statistical population-dynamics RS and 1RSB at k = 5, T = 0.8 | `beta_c` stable; the rest not-computed |
 
 HELD-OUT EVIDENCE (the test of REUSE; `tests/test_heldout_sk.py`, `tests/test_heldout_perceptron.py`,
@@ -763,11 +796,15 @@ and exact enumeration (E11), and the online-learning ODEs, Gaussian averages and
 band (O1), the linear perceptron's ODEs, closed forms, offline geometry, ridge route and small online and
 offline simulation bands (O2), the drift flow, the VKC modulations and their class maximisation, VKC's
 drift-independence claim, the KC93 bound for every rule, stationary states and small-drift laws against
-the bank and a small drifting-teacher simulation band (O3). `--full` adds 138 `@slow` tests (full-RSB Parisi up to K = 9,
+the bank and a small drifting-teacher simulation band (O3), the TCM's internal-representation averages,
+CC95 Eqs. (5), (21), (24), (30), (32) against the TCM route, CKC96's equivalence with O1's noisy perceptron
+(and a planted wrong mapping failing), the asymptotic constants against K and a K = 3 simulation band
+(O4). `--full` adds 142 `@slow` tests (full-RSB Parisi up to K = 9,
 population dynamics at reference sizes, the XORSAT GF(2) crossing at N = 400-2000 and leaf removal at
 N = 100000, the K-SAT SP-population crossing and BP window, the LDPC crossing at N = 20000, the spiked
 AMP and SBM bands at reference sizes, the ridge 1/n bands at n = 400, 1000, the online ODE-vs-simulation
-bands at N = 1000 (8 s; linear perceptron 2.3 s; drifting teacher 9 s), the 2RSB certified bound and
+bands at N = 1000 (8 s; linear perceptron 2.3 s; drifting teacher 9 s; TCM at N = 3 x 300 4 s, CC95 Fig. 1
+and the nonlocal asymptote 8 s), the 2RSB certified bound and
 the K = 5 chain, the E11 Monte Carlo / enumeration held-out routes (about 4.6 min), the Hopfield replicon
 scans, the p-spin T -> 0 energy, solver-based composed and LaTeX checks, a PDF compile when a TeX engine
 is present) and takes about 18 minutes on a laptop (measured 18 min 11 s, 557 tests); run it before merging a change to a family. The `@slow` marker is
@@ -1360,6 +1397,27 @@ KNOWN HAZARDS:
   inequality (42), delta > 1/beta + 2 = 5. VKC's values are banked, UNCLAIMED, recorded as a
   discrepancy. VKC p. 15 also prints "beta = 1 for the Hebb algorithm", which should read beta = 1/2
   (their Table I, annealed Hebb 0.40 alpha^-1/2).
+- Tree committee machine (O4, `online/tcm.py`, `tcm_flow.py`, `simulate_tcm.py`, entry `online_tcm`).
+  Papers: Copelli & Caticha 1995 (J. Phys. A 28, 1615; the preprint IFUSP/P-1126, October 1994, scanned,
+  read page by page); Copelli, Kinouchi & Caticha 1996 (Phys. Rev. E 53, 6341): ONLY THE ABSTRACT was read
+  (APS 403, closed access at repositorio.usp.br, no arXiv copy, the neuroprose file gone, not among the
+  IFUSP preprints P-1127-P-1300), so its epsilon(K), its figures and its K -> oo analysis are not used.
+  Conventions: K odd branches of N/K inputs, |B_k| = 1 (CC95's B_k^2 = 1), Gaussian inputs (CC95 use
+  +-1), J_k <- J_k + (1/N) F_k xi_k, alpha = examples / N (= CKC96's alpha_CM, examples per adjustable
+  weight), eps = P(TCM outputs differ), branch-symmetric overlaps. CC95's "optimal" (expected stability)
+  rule is NONLOCAL (branch k reads every student field) and is implemented at K = 3 only; it is optimal
+  only in `tcm.OPTIMALITY_CLASS["optimal"]` (greedy, true rho, eta = 1). `local_optimal` reads only the
+  branch's own field; it is the CKC96 "local learning", identical (derived here) to O1's optimal noisy
+  perceptron at lambda_K = (1 - P0)/2 (P0 the tie probability of the other K - 1 hidden units: 1/4 at K =
+  3, 5/16 at K = 5) on N/K inputs at alpha_p = K alpha. The TCM route computes its own field averages
+  (the posterior over the other units' internal representations) and never calls the mapping; the
+  identity holds to 1e-12 and fails under a planted wrong noise or time map. CC95's Eq. (32) integral
+  gives 0.883400, the perceptron's C(0), which also supports O1's reading of Copelli et al. 1997 Eq. (8)
+  as a typo. CC95's Eq. (21) as printed agrees with the TCM route to 2e-7 (quadrature), and their Eqs.
+  (19)-(20), typed into the simulator, reproduce the nonlocal ODE at N = 3 x 300. CC95's pseudo-Hebb
+  (constant step) from J = 0 is plain Hebb: rho does not depend on the step. The local rule's constant
+  P0 C(lambda_K) (0.883, 2.665, 3.652 at K = 1, 3, 5) grows with K, while the nonlocal rule keeps 0.88
+  (K = 3; CEKBSRC97 p. 4 state it for every K, not checked beyond K = 3).
 - families/sk.py's float64 1RSB functional (`_rsb_phi_e`, 80 x 80 Gauss-Hermite; v1 code, unchanged) is
   inaccurate in the q0 = 0 / large q1 - q0 sector, where the branch points of cosh^m (zeros of cosh at
   Im = pi/2) are not smoothed by an outer Gaussian average. Against the certified balls of bounds/krsb.py:
@@ -1413,7 +1471,7 @@ RSB analysis of [SK94]; the Viana-Bray model [VB85], the sparse cavity and popul
 [Ran11] [BKMMZ19] with [JM13], the binary teacher-student thresholds [Gyo90] [BKMMZ19] [LHZH22]. Random K-XORSAT (`csp/`): the cavity / leaf-removal solution [MRZ03] [CDMM03], the proofs of the threshold [DM02] [PS16] and of the 2-core [Mol05], the textbook treatment [MM09] and the solution geometry [IKKM15] [AM15]. Random K-SAT: BP and survey propagation [BMZ05] [MPZ02] [MZ02],
 the SP population dynamics and thresholds [MMZ06] [LM19], the clustering / condensation thresholds
 [KMRSZ07], the first-moment bound [FP83] and the proof for large K [DSS22]. LDPC codes on the BEC (`inference/`): density evolution and the peeling decoder [LMSS01] [MM09], the Maxwell construction and the MAP threshold [MMU08] [KRU10] [RU08], tabulated thresholds [KRU12] [Pfi15]. Spiked Wigner and the block model (`inference/`): the Bayes-optimal limits and state evolution [LeMi19] [MV21] [DAM15] [BDMKLZ16], the spectral threshold [FP07] [BGN11], the block-model BP and thresholds [DKMZ11] [MNS15] [Mas14] [MNS18]. Ridge regression (`learning/`): [HMRT22] [DW18] [AS20] [LGCGKMZ21] with [SS07] [TV04], context [BLLT20]. Exact series (`series/`): Onsager's integral [Ons44] [KW41] as printed by [DC22] [Bax10], the coefficient table [Fin99] [HM87], the hypergeometric identities [DLMF], the susceptibility series and its natural boundary [A002906] [Nic99] [ONGP01], the non-holonomic control [FGS05]. The universality of the SK free energy used in the held-out test is [CH04]. Solvable lattice models (`lattice/`): Onsager's free energy [Ons44] and Yang's magnetization [Yan52] as printed by [DC22], the critical constant [A242743], Kaufman's torus [Kau49] as printed by [IH02] [Kas06], the Bethe-lattice ferromagnet [DM10], the 1D transfer matrix [WDC19] [Bax82] [Wiki-Ising]; ball arithmetic is Arb [Joh17] through tools/baller. Bounds on the SK
-pressure (`bounds/`): the broken-replica bound [Gue03], the high-temperature identity [Gue92] [ALR87]. Online learning (`online/`): the perceptron learning curves [BR94], the variational optimal modulation [KC92] as restated by [VKC98] and [BR94], output-noise robustness [CEKBSRC97], the linear perceptron online versus offline [KC95], drifting rules [VKC98] [KC93]. Monte Carlo and enumeration (`numerics/`): the finite-size exponent and the banked finite-N ground energies [Boe05] [Pal03], the exchange rule of parallel tempering [HN96]. Reference digits are read
+pressure (`bounds/`): the broken-replica bound [Gue03], the high-temperature identity [Gue92] [ALR87]. Online learning (`online/`): the perceptron learning curves [BR94], the variational optimal modulation [KC92] as restated by [VKC98] and [BR94], output-noise robustness [CEKBSRC97], the linear perceptron online versus offline [KC95], drifting rules [VKC98] [KC93], the tree committee machine [CC95] [CKC96]. Monte Carlo and enumeration (`numerics/`): the finite-size exponent and the banked finite-N ground energies [Boe05] [Pal03], the exchange rule of parallel tempering [HN96]. Reference digits are read
 from [Sto25] [OSS07] [CRT03] [SY17] [DM15] [FP16] [Gyo01] [PRGE20] [Cov65] [Bar97] as stated in the bank
 cites. The typed-step architecture, the symbolic level (a), the composer, the refusal and
 finality discipline and the LaTeX writer are ours. Each bank entry names the source its digits were

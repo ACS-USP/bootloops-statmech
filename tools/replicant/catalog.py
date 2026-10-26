@@ -302,6 +302,10 @@ UNCLAIMED.update({("online_drift", k): (
     "replicant's ODE gives 1/delta = 1/3, 1/4 with eps_inf = (4D)^(1/3)/pi, 2^(5/4)/pi D^(1/4) (online/drift.py "
     "drift_exponent), and delta = 3 violates VKC's inequality (42); checked against this key's failure in "
     "tests/test_online_drift.py") for k in ("random_perceptron_exponent", "det_perceptron_exponent")})
+UNCLAIMED.update({("online_tcm", f"cc95_fig1_es_a{a}"): (
+    "CC95 Fig. 1 read off the figure: the nonlocal K = 3 ODE (a 3D field average per step) to alpha = 16.5 costs "
+    "about 1.5 s, so it is checked in the slow test tests/test_online_tcm.py "
+    "test_cc95_figure1_and_the_integrated_asymptote") for a in ("3p3", "6p7", "10", "16p5")})
 
 def _freeze(p):
     return tuple(sorted((k, tuple(v) if isinstance(v, list) else v) for k, v in p.items()))

@@ -364,7 +364,7 @@ def derivation(name, route):
     mod = {"ldpc_bec": "inference", "series_ising2d": "series", "ridge": "learning",
            "spiked_wigner": "spiked_sbm", "sbm": "spiked_sbm", "ising2d": "lattice", "ising1d": "lattice",
            "bethe_ising": "lattice", "sk_bounds": "bounds", "online_perceptron": "online",
-           "online_linear": "online_linear", "online_drift": "online_drift"}.get(name)
+           "online_linear": "online_linear", "online_drift": "online_drift", "online_tcm": "online_tcm"}.get(name)
     if mod is not None:
         from importlib import import_module
         return getattr(import_module(f".latex_{mod}", __package__), name)(route)
