@@ -32,6 +32,18 @@ Independent routes (none is computed by the code under test, none feeds it):
   SK (d)  AMP run on actually sampled +-J matrices (amp/sk.py, which imports none of the
           replica, cavity or family code): the composed q at beta = 1.5, h = 0.8 against
           the 99% Student-t band of the finite-N AMP q over named seeds (E3b).
+  E11 (tests/heldout_mc.py; Monte Carlo and exact enumeration, numerics/; none uses the
+  composer, every comparison target is computed after the measurement):
+  SK (e)  Gaussian SK ground energy by parallel tempering (N = 16..128, N^-2/3 extrapolation)
+          against the banked Parisi value; the RS value must be excluded (control).
+  SK (f)  +-J SK energy at beta = 2 by PT (N = 64, 128, 256) against the composed RS and 1RSB
+          energies; what the bands resolve is printed, only resolved contrasts are asserted.
+  SK (g)  exact E ln Z (Gray-code enumeration, N = 12..22, beta = 0.7, 0.9) against ln E Z: the
+          quenched-minus-annealed gap and the moment closure of numerics/moments.py; this
+          tells quenched from annealed, which the v1 check (a) (n = 1 only) cannot.
+  Perceptron (e)  exact counts at N = 12..24 extrapolated in 1/N against the composed S(alpha)
+          and its zero; the spherical site must be excluded (control).  (d) stays: it is the
+          v1 N <= 14 check; (e) is the larger-N route, not a replacement.
 """
 import itertools
 import math
@@ -51,6 +63,8 @@ from replicant.core import Refusal, State, run_pipeline
 from replicant.refdata import check, load
 from replicant.spec import ModelSpec
 from replicant.testing import slow
+
+import heldout_mc as MC
 
 LN2 = mp.log(2)
 FINITE_SIZE_C = 1        # enumeration slack c/N (assumed scale of finite-size corrections)
@@ -381,6 +395,83 @@ def test_heldout_pm_one_sk_q_vs_amp_on_pm_one_matrix():
                               law="pm_one", reaction=False).band
     print(f"naive mean field: q = {naive.mean:.5f} +- {naive.half_width:.5f}")
     assert _amp_failures(q, naive), naive
+
+
+@slow
+def test_pt_sk_energy_extrapolates_to_parisi():
+    """(e) Gaussian SK ground energy: PT minima (two independent runs per sample must agree;
+    exact enumeration at N = 16) at N = 16, 32, 64, 128, extrapolated as e_inf + a N^-2/3
+    (band: 99% t plus the omega = 3/4 and drop-N = 16 shifts).  The banked Parisi values lie
+    inside; the RS value -sqrt(2/pi) lies outside (positive control).  1RSB (-0.76526) is 2e-3
+    from Parisi, below the attainable band: printed, not asserted."""
+    fails, lines = MC.ground_state_check()
+    print("\n".join(lines))
+    assert not fails, fails
+
+
+@slow
+def test_pm_one_sk_finite_T_energy_vs_composed_rs_and_1rsb():
+    """(f) +-J SK at beta = 2 (T = 0.5).  PT energies at N = 64, 128, 256 (equilibration
+    diagnostic required at each size) against the composed RS energy (S - phi)/beta and the
+    composed 1RSB energy -d phi/d beta (central difference), both computed by the composer.
+    Asserted: at N = 256 both composed values lie below the 99% band (RS-vs-PT difference
+    exceeds the band; so does 1RSB's: the finite-N energy lies above); the extrapolated band
+    (omega = 2/3, stressed by 3/4 and 1) contains the composed 1RSB energy; the planted doubled
+    +-J variance (composed RS energy) is excluded.  "1RSB closer than RS" is printed with the
+    measured resolution and not asserted (not resolved at this budget)."""
+    import dataclasses
+    calc = compose(_pm_one_sk())
+    law = D.LAWS["pm_one"]
+    doubled = dataclasses.replace(
+        law, cgf=lambda t, N: sp.log(sp.cosh(sp.sqrt(2) * t / sp.sqrt(N))))
+    planted = _with(D.LAWS, "pm_one", doubled, lambda: MC.composed_energy_rs(compose(_pm_one_sk())))
+    assert D.LAWS["pm_one"] is law
+    fails, lines = MC.finite_t_check(MC.composed_energy_rs(calc),
+                                     MC.composed_energy_1rsb(compose(_pm_one_sk(), ansatz="1rsb")),
+                                     planted)
+    print("\n".join(lines))
+    assert not fails, fails
+
+
+@slow
+def test_enumeration_logZ_vs_annealed_and_quenched_expansion():
+    """(g) +-J SK (the held-out law), beta = 0.7 and 0.9 (< 1), N = 12, 16, 20, 22: exact
+    ln Z per sample by Gray-code enumeration; E ln Z - ln E Z over many samples (99% t band).
+    Asserted at every (N, beta): the annealed value 0 is excluded (quenched != annealed, per
+    spin a gap of O(1/N)); the +-J second-order closure -L2/2 (exact finite-N moments) lies
+    within the band plus |order 2 - order 3|.  Control: at beta = 0.7 the same closure with
+    Gaussian-law moments is excluded (the law's correction matters).  At beta = 0.9 the
+    closure's truncation estimate is large (printed)."""
+    fails, lines = MC.log_z_check()
+    print("\n".join(lines))
+    assert not fails, fails
+
+
+@slow
+def test_ising_perceptron_log_count_vs_composed_entropy():
+    """(e) Exact counts by meet-in-the-middle Gray-code blocks at N = 12, 16, 20, 24 (the
+    largest size the 2-minute budget allows: N = 24 is ~0.1 s per pattern set), nested
+    patterns P = 3N.  ln 0 hazard: the estimator is E ln(1 + count) / N (defined at every
+    sample), and the band includes its shift to the estimator conditioned on count > 0.
+    1/N extrapolation, band = 99% t + the largest shift over (drop N = 12, quadratic in 1/N,
+    conditioned estimator).  Asserted: the composed S(alpha) at 0.25, 0.5, 0.75 inside; the
+    annealed ln2 (1 - alpha) excluded at every alpha (measured: resolved at all three); the
+    capacity extrapolation contains the composed zero and the banked threshold.  Control: the composed spherical-site entropy
+    (alpha = 0.25, 0.5) and the spherical capacity 2 are excluded."""
+    calc = compose(_ising_perceptron())
+    S = {a: _entropy(calc, a) for a in MC.PC_ALPHAS}
+    zfails, zero = _zero_failures(calc)
+    assert not zfails, zfails
+
+    def spherical():
+        bad = compose(_ising_perceptron())
+        return {a: _entropy(bad, a, dps=12) for a in ("0.25", "0.5")}
+    sph = _with(D.SITES, "ising", D.SITES["spherical"], spherical)
+    assert D.SITES["ising"] is not D.SITES["spherical"]
+    bank = mp.mpf(load("perceptron")["ising_1rsb_capacity"].value)
+    fails, lines = MC.perceptron_check(S, zero, sph, bank)
+    print("\n".join(lines))
+    assert not fails, fails
 
 
 # ---- 2. Ising perceptron ------------------------------------------------------------

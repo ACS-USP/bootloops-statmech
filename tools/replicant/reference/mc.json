@@ -1,0 +1,14 @@
+{
+  "pm_one_ground_energy_n15": {
+    "value": "-0.64445",
+    "tol": "9e-5",
+    "cite": "Boettcher, 'Extremal optimization for Sherrington-Kirkpatrick spin glasses', Eur. Phys. J. B 46, 501 (2005), arXiv:cond-mat/0407130 (PDF read), Table 1, row N = 15: <e0> = -0.64445(9) over I = 380100 instances. Convention: +-J bonds J = +-1 with H = -(1/sqrt N) sum_{i<j} J_ij x_i x_j (his Eqs. (1)-(2)), e0 = H/N: the package's +-J SK at h = 0. tol = his quoted statistical error (one s.e.); EO is a heuristic, so his mean is an upper estimate of the exact one (at N = 15 it should be exact)",
+    "independent_route": "exact ground states by Gray-code block enumeration (numerics/enumeration.py exact_ground_energy) of 20000 sampled +-J matrices at N = 15; the 99% Student-t band of our mean, widened by 2.58 x tol, must contain the value; tests/test_pt.py (slow). Does not use the banked number"
+  },
+  "pm_one_ground_energy_n31": {
+    "value": "-0.69122",
+    "tol": "8e-5",
+    "cite": "Boettcher, Eur. Phys. J. B 46, 501 (2005), arXiv:cond-mat/0407130 (PDF read), Table 1, row N = 31: <e0> = -0.69122(8) over I = 380100 instances (conventions as pm_one_ground_energy_n15; tol = his quoted one-s.e. statistical error)",
+    "independent_route": "parallel-tempering ground states (numerics/pt.py; two independent runs per sample must agree) of 800 sampled +-J matrices at N = 31; the 99% Student-t band of our mean, widened by 2.58 x tol, must contain the value; tests/test_pt.py (slow). Does not use the banked number"
+  }
+}

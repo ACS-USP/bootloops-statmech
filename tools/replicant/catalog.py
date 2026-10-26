@@ -241,7 +241,12 @@ _HELD_OUT_SK = ("+-J SK: held out of the catalog (Task 16); the composed level-(
 _GAMP = ("Ising-prior (binary teacher) GAMP thresholds: located by bisection on the state "
          "evolution and RS potential of amp/gamp_se.py (ising_thresholds) in tests/test_gamp.py; "
          "the teacher_student catalog entry is the spherical teacher, so no pipeline outputs it")
+_MC = ("finite-N literature value (Boettcher 2005, Table 1) reproduced by exact enumeration "
+       "(N = 15) or parallel tempering (N = 31) in tests/test_pt.py (slow): a check of the "
+       "numerics/ machinery, not the output of any pipeline step")
 UNCLAIMED = {
+    ("mc", "pm_one_ground_energy_n15"): _MC,
+    ("mc", "pm_one_ground_energy_n31"): _MC,
     ("heldout", "sk_pm_one_tc"): _HELD_OUT_SK,
     ("heldout", "sk_pm_one_rs_ground_energy"): _HELD_OUT_SK,
     ("sk", "at_small_field_coefficient"):
