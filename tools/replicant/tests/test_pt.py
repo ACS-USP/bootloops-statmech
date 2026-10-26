@@ -115,6 +115,12 @@ def test_pt_refusals():
         "precondition:coupling-matrix"
     assert _refusal(lambda: PT.sk_ground_energy_finite_size((16,), 10, 0)).reason == \
         "precondition:sizes"
+    # sweeps=0 is refused, not silently replaced by the default
+    assert _refusal(lambda: PT.sk_ground_energy_finite_size((8, 10, 12), 2, 0, sweeps=0)
+                    ).reason == "precondition:sweeps"
+    from replicant.numerics import finite_size as F
+    assert _refusal(lambda: F.sk_energy_finite_size(2.0, (8, 10, 12), 2, 0, nbetas=0)
+                    ).reason == "precondition:nbetas"
 
 
 @slow
@@ -138,3 +144,15 @@ def test_pm_one_ground_energies_match_boettcher_table():
         print(f"{key}: ours {band.mean:.5f} +- {band.half_width:.5f} (99% t), Boettcher "
               f"{want} +- {tol}")
         assert abs(band.mean - want) <= band.half_width + 2.58 * tol, (key, band, want)
+
+
+def test_pt_detailed_balance_control_detects_reversed_exchange():
+    """The exchange criterion with its sign reversed (exp(-(beta_k - beta_{k+1})(E_k -
+    E_{k+1})): it favours the hotter configuration at the larger beta) breaks detailed balance
+    of the product measure; the same gate detects it at every beta (measured residuals
+    -0.130, +0.034, +0.051, +0.060 against 99% half-widths 0.015, 0.007, 0.010, 0.010)."""
+    r, _ = _planted(PT, "exchange_sign", -1.0, lambda: _detailed_balance_residuals(20261026))
+    for k, b in enumerate(DB_BETAS):
+        band = student_band(r[:, k])
+        print(f"reversed exchange beta={b}: residual {band.mean:+.4f} +- {band.half_width:.4f}")
+        assert abs(band.mean) > band.half_width, (b, band)

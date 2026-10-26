@@ -60,7 +60,7 @@ def test_pm_one_spectrum_matches_brute_force():
         hist = np.bincount(np.array(_brute_K(J)) + sp.M, minlength=2 * sp.M + 1)
         assert (sp.counts == hist).all(), N
         assert int(sp.counts.sum()) == 2**N
-        assert sp.ground_energy == -max(_brute_K(J)) / math.sqrt(N)
+        assert sp.ground_energy_total == -max(_brute_K(J)) / math.sqrt(N)
         brute_lnZ = math.log(sum(math.exp(1.3 * k / math.sqrt(N)) for k in _brute_K(J)))
         assert abs(sp.log_Z(1.3) - brute_lnZ) < 1e-12 * abs(brute_lnZ)
         assert abs(sp.log_Z(0) - N * math.log(2)) < 1e-12
@@ -164,6 +164,10 @@ def test_annealed_moments_match_brute_force_over_couplings():
     k1 = Mo.quenched_gap(N, beta, 3)
     assert k1 < 0 and abs(k1 - float(-L2 / 2)) < abs(float(L2))
     assert _refusal(lambda: Mo.quenched_gap(N, beta, 4)).reason == "precondition:order"
+    # +-J asymptote: the order-2 closure approaches -1/4 [-ln(1-b^2) - b^2 - b^4/2] as O(1/N)
+    lim = Mo.pm_one_gap_limit(0.7)
+    d400, d1600 = (abs(Mo.quenched_gap(n, 0.7, 2) - lim) for n in (400, 1600))
+    assert d1600 < 1e-4 and 3 < d400 / d1600 < 5, (d400, d1600)
 
 
 @slow
@@ -174,7 +178,7 @@ def test_pm_one_spectrum_at_twenty_six_spins():
     J = _pm_one_J(26, 4)
     sp = E.enumerate_pm_one_sk(J)
     assert int(sp.counts.sum()) == 2**26 and (sp.counts[1::2] == 0).all()
-    assert abs(sp.ground_energy / 26 - E.exact_ground_energy(J)) < 1e-12
+    assert abs(sp.ground_energy_total / 26 - E.exact_ground_energy(J)) < 1e-12
     d = 1e-5
     fd = -(sp.log_Z(0.9 + d) - sp.log_Z(0.9 - d)) / (2 * d) / 26
     assert abs(sp.mean_energy_per_spin(0.9) - fd) < 1e-8

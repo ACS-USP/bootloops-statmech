@@ -414,11 +414,13 @@ def test_pm_one_sk_finite_T_energy_vs_composed_rs_and_1rsb():
     """(f) +-J SK at beta = 2 (T = 0.5).  PT energies at N = 64, 128, 256 (equilibration
     diagnostic required at each size) against the composed RS energy (S - phi)/beta and the
     composed 1RSB energy -d phi/d beta (central difference), both computed by the composer.
-    Asserted: at N = 256 both composed values lie below the 99% band (RS-vs-PT difference
-    exceeds the band; so does 1RSB's: the finite-N energy lies above); the extrapolated band
-    (omega = 2/3, stressed by 3/4 and 1) contains the composed 1RSB energy; the planted doubled
-    +-J variance (composed RS energy) is excluded.  "1RSB closer than RS" is printed with the
-    measured resolution and not asserted (not resolved at this budget)."""
+    Asserted: at N = 256 both composed values lie below the 99% band (the brief's "RS-vs-PT
+    difference exceeds the band"; a finite-size statement only, it does NOT discriminate RS
+    from 1RSB: 1RSB lies below too); the extrapolated band (omega = 2/3, stressed by 3/4 and 1)
+    contains the composed 1RSB energy; the planted doubled +-J variance (composed RS energy) is
+    excluded.  Margins (printed): the plant lies ~20 band widths from the centre, RS only 0.012
+    (0.65 band widths: NOT excluded).  "1RSB closer than RS" is printed with the measured
+    resolution and not asserted (not resolved at this budget)."""
     import dataclasses
     calc = compose(_pm_one_sk())
     law = D.LAWS["pm_one"]
@@ -438,10 +440,13 @@ def test_enumeration_logZ_vs_annealed_and_quenched_expansion():
     """(g) +-J SK (the held-out law), beta = 0.7 and 0.9 (< 1), N = 12, 16, 20, 22: exact
     ln Z per sample by Gray-code enumeration; E ln Z - ln E Z over many samples (99% t band).
     Asserted at every (N, beta): the annealed value 0 is excluded (quenched != annealed, per
-    spin a gap of O(1/N)); the +-J second-order closure -L2/2 (exact finite-N moments) lies
-    within the band plus |order 2 - order 3|.  Control: at beta = 0.7 the same closure with
-    Gaussian-law moments is excluded (the law's correction matters).  At beta = 0.9 the
-    closure's truncation estimate is large (printed)."""
+    spin a gap of O(1/N)).  The +-J second-order closure -L2/2 (exact finite-N moments) is
+    compared within the band plus |order 2 - order 3| only where that tolerance excludes 0
+    (otherwise the comparison cannot fail where annealed would pass): asserted at beta = 0.7,
+    where it is required to be resolved at every N; at beta = 0.9 the truncation estimate
+    (0.03-0.065) is the size of the signal, so it is printed "NOT resolved", not asserted.
+    Control: at beta = 0.7 the same closure with Gaussian-law moments is excluded (the law's
+    correction matters); at 0.9 printed only."""
     fails, lines = MC.log_z_check()
     print("\n".join(lines))
     assert not fails, fails
@@ -456,8 +461,9 @@ def test_ising_perceptron_log_count_vs_composed_entropy():
     1/N extrapolation, band = 99% t + the largest shift over (drop N = 12, quadratic in 1/N,
     conditioned estimator).  Asserted: the composed S(alpha) at 0.25, 0.5, 0.75 inside; the
     annealed ln2 (1 - alpha) excluded at every alpha (measured: resolved at all three); the
-    capacity extrapolation contains the composed zero and the banked threshold.  Control: the composed spherical-site entropy
-    (alpha = 0.25, 0.5) and the spherical capacity 2 are excluded."""
+    capacity extrapolation contains the composed zero and the banked threshold.  Controls:
+    the composed spherical-site entropy (alpha = 0.25, 0.5), the spherical capacity 2 and the
+    annealed capacity 1 are excluded."""
     calc = compose(_ising_perceptron())
     S = {a: _entropy(calc, a) for a in MC.PC_ALPHAS}
     zfails, zero = _zero_failures(calc)

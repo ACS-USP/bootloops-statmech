@@ -124,8 +124,16 @@ def _check_sizes(Ns, samples, need):
     return Ns, per
 
 
-def _pick(spec, N, default):
-    return spec(N) if callable(spec) else (spec or default)
+def _pick(spec, N, default, name):
+    """spec(N) if callable, the default if None, else spec; a value that is not a positive
+    int (sweeps, nbetas) or not a sequence of betas is refused, never replaced silently."""
+    v = default if spec is None else (spec(N) if callable(spec) else spec)
+    if name == "betas":
+        if not (isinstance(v, (tuple, list)) and len(v) >= 1):
+            raise Refusal("precondition:betas", f"betas = {v!r} at N = {N}: need a sequence")
+    elif not (isinstance(v, int) and not isinstance(v, bool) and v >= 1):
+        raise Refusal(f"precondition:{name}", f"{name} = {v!r} at N = {N}: need an int >= 1")
+    return v
 
 
 def sk_ground_energy_finite_size(Ns, samples, seed, *, sweeps=None, betas=None, conf=0.99):
@@ -133,8 +141,8 @@ def sk_ground_energy_finite_size(Ns, samples, seed, *, sweeps=None, betas=None, 
     est, diag = {}, {}
     for N in Ns:
         J = gaussian_sk_couplings(N, per[N], [seed, N, 0])
-        sw = _pick(sweeps, N, max(200, 12 * N))
-        bs = _pick(betas, N, geometric_betas(0.4, 4.0, max(8, round(2 * math.sqrt(N)))))
+        sw = _pick(sweeps, N, max(200, 12 * N), "sweeps")
+        bs = _pick(betas, N, geometric_betas(0.4, 4.0, max(8, round(2 * math.sqrt(N)))), "betas")
         a = pt_sk(J, bs, sw, [seed, N, 1]).min_energy_per_spin
         b = pt_sk(J, bs, sw, [seed, N, 2]).min_energy_per_spin
         same = np.abs(a - b) <= 1e-9 * np.abs(a)
@@ -158,8 +166,8 @@ def sk_energy_finite_size(beta, Ns, samples, seed, *, law="pm_one", sweeps=None,
     est, diag = {}, {}
     for N in Ns:
         J = _LAWS[law](N, per[N], [seed, N, 0])
-        sw = _pick(sweeps, N, max(1000, 8 * N))
-        R = _pick(nbetas, N, max(8, round(1.25 * math.sqrt(N))))
+        sw = _pick(sweeps, N, max(1000, 8 * N), "sweeps")
+        R = _pick(nbetas, N, max(8, round(1.25 * math.sqrt(N))), "nbetas")
         res = pt_sk(J, geometric_betas(0.5, beta, R), sw, [seed, N, 1])
         eq = equilibration(res, R - 1)
         if not eq.equilibrated:

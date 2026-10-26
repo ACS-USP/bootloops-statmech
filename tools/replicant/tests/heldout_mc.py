@@ -85,6 +85,7 @@ def finite_t_check(u_rs, u_1rsb, u_planted):
     lines.append(f"N = {max(fs.sizes)}: {big.mean:.5f} +- {big.half_width:.5f} (99% t); composed "
                  f"RS {float(u_rs):.5f}, 1RSB {float(u_1rsb):.5f}; extrapolated {fs.e_inf:.5f} +- "
                  f"{fs.band:.5f}")
+    # a finite-size statement only: it does not discriminate RS from 1RSB (both lie below)
     for name, u in (("RS", u_rs), ("1RSB", u_1rsb)):
         if not big.mean - float(u) > big.half_width:      # finite N lies above, outside the band
             fails.append(f"N = {max(fs.sizes)}: composed {name} {float(u):.5f} not below the band")
@@ -92,6 +93,13 @@ def finite_t_check(u_rs, u_1rsb, u_planted):
         fails.append(f"composed 1RSB {float(u_1rsb):.5f} outside {fs.e_inf:.5f} +- {fs.band:.5f}")
     if not fs.excludes(u_planted):
         fails.append(f"positive control: planted {float(u_planted):.5f} inside the band")
+    dp = abs(float(u_planted) - fs.e_inf)
+    lines.append(f"margins to the extrapolated centre: planted {dp:.4f}"
+                 f" ({dp / fs.band:.1f} bands), RS "
+                 f"{abs(float(u_rs) - fs.e_inf):.4f} ({abs(float(u_rs) - fs.e_inf) / fs.band:.2f} "
+                 f"bands, not excluded), 1RSB {abs(float(u_1rsb) - fs.e_inf):.4f}; the N = "
+                 f"{max(fs.sizes)} 'below the band' check is finite-size only and does not "
+                 "discriminate RS from 1RSB")
     mid = (float(u_rs) + float(u_1rsb)) / 2
     lines.append(f"1RSB closer than RS: {'resolved' if fs.excludes(mid) else 'NOT resolved'} "
                  f"(midpoint {mid:.5f} at {abs(mid - fs.e_inf):.4f} from the centre, band "
@@ -118,15 +126,25 @@ def log_z_check():
             band = student_band(X[b])
             p2, p3 = Mo.quenched_gap(N, b, 2), Mo.quenched_gap(N, b, 3)
             g2, g3 = Mo.quenched_gap(N, b, 2, "gaussian"), Mo.quenched_gap(N, b, 3, "gaussian")
-            ok_pred = abs(band.mean - p2) <= band.half_width + abs(p2 - p3)
+            tol = band.half_width + abs(p2 - p3)       # stat + the stated truncation estimate
+            ok_pred = abs(band.mean - p2) <= tol
+            # the closure comparison discriminates only if its tolerance excludes the annealed
+            # value 0 (|p2| > tol); at beta = 0.9 the truncation estimate is the size of the
+            # signal (orders 2 and 3 disagree by 0.03-0.065, the guard holds by <= 1.35x at
+            # N = 12, 16 and fails at 20, 22), so it is never asserted there (fix round 1)
+            resolved = b == 0.7 and abs(p2) > tol
             gauss_out = abs(band.mean - g2) > band.half_width + abs(g2 - g3)
             lines.append(f"N = {N}, beta = {b}: E lnZ - ln EZ = {band.mean:+.5f} +- "
                          f"{band.half_width:.5f} ({S} samples); +-J closure {p2:+.5f} (order 3 "
-                         f"{p3:+.5f}); Gaussian-law closure {g2:+.5f} ({g3:+.5f}): "
+                         f"{p3:+.5f}, tolerance {tol:.5f}: "
+                         f"{'resolved, asserted' if resolved else 'NOT resolved, not asserted'}); "
+                         f"Gaussian-law closure {g2:+.5f} ({g3:+.5f}): "
                          f"{'excluded' if gauss_out else 'NOT resolved'}")
             if abs(band.mean) <= band.half_width:
                 fails.append(f"N = {N}, beta = {b}: annealed (0) inside the band")
-            if not ok_pred:
+            if b == 0.7 and not resolved:
+                fails.append(f"N = {N}, beta = 0.7: closure tolerance {tol:.5f} does not exclude 0")
+            if resolved and not ok_pred:
                 fails.append(f"N = {N}, beta = {b}: +-J closure {p2:+.5f} outside the band")
             if b == 0.7 and not gauss_out:
                 fails.append(f"N = {N}, beta = 0.7: Gaussian-law closure not excluded")
@@ -195,4 +213,8 @@ def perceptron_check(S_composed, zero_composed, S_spherical, alpha_c_bank):
             fails.append(f"{name} {float(v):.5f} outside capacity {m:.4f} +- {band:.4f}")
     if abs(2 - m) <= band:
         fails.append("spherical capacity 2 inside the capacity band (control)")
+    if abs(1 - m) <= band:          # annealed capacity: ln2 (1 - alpha) = 0 at alpha = 1
+        fails.append("annealed capacity 1 inside the capacity band (control)")
+    lines.append(f"capacity controls: annealed 1 at {abs(1 - m):.4f}, spherical 2 at "
+                 f"{abs(2 - m):.4f} from the centre (band {band:.4f})")
     return fails, lines

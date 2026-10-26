@@ -26,7 +26,7 @@ spins (final_energy_per_spin) as a bookkeeping check.
 Statistics: one run per disorder sample; time averages within a run are correlated, so error
 bars are taken over independent samples (or independent seeds), never over sweeps.  Results
 are statistical, never certified.  `equilibration` compares the sample-mean energy in the
-windows [T/4, T/2) and [T/2, T) (logarithmic binning) by a 99% Student-t band over samples;
+windows [T/4, T/2) and [T/2, T) (a two-window split) by a 99% Student-t band over samples;
 a drift outside the band is reported as not equilibrated, which callers turn into an
 "undetermined" label rather than a number.  Replica round trips (a replica travelling from
 the lowest to the highest beta and back) are counted per sample as a second diagnostic.
@@ -39,7 +39,9 @@ import numpy as np
 from ..amp._stats import student_band
 from ..core import Refusal
 
-_HOOKS = {"acceptance_scale": 1.0}   # tests plant 0.8 (wrong Metropolis rule) as a control
+# planted-error hooks (tests): acceptance_scale 0.8 = wrong Metropolis rule; exchange_sign -1 =
+# the exchange criterion with its sign reversed (favours the hotter state at the larger beta)
+_HOOKS = {"acceptance_scale": 1.0, "exchange_sign": 1.0}
 
 
 @dataclass
@@ -119,7 +121,7 @@ def pt_sk(J, betas, sweeps, seed):
         if R > 1:
             k = np.arange(sw % 2, R - 1, 2)
             if len(k):
-                x = (b[k] - b[k + 1])[None, :] * (E[:, k] - E[:, k + 1])
+                x = _HOOKS["exchange_sign"] * (b[k] - b[k + 1])[None, :] * (E[:, k] - E[:, k + 1])
                 ok = rng.random((S, len(k))) < np.exp(np.minimum(0.0, x))
                 tries[k] += S
                 accepts[k] += ok.sum(axis=0)

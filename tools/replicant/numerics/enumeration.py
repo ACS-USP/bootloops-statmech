@@ -3,6 +3,7 @@
   gray_states(m)                    the 2^m states of m spins in binary-reflected Gray order
   random_pm_one_J(N, seed)          a +-J SK matrix J_ij = sigma_ij / sqrt(N) (named seed)
   enumerate_pm_one_sk(J)            PmOneSpectrum: the exact integer density of states
+                                    (log_Z, mean_energy_per_spin, ground_energy_total)
   exact_ground_energy(J)            min_s H(s) / N for any real symmetric J (N <= 26)
   ising_perceptron_counts(N, P, seed)   #{J in {-1,+1}^N storing patterns 1..p}, p = 0..P
   ising_perceptron_log_count(alpha, N, seed)   ln of that count at P = alpha N (-inf if 0)
@@ -23,7 +24,9 @@ and the counts are doubled.  The perceptron has no such symmetry; its count over
 (A, B) is filtered pattern by pattern (the survivors of the first p patterns, so one pass
 gives every p).  Ties J.xi = 0 have probability zero for Gaussian patterns and are counted as
 not stored.  Exact up to float64 rounding of the Gaussian fields (perceptron) and exact in
-integers (SK).  Cost grows as 2^N: N = 16 takes milliseconds, N = 26 about a second.
+integers (SK).  Cost grows as 2^N: N = 16 takes about 2 ms, N = 26 about
+0.07-0.1 s (measured on the development laptop); the perceptron at N = 24 about 0.1 s per
+pattern set, N = 28 about 1.5 s.
 """
 import math
 from dataclasses import dataclass
@@ -111,8 +114,8 @@ class PmOneSpectrum:
         return float(-(w @ K) / w.sum() / math.sqrt(self.N) / self.N)
 
     @property
-    def ground_energy(self):
-        """Ground-state energy (total, not per spin): -K_max / sqrt N."""
+    def ground_energy_total(self):
+        """Ground-state energy, TOTAL (not per spin): -K_max / sqrt N."""
         return -int(np.nonzero(self.counts)[0].max() - self.M) / math.sqrt(self.N)
 
 
