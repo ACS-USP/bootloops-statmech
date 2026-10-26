@@ -363,7 +363,8 @@ def derivation(name, route):
         return getattr(latex_csp, name)(route)
     mod = {"ldpc_bec": "inference", "series_ising2d": "series", "ridge": "learning",
            "spiked_wigner": "spiked_sbm", "sbm": "spiked_sbm", "ising2d": "lattice", "ising1d": "lattice",
-           "bethe_ising": "lattice", "sk_bounds": "bounds", "online_perceptron": "online"}.get(name)
+           "bethe_ising": "lattice", "sk_bounds": "bounds", "online_perceptron": "online",
+           "online_linear": "online_linear"}.get(name)
     if mod is not None:
         from importlib import import_module
         return getattr(import_module(f".latex_{mod}", __package__), name)(route)

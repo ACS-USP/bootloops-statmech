@@ -7,6 +7,10 @@
   optimal.py   the variationally optimal modulation (Kinouchi-Caticha 1992; VKC 1998 Eq. (25)),
                its asymptotic constant and the noise-robustness boundaries (Copelli et al. 1997)
   simulate.py  finite-N online learning over named seeds (shares no code with the ODEs)
+  linear.py    (O2) the linear perceptron with quadratic error: standard and optimal rules, sphere or
+               unconstrained, greedy eta, closed forms (Kinouchi-Caticha 1995)
+  linear_offline.py  zero-temperature offline solutions of the linear perceptron and the ridge route
+  simulate_linear.py finite-N online and offline linear learning (shares no code with the above)
 
 Convention (Biehl & Riegler, Europhys. Lett. 28, 525 (1994)): |B| = 1, xi_j i.i.d. N(0, 1),
 J <- J + (eta / N) F(h, b, Q) b xi, h = J . xi, R = J . B, Q = J . J, eps = arccos(R / sqrt Q) / pi.

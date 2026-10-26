@@ -209,7 +209,8 @@ def online_perceptron():
 
 
 def online_entries():
-    return [online_perceptron()]
+    from .catalog_online_linear import online_linear
+    return [online_perceptron(), online_linear()]
 
 
 __all__ = ["online_entries", "online_perceptron"]

@@ -97,6 +97,10 @@ series` for `series_ising2d`, `--route bound` for `sk_bounds`, and `--pdf` (with
   `optimal.py`: the variationally optimal modulation of Kinouchi-Caticha and its noise-robustness
   boundaries; `simulate.py`: finite-N online learning over named seeds, sharing no code with the ODEs);
   catalog entry `online_perceptron` (route `online`) (`catalog_online.py`, `latex_online.py`).
+  O2: `linear.py` (the linear perceptron with quadratic error: standard and optimal rules, sphere or
+  unconstrained, greedy eta, closed forms), `linear_offline.py` (zero-temperature offline solutions and the
+  ridge route), `simulate_linear.py` (finite-N online and offline); catalog entry `online_linear`
+  (`catalog_online_linear.py`, `latex_online_linear.py`).
 - `catalog*.py`, `compose.py` (+ `compose_result.py`: `Result` and the finality rule), `cli.py`,
   `__main__.py`: the 19-entry catalog (`catalog_ts.py` holds the teacher-student entry,
   `catalog_pspin.py` the two p-spin entries; LaTeX in `latex_pspin.py`), the composer,
