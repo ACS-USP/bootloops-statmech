@@ -11,14 +11,18 @@ Run parameters:
               permutation-symmetric Q > C, BRW Eq. (21) / SS Fig. 1's plateau), their escape times, the
               eta^2-truncated (small-eta) point and its escape time in units of 1/eta; K = M, isotropic: the
               asymptotic eigenvalues lambda1, lambda2 at the optimum and the rate max(lambda1, 2 lambda2)
-  critical    (any value) the critical learning rates: K = M: eta_max, eta_crossing (lambda1 = 2 lambda2),
-              eta_fastest; K = 2, M = 1: BS's eta_c and eta_s
+  sym         all (default) | none | a comma list of identical, permutation, small_eta: the symmetric points
+              to compute
+  critical    eta_max (only that root) or any other value: the critical learning rates: K = M: eta_max,
+              eta_crossing (lambda1 = 2 lambda2), eta_fastest; K = 2, M = 1: BS's eta_c and eta_s
   init        brw16 (BRW Eq. (16), Fig. 5 choice; K = M = 2; default there) with X (1e-6), Nx (1000) |
               ss (SS's random overlaps; default otherwise) with init_seed (1)
   alpha       the learning curve to alpha and the plateau report (online/plateau.py), with B (0.05)
   N (seeds)   finite-N simulation at alpha over named seeds (default 0-11): eps_sim
 """
 import math
+
+import numpy as np
 
 from .catalog import Out, RefCheck, Stability, entry, fstep, has
 from .catalog_online import _num
@@ -81,21 +85,45 @@ def _state(p):
                f"SCM K = {f.K}, M = {f.M}, eta = {f.eta} (SS NIPS Eqs. (1)-(4))")
 
 
+_SYM = ("identical", "permutation", "small_eta")
+
+
+def _sym_parts(p):
+    v = p.get("sym", "all")
+    parts = _SYM if v == "all" else () if v == "none" else tuple(x.strip() for x in str(v).split(","))
+    if any(x not in _SYM for x in parts):
+        raise Refusal("unsupported:sym", f"sym {v!r}: all | none | a comma list of {', '.join(_SYM)}")
+    return parts
+
+
+def _odd(f, fp):
+    """A root no better than the zero student, or with norms far beyond the teacher's, is flagged."""
+    eps0 = f.eps(np.zeros((f.K, f.K)), np.zeros((f.K, f.M)))
+    if fp.eps >= eps0 or fp.Q > 3 * float(f.T.max()):
+        return (f"odd {fp.branch} root at eta = {f.eta:g}: eps = {fp.eps:.4g} (the zero student has {eps0:.4g}), "
+                f"Q = {fp.Q:.4g}; it is a fixed point of the ODE but not a plateau a learning curve visits",)
+    return ()
+
+
 def _symmetric(p):
-    f, vals, notes = _flow(p), {}, []
-    a = F.symmetric_fixed_point(f, "identical")
-    vals.update(eps_sym_identical=a.eps, R_sym_identical=a.R, Q_sym_identical=a.Q, tau_esc_identical=1 / a.lam_esc,
-                plateau_shift_per_100x=0.5 * math.log(100) / a.lam_esc)
-    try:
-        b = F.symmetric_fixed_point(f, "permutation")
-        vals.update(eps_sym_permutation=b.eps, R_sym_permutation=b.R, Q11_sym_permutation=b.Q,
-                    Q12_sym_permutation=b.C, tau_esc_permutation=1 / b.lam_esc if b.lam_esc > 0 else math.inf)
-    except Refusal as r:
-        notes.append(f"no permutation-symmetric point distinct from Q = C ({r.reason})")
-    t = F.symmetric_fixed_point(_flow(p, truncated=True), "identical")
-    vals.update(eps_small_eta=t.eps, R_small_eta=t.R, Q_small_eta=t.Q, tau_small_eta=f.eta / t.lam_esc)
-    return Out(vals, f"identical-student point eps = {a.eps:.6g} (tau_esc {1 / a.lam_esc:.6g}); eta^2-truncated "
-               f"eps = {t.eps:.6g}", notes=tuple(notes))
+    f, vals, notes, parts = _flow(p), {}, [], _sym_parts(p)
+    if "identical" in parts:
+        a = F.symmetric_fixed_point(f, "identical")
+        vals.update(eps_sym_identical=a.eps, R_sym_identical=a.R, Q_sym_identical=a.Q, tau_esc_identical=1 / a.lam_esc,
+                    plateau_shift_per_100x=0.5 * math.log(100) / a.lam_esc)
+        notes += _odd(f, a)
+    if "permutation" in parts:
+        try:
+            b = F.symmetric_fixed_point(f, "permutation")
+            vals.update(eps_sym_permutation=b.eps, R_sym_permutation=b.R, Q11_sym_permutation=b.Q,
+                        Q12_sym_permutation=b.C, tau_esc_permutation=1 / b.lam_esc if b.lam_esc > 0 else math.inf)
+            notes += _odd(f, b)
+        except Refusal as r:
+            notes.append(f"no permutation-symmetric point distinct from Q = C ({r.reason})")
+    if "small_eta" in parts:
+        t = F.symmetric_fixed_point(_flow(p, truncated=True), "identical")
+        vals.update(eps_small_eta=t.eps, R_small_eta=t.R, Q_small_eta=t.Q, tau_small_eta=f.eta / t.lam_esc)
+    return Out(vals, "symmetric fixed points: " + (", ".join(parts) or "none requested"), notes=tuple(notes))
 
 
 def _asymptotics(p):
@@ -108,7 +136,10 @@ def _critical(p):
     f = _flow(p)
     note = (f"optimal only in its class: {F.OPTIMALITY_CLASS}",)
     if f.K == f.M:
-        r = F.critical_rates(f.K)
+        r = F.critical_rates(f.K, need=("eta_max",) if p["critical"] == "eta_max" else
+                             ("eta_max", "eta_crossing", "eta_fastest"))
+        if "eta_crossing" not in r:
+            return Out(r, f"eta_max {r['eta_max']:.6g} (critical=eta_max: the crossing and the fastest rate skipped)")
         return Out(r, f"eta_max {r['eta_max']:.6g}, lambda1 = 2 lambda2 at {r['eta_crossing']:.6g}, fastest "
                    f"asymptotic decay at {r['eta_fastest']:.6g}", notes=note)
     if (f.K, f.M) == (2, 1) and F._isotropic(f):
@@ -126,6 +157,8 @@ def _curve(p):
     if rep.status != "none":
         vals.update(plateau_branch=rep.branch, plateau_height=rep.eps_fp, plateau_eps_mid=rep.eps_mid,
                     plateau_entry=rep.alpha_entry, plateau_tau_esc=rep.tau_esc)
+    if rep.runaway:
+        vals["plateau_runaway"] = True
     if rep.status == "escaped":
         vals.update(plateau_exit=rep.alpha_exit, plateau_length=rep.length, plateau_rtol_spread=rep.exit_rtol_spread)
     return Out(vals, f"SCM ODE to alpha = {a:g}: eps = {eps:.6g}; plateau {rep.status}: {rep.reason}",
@@ -177,21 +210,22 @@ def online_scm():
             R("brw96_fig1_Q12", lambda v: v["Q12_sym_permutation"]),
             R("brw96_fig2_shift_per_100x", lambda v: v["plateau_shift_per_100x"]),
             R("ss_tau_k2", lambda v: v["tau_small_eta"])]
-    refs += [R(f"brw96_{k}", lambda v, g=g: v[g], eta="2") for k, g in (
+    refs += [R(f"brw96_{k}", lambda v, g=g: v[g], eta="2", sym="identical,permutation") for k, g in (
         ("eq20_R", "R_sym_identical"), ("eq20_Q", "Q_sym_identical"), ("eq20_eps", "eps_sym_identical"),
         ("eq21_R", "R_sym_permutation"), ("eq21_Q11", "Q11_sym_permutation"), ("eq21_Q12", "Q12_sym_permutation"),
         ("eq21_eps", "eps_sym_permutation"))]
-    refs += [R(f"ss_fig1d_height_eta{t}", lambda v: v["eps_sym_permutation"], K="3", eta=e)
+    refs += [R(f"ss_fig1d_height_eta{t}", lambda v: v["eps_sym_permutation"], K="3", eta=e, sym="permutation")
              for t, e in (("0p1", "0.1"), ("0p3", "0.3"), ("0p5", "0.5"), ("0p7", "0.7"))]
-    refs += [R(f"ss_fig2_lambda{i}_eta{t}", lambda v, i=i: v[f"lambda{i}"], K="3", eta=e)
-             for t, e in (("0p4", "0.4"), ("1p0", "1.0"), ("1p5", "1.5")) for i in (1, 2)]
-    refs += [R(k, lambda v: v["eps_small_eta"], K="3", eta="1.0") for k in ("ss_trunc_eps_k3", "ss_trunc_eps_k3_formula")]
-    refs += [R("ss_tau_k3", lambda v: v["tau_small_eta"], K="3", eta="1.0"),
-             R("ss_fig2_eta_max_k3", lambda v: v["eta_max"], K="3", critical="1")]
+    refs += [R(f"ss_fig2_lambda{i}_eta{t}", lambda v, i=i: v[f"lambda{i}"], K="3", eta=e, sym=sy)
+             for t, e, sy in (("0p4", "0.4", "none"), ("1p0", "1.0", "small_eta"), ("1p5", "1.5", "none")) for i in (1, 2)]
+    refs += [R(k, lambda v: v["eps_small_eta"], K="3", eta="1.0", sym="small_eta")
+             for k in ("ss_trunc_eps_k3", "ss_trunc_eps_k3_formula")]
+    refs += [R("ss_tau_k3", lambda v: v["tau_small_eta"], K="3", eta="1.0", sym="small_eta"),
+             R("ss_fig2_eta_max_k3", lambda v: v["eta_max"], K="3", critical="eta_max", sym="none")]
     refs += [R(k, lambda v, g=g: v[g], K="1", critical="1") for k, g in (
         ("bs95_eta_c_single", "eta_max"), ("bs95_eta_c_single_formula", "eta_max"),
         ("bs95_eta_opt_single", "eta_crossing"), ("bs95_eta_opt_single_formula", "eta_crossing"))]
-    refs += [R(k, lambda v, g=g: v[g], K="2", M="1", critical="1") for k, g in (
+    refs += [R(k, lambda v, g=g: v[g], K="2", M="1", critical="1", sym="none") for k, g in (
         ("bs95_k2_eta_c", "eta_c_specialised"), ("bs95_k2_eta_s", "eta_s_symmetric"))]
     ode = Stability("not-computed", "online-ode", SS, _ODE_NOTE)
     rate = Stability("not-computed", "online-ode", f"{SS}; {BS}", "roots of numerically differentiated eigenvalues "
@@ -207,13 +241,14 @@ def online_scm():
                                                             "rate_fastest", "eta_c_specialised", "eta_s_symmetric")},
            "eps_sim": sim}
     meta = ("K", "M", "eta", "teacher", "init", "alpha", "plateau_status", "plateau_branch", "plateau_rtol_spread",
+            "plateau_runaway",
             "eps_sim_halfwidth99", "N", "seeds")
     spec = ModelSpec("online_scm", "spherical", "gaussian", constraint="online", prior="teacher")
     return entry("online_scm", spec, f"{SS}; {BS}; {BRW}", {"online": steps}, refs, {"online": CAVEAT},
                  "online gradient descent in the soft committee machine (Saad-Solla ODEs, erf units): symmetric "
                  "plateaus (height, escape, BRW's plateau length), asymptotic eigenvalues and critical learning "
                  "rates, finite-N simulation", default_route="online", finality=fin, meta=meta,
-                 parameters={"online": ("K", "M", "eta", "teacher", "critical", "init", "X", "Nx", "init_seed", "alpha",
+                 parameters={"online": ("K", "M", "eta", "teacher", "sym", "critical", "init", "X", "Nx", "init_seed", "alpha",
                                         "B", "N", "seeds")})
 
 

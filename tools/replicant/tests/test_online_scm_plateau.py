@@ -71,6 +71,26 @@ def test_plateau_escaped_undetermined_and_none():
     assert rep.status == "none", rep
 
 
+def test_an_escape_seeded_by_round_off_is_undetermined():
+    """An exactly permutation-symmetric start (Q = 0.5 I, R = 0; K = M = 2, eta = 1.5) leaves the permutation
+    point at alpha ~ 451 only through floating-point error: the initial symmetry breaking is 0 < ROUNDOFF_FLOOR,
+    so the report is undetermined with no exit; BRW's X = 1e-6 start (breaking 2e-6) is not affected."""
+    rep = P.analyse(_BRW, (0.5 * np.eye(2), np.zeros((2, 2))), 800.0, rtol=1e-6, points=60, rtol_check=False)
+    assert rep.status == "undetermined" and "round-off" in rep.reason and rep.alpha_exit is None, rep
+    assert P.symmetry_breaking(*F.brw_initial(1e-6), "identical") > 1e-6
+
+
+@slow
+def test_round_off_escape_k3_and_runaway_norms():
+    """The reviewer's case: K = M = 3, eta = 0.5 from (0.3 I, 0) 'escaped' at alpha = 1683 with an rtol spread
+    (0.477) just under its tolerance (0.487); it is now undetermined (seeded below round-off).  K = 3 at
+    eta = 1.5 from SS's start: the norms run away (max Q_ii 4.4 at alpha = 200, growing): undetermined."""
+    rep = P.analyse(S.scm_flow(3, 3, 0.5), (0.3 * np.eye(3), np.zeros((3, 3))), 4000.0)
+    assert rep.status == "undetermined" and "round-off" in rep.reason, rep
+    rep = P.analyse(S.scm_flow(3, 3, 1.5), F.ss_initial(3, 3, 1), 200.0)
+    assert rep.status == "undetermined" and rep.runaway and "without bound" in rep.reason, rep
+
+
 @slow
 def test_identical_students_never_escape():
     """Exactly identical students (Q_12 = Q_11, R = 0) stay on their invariant manifold: undetermined at
@@ -117,7 +137,10 @@ def test_plateau_refusals():
 @slow
 def test_brw96_eq17_half_log_slope_and_fig2_shift():
     """BRW Eq. (17): with Eq. (16) initial conditions the plateau end moves by -(tau_esc/2) ln X (half the
-    naive Eq. (12)); X = 1e-6, 1e-8, 1e-10 at N = 1000, eta = 1.5; the shifts against Fig. 2 (read off)."""
+    naive Eq. (12)); X = 1e-6, 1e-8, 1e-10 at N = 1000, eta = 1.5; the shifts against Fig. 2 (read off).
+    Near-structural: brw_initial builds BRW's X_R = sqrt(2X/N) in, so this checks that the R asymmetry (not X
+    itself) sets the escape and that the ODE's escape mode is tau_esc; only differences of alpha_P are used
+    (BRW's alpha_0 is arbitrary)."""
     reps = [P.analyse(_BRW, F.brw_initial(x), 200.0) for x in (1e-6, 1e-8, 1e-10)]
     assert all(r.status == "escaped" for r in reps), reps
     tau = reps[0].tau_esc

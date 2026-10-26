@@ -105,6 +105,7 @@ def test_ode_vs_simulation_through_the_plateau():
               f"({abs(x - b.mean) / b.half_width:.1f} hw)")
         assert abs(o - b.mean) <= b.half_width, (a, o, b)
     assert ode[1] > 0.034 and ode[-1] < 0.002                      # on the plateau, then out
+    assert sim.bands[1].mean > 0.033 and sim.bands[-1].mean < sim.bands[1].mean / 2    # the simulation escaped too
     assert max(abs(x - b.mean) / b.half_width for b, x in zip(sim.bands, bad)) > 5
 
 

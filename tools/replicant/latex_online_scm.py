@@ -68,16 +68,22 @@ def online_scm(route):
         sym("Single graded unit, the slower mode (BS Eq. (12)); eta_opt = 2 eta_c/3 where lambda_1 = 2 lambda_2",
             sp.Eq(sp.Symbol("lambda_2"), -2 * sp.sqrt(5) * ETA / (9 * etac)), source=_BS,
             check=Check((ETA,), lambda e: mode(e, "lam2"), (("0.5",), ("2",), ("3.5",)), "rhs", tol="1e-6")),
-        cited("eta_max of the realisable SCM to first order in 1/K (SS NIPS Eq. (9)); the exact K = 3 root is 1.6207 "
-              "(Fig. 2: 1.62); SS's eta_opt: lambda_1(eta_opt) = 2 lambda_2(eta_opt), which at K = 3 is not the fastest "
-              "asymptotic decay (replicant: crossing 0.917, fastest 1.280)",
-              r"\eta_{max} = \frac{\pi}{K}\,\frac{75 - 42\sqrt3}{25\sqrt3 - 42} + O(K^{-2})", _SS),
+        cited("eta_max of the realisable SCM to first order in 1/K (SS NIPS Eq. (9); the ratio is sqrt3 exactly, so "
+              "eta_max ~ pi sqrt3 / K = 5.4414/K); the exact K = 3 root is 1.6207 (Fig. 2: 1.62).  SS's eta_opt rule "
+              "lambda_1(eta_opt) = 2 lambda_2(eta_opt) only balances the two decay exponents (their p. 307 inequality "
+              "'2 lambda_2 < lambda_1' is reversed for the negative eigenvalues of their Fig. 2); it is the fastest "
+              "decay max(lambda_1, 2 lambda_2) only where lambda_1 is non-decreasing at the crossing: true at K = 1 "
+              "(BS: 2 eta_c/3), false at K = 2, 3, 4, 5, 8 (crossing -> fastest: 1.275 -> 1.881, 0.917 -> 1.280, "
+              "0.700 -> 0.970, 0.564 -> 0.780, 0.355 -> 0.492); the full Jacobian confirms the restricted analysis",
+              r"\eta_{max} = \frac{\pi}{K}\,\frac{75 - 42\sqrt3}{25\sqrt3 - 42} + O(K^{-2}) = \frac{\pi\sqrt3}{K} + O(K^{-2})", _SS),
         cited("Plateau length (BRW Eqs. (9)-(11), (16)-(17)): alpha_P is where the deviation of an order parameter from "
               "the fixed point exceeds B; with an R asymmetry X_R = sqrt(2X/N) the length grows as half the naive "
-              "tau_esc ln(1/X)", r"\alpha_P - \alpha_0 = \tau_{esc}\Big(D - \tfrac12\ln(2X) - \tfrac12\ln N\Big),\quad "
+              "tau_esc ln(1/X); alpha_0 is arbitrary, so only differences of alpha_P are meaningful (replicant's "
+              "entry alpha is its own choice)", r"\alpha_P - \alpha_0 = \tau_{esc}\Big(D - \tfrac12\ln(2X) + \tfrac12\ln N\Big),\quad "
               r"\tau_{esc} = 1/\lambda_{esc}", _BRW),
         text("Plateau reports and finite-N checks", "online/plateau.py: the unstable fixed point by Newton from the slowest "
              "point, BRW's entry/exit with B = 0.05, 'undetermined' when not left by alpha_max (nothing extrapolated), "
+             "when seeded below round-off or when the norms run away, "
              "the escape alpha recomputed at rtol x 1e-2; online/simulate_scm.py: online gradient descent with no code "
              "shared with the ODEs, 99% Student-t bands; the ODE without its eta^2 term falls outside them"),
     ]

@@ -39,9 +39,12 @@ def test_catalog_entry_runs_and_refuses():
     _refuses(lambda: e.run(route="online", eta="-1"), "precondition:eta")
     _refuses(lambda: e.run(route="online", teacher="noisy"), "unsupported:teacher")
     _refuses(lambda: e.run(route="online", init="random"), "unsupported:init")
+    _refuses(lambda: e.run(route="online", sym="odd"), "unsupported:sym")
     _refuses(lambda: e.run(route="online", N=100), "precondition:state-point")
     _refuses(lambda: e.run(route="online", seeds=[1, 2]), "precondition:known-parameter")
     _refuses(lambda: compose(e.spec, "online").run(Kay="3"), "precondition:known-parameter")
+    st, _ = e.execute("online", K="3", sym="identical")             # eta = 1.5: the identical root is odd
+    assert any("odd identical root" in n for n in st["notes"]) and "eps_sym_permutation" not in st["values"]
     for key in ("ss_eta_max_coefficient", "brw96_eq17_log_slope", "ss_trapping_eta_exponent"):
         assert ("online_scm", key) in UNCLAIMED                # integrations: checked by the slow tests
 
@@ -90,7 +93,7 @@ def test_guide_is_true():
     code = "".join(p.read_text() for p in [*(root / "online").glob("scm*.py"), root / "online" / "plateau.py",
                                            root / "online" / "simulate_scm.py", root / "catalog_online_scm.py",
                                            root / "online" / "odes.py"])
-    for reason in ("precondition:K", "precondition:M", "precondition:eta", "unsupported:teacher", "unsupported:init",
+    for reason in ("precondition:K", "precondition:M", "precondition:eta", "unsupported:teacher", "unsupported:init", "unsupported:sym",
                    "unsupported:branch", "precondition:symmetric", "precondition:state-point",
                    "precondition:initial-overlap", "precondition:alpha", "precondition:threshold", "precondition:grid",
                    "precondition:size", "precondition:known-parameter", "no-solution:fixed-point",
