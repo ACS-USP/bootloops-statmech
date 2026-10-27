@@ -116,7 +116,7 @@ def _tri_torus(p):
     ks = A.couplings(beta, Js, False)
     bulk = _soft_mode(lambda: T.triangular_free_energy(beta, *Js))
     tz, meta = _torus("triangular", L, ks, bulk, (3, 4, 5), Js,
-                      lambda b: T.triangular_free_energy(b, *Js))
+                      lambda b: T.triangular_free_energy(b, *Js), _raw(p))
     v, e = _put(torus_minus_beta_f=tz)
     return Out({**v, **meta}, f"{L} x {L} triangular torus (transfer matrix in balls; = the bulk "
                "at beta = 1e-8 within O(K^L)); cylinders of circumference 3, 4, 5 towards the bulk "
@@ -204,8 +204,9 @@ def ising_triangular():
 
 # ---- ising_honeycomb ---------------------------------------------------------------------------
 def _hc_js(p):
-    """Every honeycomb face has two edges of each class, so no sign pattern is frustrated: any
-    negative J maps onto |J| by a gauge flip, and the entry computes with |J| (meta gauge)."""
+    """Every honeycomb face has two edges of each class, so no sign pattern is frustrated: in the bulk
+    any negative J maps onto |J| by a gauge flip, and the entry computes the bulk with |J| (meta
+    gauge); the torus uses the signed J (catalog_lattice_common.gauge)."""
     return gauge(_raw(p))
 
 
@@ -264,7 +265,7 @@ def _hc_torus(p):
     L = _side(p, 3, 4)
     ks = A.couplings(beta, Js)
     tz, meta = _torus("honeycomb", L, ks, T.honeycomb_free_energy(beta, *Js), (2, 3), Js,
-                      lambda b: T.honeycomb_free_energy(b, *Js))
+                      lambda b: T.honeycomb_free_energy(b, *Js), _raw(p))
     v, e = _put(torus_minus_beta_f=tz)
     return Out({**v, **meta}, f"{L} x {L} honeycomb torus ({2 * L * L} sites; transfer matrix in "
                "balls; = the bulk at beta = 1e-8 within O(K^L)); cylinders of circumference 2, 3 "

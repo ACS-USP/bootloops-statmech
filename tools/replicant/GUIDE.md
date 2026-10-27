@@ -664,7 +664,10 @@ transfer matrix), `cylinder_free_energy(geom, Ly, Ks)` (the Perron root by Colla
 `duality_identity_univariate`, `star_triangle_check(Lx, Ly, L)` (Z_H = R^N Z_T on matched tori;
 use Lx != Ly: on an L x L torus every permutation of the three directions is a symmetry). Sign
 patterns: a triangular J1 J2 J3 > 0, and any signs on the square and honeycomb lattices, are
-gauge-equivalent to |J| and computed so (meta `gauge`); J1 J2 J3 < 0 is frustrated, computed with its
+gauge-equivalent to |J| in the bulk and computed so (meta `gauge`: bulk values, critical point,
+cylinders); the torus values always use the signed J, which equal |J|'s only where the gauge closes
+on the torus (even sides on the square and triangular lattices, all three J negative on the
+honeycomb; e.g. J = (-1, -1, 1), beta = 1/5, L = 3 gives 0.763770 against |J|'s 0.805104); J1 J2 J3 < 0 is frustrated, computed with its
 signs (no critical point), refused `no-solution:frustrated-soft-mode` only when the certified
 integrator stalls (e.g. J = -1 at beta = 5). Every torus value is checked against the bulk at beta =
 1e-8 (`torus_high_t_identity`: both balls, finite size enters at O(K^L), tolerance 10 (6K)^L; a 0.1 %

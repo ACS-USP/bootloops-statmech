@@ -358,10 +358,33 @@ def test_gauge_equivalent_and_frustrated_sign_patterns():
     assert v["beta_c"] == w["beta_c"] and "minus_beta_f_square_route" in v
     v = _run("ising_triangular", beta="0.5", J1=-1, J2=2, J3=1)          # frustrated (beta = 3: slow)
     assert "beta_c" not in v and "gauge" not in v and "minus_beta_f" in v
-    v = _run("ising_honeycomb", J1=-1)                                   # bipartite: |J|
+    v = _run("ising_honeycomb", J1=-1)                                   # bulk: |J|
     assert v["gauge"] and v["minus_beta_f"] == _cached("ising_honeycomb")["minus_beta_f"]
     v = _run("ising2d_anisotropic", J2=-2)
     assert v["gauge"] and v["minus_beta_f"] == _cached("ising2d_anisotropic")["minus_beta_f"]
+
+
+def test_gauge_mapped_runs_report_the_signed_torus():
+    """J = (-1, -1, 1) at beta = 1/5: the bulk is |J|'s, but the odd 3 x 3 torus is not gauge-closed,
+    so its value is the signed torus's: ln Z / N = 0.76377012841100205489 by enumeration (|J|:
+    0.80510378392); on 4 x 4 the two agree.  Planted: the torus with |J| (torus_signed False)."""
+    from replicant import catalog_lattice_common as CC
+    from replicant.lattice import geom_tori as G
+    from replicant.lattice.ball import certify
+    c, E = G.counts("triangular", 3, 3), G.class_sizes("triangular", 3, 3)
+    brute = certify(lambda: G.z_of_counts(c, E, _arbs("-0.2", "-0.2", "0.2")).log() / 9)
+    with mp.workdps(45):
+        assert abs(brute.mid() - mp.mpf("0.76377012841100205489")) < 1e-19
+
+    def signed3():
+        v = _run("ising_triangular", beta="1/5", J1=-1, J2=-1, J3=1, L=3)
+        with mp.workdps(45):
+            return abs(mp.mpf(v["torus_minus_beta_f"]) - brute.mid())
+    assert signed3() < 1e-35
+    assert _planted(CC, "torus_signed", False, signed3) > 0.04    # |J|'s 0.80510: the check can fail
+    v = _run("ising_triangular", beta="1/5", J1=-1, J2=-1, J3=1, L=4)
+    assert v["torus_minus_beta_f"] == _cached("ising_triangular")["torus_minus_beta_f"]
+    # the square at odd L and the honeycomb: tests/test_lattice_geom_slow.py
 
 
 def test_planted_swapped_dual_couplings_are_refused():

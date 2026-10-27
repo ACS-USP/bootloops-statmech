@@ -110,3 +110,16 @@ def test_slow_grid_of_route_agreements():
         _run("ising_honeycomb", beta=b)
         _run("ising_triangular", beta=b, J1=1, J2=2, J3=3)
         _run("ising2d_anisotropic", beta=b, J1=3, J2=1)
+
+
+@slow
+def test_slow_signed_tori_on_the_square_and_honeycomb():
+    v = _run("ising2d_anisotropic", J2=-2, L=3)                  # odd L: not gauge-closed
+    w = _run("ising2d_anisotropic", L=3)
+    assert abs(mp.mpf(v["torus_minus_beta_f"]) - mp.mpf(w["torus_minus_beta_f"])) > 0.01
+    assert _run("ising2d_anisotropic", J2=-2, L=4)["torus_minus_beta_f"] == \
+        _run("ising2d_anisotropic", L=4)["torus_minus_beta_f"]
+    v = _run("ising_honeycomb", J1=-1, J2=-1, J3=-1)             # one sublattice flip: closed
+    assert v["torus_minus_beta_f"] == _run("ising_honeycomb")["torus_minus_beta_f"]
+    v = _run("ising_honeycomb", J1=-1)                           # one class negative: not on 3 x 3
+    assert v["torus_minus_beta_f"] != _run("ising_honeycomb")["torus_minus_beta_f"]

@@ -83,7 +83,7 @@ def _tor(p):
     beta, Js, ks, _ = _p(p)
     L = _side(p, 4, 6)
     tz, meta = _torus("square", L, ks + [0], A.free_energy(beta, *Js), (3, 4, 5), tuple(Js) + (0,),
-                      lambda b: A.free_energy(b, *Js))
+                      lambda b: A.free_energy(b, *Js), tuple(_raw(p, 2)) + (0,))
     v, e = _put(torus_minus_beta_f=tz)
     return Out({**v, **meta}, f"{L} x {L} anisotropic torus (transfer matrix in balls; = the bulk at "
                "beta = 1e-8 within O(K^L)); cylinders of circumference 3, 4, 5 towards the bulk "

@@ -55,15 +55,24 @@ def _frustrated(p):
     return a * b * c < 0
 
 
+_HOOKS = {"torus_signed": True}      # planted False: the torus computed with |J| (wrong at odd L)
+
+
 def gauge(Js):
-    """(|J|, meta note or None): the gauge map of an unfrustrated sign pattern (in the bulk; a
-    finite torus is mapped when its sides are even, so the entry's tori are those of |J|)."""
+    """(|J|, meta note or None): the gauge map of an unfrustrated sign pattern.  It maps the bulk
+    exactly, and a finite torus only when the flipped spins close around it (even sides on the
+    square and triangular lattices; on the honeycomb when all three J are negative, by flipping one
+    sublattice, but not for one negative class on the 3 x 3 torus).  So the bulk values, the critical
+    point and the cylinders use |J|; the torus values are computed with the signed couplings."""
     absJ = tuple(abs(j) for j in Js)
     if absJ == tuple(Js):
         return absJ, None
     return absJ, (f"J = {tuple(str(j) for j in Js)} -> |J| = {tuple(str(j) for j in absJ)}: "
-                  "unfrustrated sign pattern, gauge-equivalent by flipping a sublattice of rows or "
-                  "columns (values, critical point and tori are those of |J|)")
+                  "unfrustrated sign pattern, gauge-equivalent by flipping alternate rows or columns: "
+                  "the bulk values, critical point and cylinders are those of |J|; the torus values "
+                  "use the signed J (equal to |J|'s only where the gauge closes on the torus: even "
+                  "sides on the square and triangular lattices, all three J negative on the "
+                  "honeycomb; different otherwise, e.g. odd sides)")
 
 
 def _tri_js(p):
@@ -113,14 +122,16 @@ def cylinder_sequence(geom, widths, Ks, bulk):
 BETA_HT = Fraction(1, 10 ** 8)
 
 
-def high_t_identity(geom, L, Js, bulk_fn):
+def high_t_identity(geom, L, Js, bulk_fn, signed=None):
     """The torus against the bulk at beta = 1e-8 (couplings K = 1e-8 J), both certified balls.  Their
     high-temperature expansions agree term by term until the first non-contractible polygon, of
     length >= L on the L x L torus: |torus - bulk| = O(K^L).  Tolerance 10 (6 K)^L, K = max |K_j|
     (at most 6^l polygons of length l per site on these lattices; a counting estimate made here, not
     a proof).  A wrong edge weight w shifts -beta f by about (w^2 - 1) K^2 / 2: 2e-18 for 2 %,
-    against 1.3e-28 (L = 4) or 2.2e-21 (L = 3).  Refused no-solution:torus-weight."""
-    ks = [BETA_HT * Fraction(j) for j in Js]          # J = 0: the square's empty third class
+    against 1.3e-28 (L = 4) or 2.2e-21 (L = 3).  Refused no-solution:torus-weight.  `signed`: the
+    torus's own couplings when the bulk uses gauge-mapped |J| (a signed odd torus differs from the |J|
+    one only through non-contractible polygons, again O(K^L))."""
+    ks = [BETA_HT * Fraction(j) for j in (signed if signed is not None else Js)]   # J = 0: empty class
     tz, b = G.torus_free_energy(geom, L, L, ks), bulk_fn(BETA_HT)
     with mp.workdps(60):
         K = max(abs(mp.mpf(k.numerator) / k.denominator) for k in ks)
@@ -135,12 +146,17 @@ def high_t_identity(geom, L, Js, bulk_fn):
     return out
 
 
-def _torus(geom, L, Ks, bulk, sizes, Js, bulk_fn):
-    """The L x L torus by the transfer matrix, its weights checked against the bulk at high
-    temperature (high_t_identity), and the cylinder sequence (circumferences `sizes`).  The
-    enumeration of all configurations is the tests' cross-check (tests/test_lattice_geom.py)."""
-    tz = G.torus_free_energy(geom, L, L, Ks)
-    meta = {"torus_size": f"{L} x {L}", "torus_high_t_identity": high_t_identity(geom, L, Js, bulk_fn),
+def _torus(geom, L, Ks, bulk, sizes, Js, bulk_fn, signed):
+    """The L x L torus by the transfer matrix with the signed couplings `signed` (the run's own J; Ks
+    and Js are the gauge-mapped |J| couplings of the bulk), its weights checked against the bulk at
+    high temperature (high_t_identity), and the cylinder sequence (circumferences `sizes`, with |J|:
+    a consistency check of the bulk).  The enumeration of all configurations is the tests'
+    cross-check (tests/test_lattice_geom.py)."""
+    sig = tuple(signed) if _HOOKS["torus_signed"] else tuple(Js)
+    beta = Ks[0] / Fraction(Js[0]) if Js[0] else Ks[1] / Fraction(Js[1])
+    tz = G.torus_free_energy(geom, L, L, [beta * Fraction(j) for j in sig])
+    meta = {"torus_size": f"{L} x {L}",
+            "torus_high_t_identity": high_t_identity(geom, L, Js, bulk_fn, sig),
             "cylinder_sequence": cylinder_sequence(geom, sizes, Ks, bulk)}
     return tz, meta
 
