@@ -30,7 +30,22 @@ def ising2d_xi_blocks():
     from .lattice import critical2d as D
     kstar = -sp.log(sp.tanh(K)) / 2
     xi = sp.Symbol(r"\xi")
-    return [
+    # amplitudes: K = K_c/(1 + t); K* - K = lin t + O(t^2) (the constant vanishes at K_c, sinh 2K_c
+    # = 1), lin = d(K* - K)/dt at t = 0 by sympy.diff.  (sympy.limit of t xi returns 0 here: it
+    # does not see that -ln tanh(K_c)/2 - K_c = 0; the derivative form avoids it.)
+    t, c = sp.symbols("t K_c", positive=True)
+    lin = sp.diff((kstar - K).subs(K, c / (1 + t)), t).subs(t, 0)
+    kc = sp.log(1 + sp.sqrt(2)) / 2
+    amp = lambda i: C.xi_amplitudes()[i].mid()
+    blocks_amp = [
+        sym("Amplitude above T_c: xi = xi_0+ t^-1, t = K_c/K - 1 (lin = d(K* - K)/dt at t = 0)",
+            sp.Eq(sp.Symbol(r"\xi_{0+}"), (1 / (2 * lin)).subs(c, kc)), source=_XI,
+            check=Check((), lambda: amp(0), ((),), "rhs")),
+        sym("Amplitude below T_c (1/xi = 4(K - K*))", sp.Eq(sp.Symbol(r"\xi_{0-}"),
+                                                         (1 / (4 * lin)).subs(c, kc)), source=_XI,
+            check=Check((), lambda: amp(1), ((),), "rhs")),
+    ]
+    return blocks_amp + [
         sym("Correlation length above T_c (exponential, along an axis; tanh K* = e^{-2K})",
             sp.Eq(xi, 1 / (2 * (kstar - K))), source=_XI,
             check=Check((K,), lambda k: C.correlation_length(k).mid(), (("0.2",), ("0.3",), ("0.4",)),

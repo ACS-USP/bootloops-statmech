@@ -36,7 +36,9 @@ log(lambda_max/lambda)"):
   strip_gaps(n, beta) -> StripGaps(odd, even) Balls: Onsager's spectrum on the width-n strip
   xi_log_slope(d1, d2) -> Ball   [ln xi(b2) - ln xi(b1)] / [ln|b2 - K_c| - ln|b1 - K_c|] -> -nu
   xi_amplitude(d) -> Ball        xi(b) |K_c / b - 1|, b = K_c + d (rational): -> xi_0+ (d < 0) or
-                                 xi_0- (d > 0)
+                                 xi_0- (d > 0) (a consistency value)
+  xi_amplitudes() -> (Ball, Ball) the closed forms xi_0+ = 1/(4 K_c), xi_0- = 1/(8 K_c)
+  two_particle_gap(beta) -> Ball  4 |K - K*| = lim 2 gamma_1 (Onsager Eq. (102))
   critical_gap_scaled(n) -> Ball n gap_odd(n) at beta_c: -> 2 pi x_sigma = pi eta (Cardy)
 _HOOKS: "below_factor" (4: xi^-1 = 4(K - K*) below T_c; planted 2 = the T > T_c branch),
 "gamma0_signed" (True; planted False = the wrong sector boundary condition |gamma_0| in the
@@ -166,6 +168,21 @@ def xi_log_slope(d1, d2, digits=30) -> Ball:
     return certify(thunk, digits)
 
 
+def two_particle_gap(beta) -> Ball:
+    """lim 2 gamma_1 = 2 gamma(0) = 4 |K - K*| (Onsager Eqs. (100), (102)): the principal sector's
+    two-particle gap, in both phases (below T_c it is 1/xi, the identification derived here)."""
+    c = coupling(beta)
+    return certify(lambda: 4 * abs(c.arb() - _kstar(c.arb())))
+
+
+def xi_amplitudes():
+    """(xi_0+, xi_0-) in closed form, xi = xi_0+- |t|^-1, t = T/T_c - 1 = K_c/K - 1: at K_c,
+    dK*/dK = -1/sinh 2K_c = -1, so K* - K = 2 K_c t + O(t^2) above and K - K* = 2 K_c |t| + O(t^2)
+    below; with 1/xi = 2(K* - K), 4(K - K*): xi_0+ = 1/(4 K_c) = [2 ln(1 + sqrt 2)]^-1 (Dohm Eq.
+    (30)), xi_0- = 1/(8 K_c) (ratio 2, Dohm Eq. (46))."""
+    return certify(lambda: 1 / (4 * _kc())), certify(lambda: 1 / (8 * _kc()))
+
+
 def xi_amplitude(d, digits=30) -> Ball:
     b = _near_kc() + _signed(d)
 
@@ -178,7 +195,8 @@ def xi_amplitude(d, digits=30) -> Ball:
 @dataclass(frozen=True)
 class StripLimit:
     """Strip -> bulk, a finite-size consistency check (no proven bound): the estimate of xi^-1 from
-    Onsager's strip gaps at widths `widths`, its band (3 x the last change of the estimate) and
+    Onsager's strip gaps at widths `widths`, its band (3 x the last change of the estimate, floored at
+    1e-30 relative: the midpoints' precision; e.g. at beta = 40 the sequence is constant) and
     whether the band resolves the factor-2 contrast between the two branches (band < xi^-1 / 10)."""
     pair: str          # which eigenvalue pair
     widths: tuple
@@ -204,7 +222,7 @@ def strip_limit(beta, widths=(32, 64, 128, 256)) -> StripLimit:
             est, inc = r[-1], abs(r[-1] - r[-2])
         else:
             est, inc = seq[-1], abs(seq[-1] - seq[-2])
-        band = 3 * inc
+        band = 3 * inc + mp.mpf("1e-30") * max(1, abs(xi_inv))   # floor: the 40-digit balls' midpoints
         return StripLimit("lambda_0/lambda_2 (principal sector, momenta +-pi/n; lambda_1 tunnels)"
                           if below else "lambda_0/lambda_1 (principal vs odd sector)", tuple(widths),
                           seq, est, band, bool(band < xi_inv / 10))
@@ -212,4 +230,4 @@ def strip_limit(beta, widths=(32, 64, 128, 256)) -> StripLimit:
 
 __all__ = ["MAX_STRIP", "StripGaps", "StripLimit", "correlation_length", "critical_gap_scaled",
            "dual_coupling", "inverse_correlation_length", "strip_gaps", "strip_limit",
-           "xi_amplitude", "xi_log_slope"]
+           "two_particle_gap", "xi_amplitude", "xi_amplitudes", "xi_log_slope"]

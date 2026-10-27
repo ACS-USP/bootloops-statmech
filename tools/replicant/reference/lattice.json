@@ -68,32 +68,38 @@
   "ising2d_correlation_length_beta0_3": {
     "value": "1.578885080160964502155803030182",
     "tol": "1e-29",
-    "cite": "exponential correlation length along a lattice axis of the isotropic square-lattice Ising model (J = 1, K = beta), K* the dual coupling, sinh 2K sinh 2K* = 1 (Onsager, 'Crystal Statistics. I.', Phys. Rev. 65, 117 (1944), doi:10.1103/PhysRev.65.117 (journal scan read, www.phys.ens.psl.eu/~langlois/Onsager43.pdf, pp. 117, 137-138, as page images), Eq. (17)). Strip spectrum: Eqs. (89a), (95), (97)-(100) (gamma_0 = 2|K - K*|); the limit of the ratio of the two largest eigenvalues, Eq. (101), and 'the range ... is inversely proportional to log(lambda_max/lambda)' (p. 138). Discrepancy: (101) prints exp(2H* - 2H') for lambda^(-)/lambda when H' < H*, which exceeds 1; Eqs. (99), (100) give exp(2H' - 2H*). T > T_c: 1/xi = 2(K* - K) at K = 0.3. Value: mpmath at 60 digits of the formula, rounded to 31 significant digits; tol 1e-29",
-    "independent_route": "Onsager's strip gaps at widths 4 and 6 equal the direct double-precision diagonalisation of the strip transfer matrix (lattice/strip_tm.py, to 1e-9); the width-256 gap lambda_0/lambda_1 is within 1e-36 of the bulk value (exponential convergence; a finite-size check, tests/test_lattice_xi.py)"
+    "cite": "exponential correlation length along a lattice axis of the isotropic square-lattice Ising model (J = 1, K = beta), K* the dual coupling, sinh 2K sinh 2K* = 1 (Onsager, 'Crystal Statistics. I.', Phys. Rev. 65, 117 (1944), doi:10.1103/PhysRev.65.117 (journal scan read, www.phys.ens.psl.eu/~langlois/Onsager43.pdf, pp. 117, 137-138, as page images), Eq. (17)). Strip spectrum: Eqs. (89a), (95), (97)-(100) (gamma_0 = 2|K - K*|); the limit of the ratio of the two largest eigenvalues, Eq. (101), and 'the range ... is inversely proportional to log(lambda_max/lambda)' (p. 138). Discrepancy: (101) prints exp(2H* - 2H') for lambda^(-)/lambda when H' < H*, which exceeds 1; Eqs. (99), (100) give exp(2H' - 2H*). T > T_c: 1/xi = 2(K* - K) at K = 0.3. Value: mpmath at 60 digits of the formula, rounded to 31 significant digits; tol 1e-29; concordant: Caselle, Hasenbusch, Pelissetto & Vicari, arXiv:cond-mat/0106372 (PDF read), Eqs. (2.8), (5.1)-(5.4): the pole 4 sinh^2(1/(2 xi)) = M_s^2 = 4(sqrt(1 + tau^2) - 1) equals 2(K* - K) to 40 digits",
+    "independent_route": "Onsager's strip gaps at widths 4 and 6 equal the direct double-precision diagonalisation of the strip transfer matrix (lattice/strip_tm.py, numpy double precision, not certified, to 1e-9); the width-256 gap lambda_0/lambda_1 is within 1e-36 of the bulk value (exponential convergence; a finite-size check, tests/test_lattice_xi.py)"
   },
   "ising2d_correlation_length_beta0_6": {
     "value": "0.8645506510037578328362483583344",
     "tol": "1e-29",
     "cite": "exponential correlation length along a lattice axis of the isotropic square-lattice Ising model (J = 1, K = beta), K* the dual coupling, sinh 2K sinh 2K* = 1 (Onsager, 'Crystal Statistics. I.', Phys. Rev. 65, 117 (1944), doi:10.1103/PhysRev.65.117 (journal scan read, www.phys.ens.psl.eu/~langlois/Onsager43.pdf, pp. 117, 137-138, as page images), Eq. (17)). Strip spectrum: Eqs. (89a), (95), (97)-(100) (gamma_0 = 2|K - K*|); the limit of the ratio of the two largest eigenvalues, Eq. (101), and 'the range ... is inversely proportional to log(lambda_max/lambda)' (p. 138). Discrepancy: (101) prints exp(2H* - 2H') for lambda^(-)/lambda when H' < H*, which exceeds 1; Eqs. (99), (100) give exp(2H' - 2H*). T < T_c: lambda_0, lambda_1 are asymptotically degenerate (Eqs. (101), (103)); the next level of the principal sector is log lambda_max - 2 gamma_1 (Eq. (102)), so 1/xi = 2 gamma(0) = 4(K - K*) at K = 0.6. The identification of the two-particle gap with the decay of the connected correlation is taken from the form-factor expansions of Lyberg & McCoy, arXiv:math-ph/0612051 (PDF read), Eqs. (5), (13), (20), (21) (even terms below T_c, z^N factors per particle, branch points at alpha_2 = e^{-2K} coth K): the derivation of the decay rate alpha_2^{2N} is replicant's; concordant near T_c with Dohm, arXiv:1907.00859, Eqs. (41), (46): xi_0+ = 2 xi_0-. Value: mpmath at 60 digits, 31 significant digits; tol 1e-29",
-    "independent_route": "Onsager's strip gaps equal the direct transfer matrix at widths 4, 6; Richardson in 1/n^2 of the lambda_0/lambda_2 gap at widths 64, 128, 256 is within 1.3e-7 of the bulk value (band 5.8e-6; the T > T_c branch 2(K - K*) = 0.578 is excluded); a finite-size consistency check, tests/test_lattice_xi.py"
+    "independent_route": "Onsager's strip gaps equal the direct transfer matrix at widths 4, 6 (numpy double precision, not certified); Richardson in 1/n^2 of the lambda_0/lambda_2 gap at widths 64, 128, 256 is within 1.3e-7 of the bulk value (band 5.8e-6; the T > T_c branch 2(K - K*) = 0.578 is excluded); a finite-size consistency check, tests/test_lattice_xi.py"
   },
   "ising2d_correlation_length_amplitude_plus": {
     "value": "0.5672963285532554920286227025766",
-    "tol": "1e-11",
-    "cite": "xi = xi_0+ t^-1 (t = T/T_c - 1 -> 0+) for the isotropic square-lattice Ising model: Dohm, arXiv:1907.00859v3 (2019) (PDF read), Eq. (30): xi_0+ = (4 beta_c E)^-1 = [2 ln(1 + 2^{1/2})]^-1, from Wu, McCoy, Tracy & Barouch, Phys. Rev. B 13, 316 (1976) (not fetched). Value: 60-digit mpmath, rounded; tol 1e-11 covers the O(t) of replicant's evaluation xi |t| at K - K_c = -1e-12 (measured 8.9e-13)",
-    "independent_route": "xi |t| of replicant's certified exact form 1/xi = 2(K* - K) (Onsager's gap) at K - K_c = -1e-12 (catalog value correlation_length_amplitude_plus)"
+    "tol": "1e-29",
+    "cite": "xi = xi_0+ t^-1 (t = T/T_c - 1 -> 0+), exponential correlation length of the isotropic square-lattice Ising model: Dohm, arXiv:1907.00859v3 (2019) (PDF read), Eq. (30): xi_0+ = (4 beta_c E)^-1 = [2 ln(1 + 2^{1/2})]^-1, from Wu, McCoy, Tracy & Barouch, Phys. Rev. B 13, 316 (1976) (not fetched). Value: 60-digit mpmath of the printed closed form, rounded; tol 1e-29",
+    "independent_route": "replicant's closed form 1/(4 K_c), derived from 1/xi = 2(K* - K) (Onsager 1944, Eqs. (99)-(101)) and dK*/dK = -1/sinh 2K_c = -1 (lattice/correlation2d.xi_amplitudes); and, as a consistency value, xi |t| of the exact form at K - K_c = -1e-12, within 8.9e-13 (xi_t_amplitude_plus, band 1e-11)"
+  },
+  "ising2d_correlation_length_amplitude_minus": {
+    "value": "0.2836481642766277460143113512883",
+    "tol": "1e-29",
+    "cite": "xi_0- = xi_0+ / 2 = 1/(8 K_c) = [4 ln(1 + sqrt 2)]^-1: Dohm, arXiv:1907.00859v3 (PDF read), Eqs. (30), (41), (46). Value: 60-digit mpmath, rounded; tol 1e-29",
+    "independent_route": "replicant's closed form 1/(8 K_c) from 1/xi = 4(K - K*) below T_c (the two-particle gap, Onsager Eq. (102); its identification with xi derived here) and dK*/dK = -1 at K_c; xi |t| at K - K_c = +1e-12 within 1e-11 (xi_t_amplitude_minus)"
   },
   "ising2d_correlation_length_amplitude_ratio": {
     "value": "2",
-    "tol": "1e-11",
-    "cite": "xi_0+ / xi_0- = 2 for the exponential correlation lengths of the 2D Ising model: Dohm, arXiv:1907.00859v3 (PDF read), Eqs. (41), (46) and the text after Eq. (14) ('xi_0+/xi_0- = 2'); tol 1e-11 covers the O(t) of the evaluation at K - K_c = -+1e-12",
-    "independent_route": "ratio of replicant's xi |t| above and below T_c from the exact forms 2(K* - K), 4(K - K*)"
+    "tol": "1e-29",
+    "cite": "xi_0+ / xi_0- = 2 for the exponential correlation lengths of the 2D Ising model: Dohm, arXiv:1907.00859v3 (PDF read), Eqs. (41), (46) and the text after Eq. (14) ('xi_0+/xi_0- = 2'). Value: exact; tol 1e-29",
+    "independent_route": "the ratio of replicant's closed forms 1/(4 K_c) and 1/(8 K_c) (from 2(K* - K) above, 4(K - K*) below and dK*/dK = -1 at K_c); finite-t consistency: xi |t| at K - K_c = -+1e-12 gives 2 + 6.2e-12"
   },
   "ising2d_critical_nn_correlation": {
     "value": "0.7071067811865475244008443621048",
     "tol": "1e-29",
     "cite": "<s_0 s_1> for nearest neighbours of the square-lattice Ising model at T_c: -u_c/(2J) with Onsager, 'Crystal Statistics. I.', Phys. Rev. 65, 117 (1944), doi:10.1103/PhysRev.65.117 (journal scan read, www.phys.ens.psl.eu/~langlois/Onsager43.pdf, pp. 117, 137-138, as page images), Eq. (121): -U_c/NJ = 2^{1/2} (pp. 140-143, read in I1); two bonds per site and isotropy give u = -2J <s s'>_nn, so sqrt 2 / 2 (the step from u to the bond correlation is replicant's). Value: 31 digits of sqrt 2 / 2; tol 1e-29",
-    "independent_route": "on the periodic strip of width L = 3 .. 8 at beta_c the mean of the row and column nearest-neighbour correlations (direct transfer matrix, principal eigenvector, double precision) equals sqrt 2 / 2 to 1e-15 (an observed identity, not proved here; tests/test_lattice_xi.py)"
+    "independent_route": "on the periodic strip of width L = 3, 4, 6, 8 (default tier) and 10 (slow) at beta_c the mean of the row and column nearest-neighbour correlations (direct transfer matrix, principal eigenvector, double precision) equals sqrt 2 / 2 to 1e-15 (an observed identity, not proved here; tests/test_lattice_xi.py)"
   },
   "ising2d_critical_diagonal_correlation_n1": {
     "value": "0.6366197723675813430755350534901",

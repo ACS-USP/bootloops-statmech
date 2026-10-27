@@ -121,9 +121,13 @@ def test_exponent_consistency_nu_and_eta():
     for d1, d2 in (("-1e-6", "-1e-8"), ("1e-6", "1e-8")):
         s = C.xi_log_slope(d1, d2).mid()
         assert abs(s + 1) < mp.mpf("1e-5") and abs(s + 1) > mp.mpf("1e-9"), (d1, s)  # O(d) seen
-    assert _near(C.xi_amplitude("-1e-12"), "ising2d_correlation_length_amplitude_plus")
-    ratio = C.xi_amplitude("-1e-12").mid() / C.xi_amplitude("1e-12").mid()
-    assert _near(ratio, "ising2d_correlation_length_amplitude_ratio")
+    plus, minus = C.xi_amplitudes()          # closed forms 1/(4 K_c), 1/(8 K_c)
+    assert _near(plus, "ising2d_correlation_length_amplitude_plus")
+    assert _near(minus, "ising2d_correlation_length_amplitude_minus")
+    assert _near(plus.mid() / minus.mid(), "ising2d_correlation_length_amplitude_ratio")
+    for d, closed in (("-1e-12", plus), ("1e-12", minus)):   # xi |t| at finite t: O(t) consistency
+        gap = abs(C.xi_amplitude(d).mid() - closed.mid())
+        assert mp.mpf("1e-14") < gap < mp.mpf("1e-11"), (d, gap)
     # Cardy: n ln(lambda_0/lambda_1) at beta_c -> pi eta, corrections ~ 0.32/n^2 (observed)
     a = {n: C.critical_gap_scaled(n).mid() for n in (64, 128, 256)}
     pi4 = mp.mpf(_bank("ising2d_strip_critical_gap_amplitude").value)
@@ -214,7 +218,18 @@ def test_catalog_xi_certified_printed_enclosures_and_precision():
             with baller().hygiene.ctx_guard(prec=300):
                 b = ball().arb
                 assert (arb(v) - arb(err)).upper() <= b.lower() and b.upper() <= (arb(v) + arb(err)).lower()
-            assert res.finality[k].state == "exact-by-literature" and "Eq" in res.finality[k].cite
+            assert res.finality[k].state == ("not-computed" if k == "correlation_length" else
+                                             "exact-by-literature") and "Eq" in res.finality[k].cite
+    # xi: exact-by-literature above T_c (with the CHPV concordance); below T_c not-computed (the
+    # identification with the two-particle gap is derived here), the gap itself exact-by-literature
+    up, down = _run(beta="0.3"), _run(beta="0.6")
+    assert up.finality["correlation_length"].state == "exact-by-literature"
+    assert "cond-mat/0106372" in up.finality["correlation_length"].cite
+    assert "derived here" in down.finality["inverse_correlation_length"].note
+    assert down.finality["two_particle_gap"].state == "exact-by-literature"
+    with mp.workdps(45):
+        assert abs(mp.mpf(down.values["two_particle_gap"]) - 1 / mp.mpf(down.values["correlation_length"])) \
+            < mp.mpf("1e-38")
     res = _run()
     assert "correlation_length" not in res.values
     assert res.finality["nu_loglog_above"].state == "not-computed"
@@ -238,7 +253,43 @@ def test_slow_toeplitz_to_40_and_strip_limit_grid():
     from replicant.lattice import correlation2d as C, critical2d as D
     for n in (20, 30, 40):
         assert D.diagonal_correlation(n).overlaps(D.diagonal_toeplitz(n)), n
-    for beta in ("0.1", "0.2", "0.35", "0.4", "0.42", "0.43", "0.47", "0.5", "0.55", "0.7", "1", "2"):
+    for beta in ("0.1", "0.2", "0.35", "0.4", "0.42", "0.43", "0.436", "0.44", "0.45", "0.455", "0.47",
+                 "0.5", "0.55", "0.7", "1", "2", "40"):
         lim, xi_inv = C.strip_limit(beta), C.inverse_correlation_length(beta).mid()
         assert abs(lim.estimate - xi_inv) <= lim.band, (beta, lim)
-        assert lim.resolved or beta in ("0.42", "0.47"), (beta, lim)
+        assert lim.resolved == (beta not in ("0.436", "0.44", "0.45")), (beta, lim)   # window ~0.436-0.450
+
+
+def test_large_beta_runs_and_skips_the_direct_check():
+    """Regression (fix round 1): ising2d at beta = 40 returns values; the double-precision strip check
+    is skipped and says so (lambda_2/lambda_0 = e^-160), the strip -> bulk check still runs."""
+    v = _run(beta=40).values
+    assert v["correlation_length"] and v["minus_beta_f"] and v["magnetization"]
+    assert all(str(x).startswith("not run") for x in v["strip_direct_check"].values())
+    assert v["strip_limit"]["resolved"]
+    assert _run(beta="1").values["strip_direct_check"][6] != "not run"
+
+
+def test_below_tc_sigma_weight_sits_at_the_two_particle_gap():
+    """Below T_c the spin's spectral weight from the vacuum (dense strip matrix, L = 8, beta = 0.6,
+    numpy double precision; no shared code with lattice/): beyond the tunnelling pair (gap ~ 2e-3)
+    no state with weight > 1e-14 lies within 0.3 of the one-particle value 2(K - K*) = 0.578; the
+    first weighted gap (1.511 at L = 8: an odd-sector two-particle level) lies above the bulk
+    two-particle threshold 4(K - K*) = 1.157 and approaches it as L grows."""
+    import itertools
+    import numpy as np
+    L, K = 8, 0.6
+    cs = np.array(list(itertools.product((1, -1), repeat=L)), float)
+    e = (cs * np.roll(cs, -1, axis=1)).sum(1)
+    T = np.exp(K * ((e[:, None] + e[None, :]) / 2 + cs @ cs.T - 2 * L))
+    w, V = np.linalg.eigh(T)
+    w, V = w[::-1], V[:, ::-1]
+    amp = (V[:, 0] * cs[:, 0]) @ V
+    gaps = np.log(w[0] / w[w > 0])
+    weighted = [g for g, a in zip(gaps, amp[:len(gaps)] ** 2) if a > 1e-14]
+    ks = float(mp.asinh(1 / mp.sinh(2 * K)) / 2)
+    one, two = 2 * (K - ks), 4 * (K - ks)
+    assert weighted[0] < 1e-2                                  # the tunnelling partner lambda_1
+    beyond = [g for g in weighted[1:]]
+    assert beyond and not any(abs(g - one) < 0.3 for g in beyond), beyond[:4]
+    assert two - 0.05 < beyond[0] < two + 0.4, (beyond[0], two)     # 1.511 at L = 8 (finite size)

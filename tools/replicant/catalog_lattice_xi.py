@@ -40,7 +40,9 @@ XI_CITE = f"{ONS44}, Eqs. (17), (89a), (95)-(103); {LM}; {DOHM}"
 LIT = lambda cite, note: Stability("exact-by-literature", "exact", cite, note)
 CONS = lambda cite, note: Stability("not-computed", "exact", cite, note)
 STRIP_TOL = 1e-9           # |ln ratio| agreement, Onsager's spectrum vs the double-precision matrix
+DIRECT_MAX_GAP = 12        # the direct check runs while lambda_2/lambda_0 > e^-12 (double precision)
 NU_BAND, ETA_BAND, CARDY_BAND = mp.mpf("1e-5"), mp.mpf("1e-5"), mp.mpf("1e-8")
+AMP_BAND = mp.mpf("1e-11")   # xi |t| at |K - K_c| = 1e-12 against the closed forms (O(t))
 TOEPLITZ_MAX = 10
 
 UNCLAIMED[("lattice", "ising2d_strip_critical_gap_amplitude")] = (
@@ -74,7 +76,12 @@ def _xi(p):
     below = _ordered(coupling(beta).arb)
     direct = {}
     for n in (4, 6):
-        g, (do, de) = C.strip_gaps(n, beta), S.strip_spectrum(n, beta)
+        g = C.strip_gaps(n, beta)
+        if not g.even.mid() <= DIRECT_MAX_GAP:
+            direct[n] = (f"not run: lambda_2/lambda_0 = e^-{_s(g.even.mid(), 3)} is below the "
+                         "resolution of the double-precision diagonalisation")
+            continue
+        do, de = S.strip_spectrum(n, beta)
         diff = max(abs(g.odd.mid() - do), abs(g.even.mid() - de))
         direct[n] = _s(diff, 2)
         if not diff <= STRIP_TOL:
@@ -88,7 +95,8 @@ def _xi(p):
         raise Refusal("no-solution:strip-limit", f"the strip estimate {_s(lim.estimate, 12)} of 1/xi "
                       f"({lim.pair}) is {_s(off, 2)} from the bulk form {_s(xi_inv.mid(), 12)}, "
                       f"outside its band {_s(lim.band, 2)}")
-    v, e = _put(correlation_length=C.correlation_length(beta), inverse_correlation_length=xi_inv)
+    v, e = _put(correlation_length=C.correlation_length(beta), inverse_correlation_length=xi_inv,
+                two_particle_gap=C.two_particle_gap(beta))
     branch = ("T < T_c: 1/xi = 4 (K - K*), the two-particle gap" if below else
               "T > T_c: 1/xi = 2 (K* - K), the one-particle gap")
     strip = {"pair": lim.pair, "widths": list(lim.widths),
@@ -97,8 +105,9 @@ def _xi(p):
              "resolved": lim.resolved, "kind": "finite-size consistency check, no proven bound"}
     return Out({**v, "xi_branch": branch, "strip_direct_check": direct, "strip_limit": strip},
                f"{branch}; exponential correlation length along an axis (K* dual, tanh K* = "
-               f"e^-2K); Onsager's strip gaps = the direct transfer matrix at n = 4, 6 (to "
-               f"{STRIP_TOL}); strip -> bulk " + ("within its band" if lim.resolved else
+               f"e^-2K); Onsager's strip gaps = the direct transfer matrix at n = 4, 6 (numpy "
+               f"double precision, not certified; to {STRIP_TOL}, when lambda_2/lambda_0 > "
+               f"e^-{DIRECT_MAX_GAP}); strip -> bulk " + ("within its band" if lim.resolved else
                                                   "not resolved here (band >= 1/xi / 10): printed, "
                                                   "not asserted"), errors=e)
 
@@ -109,8 +118,8 @@ def _exponents(hooks):
     nu, eta = C._HOOKS["nu"], C._HOOKS["eta"]
     balls = {"nu_loglog_above": C.xi_log_slope("-1e-6", "-1e-8"),
              "nu_loglog_below": C.xi_log_slope("1e-6", "1e-8"),
-             "correlation_length_amplitude_plus": C.xi_amplitude("-1e-12"),
-             "correlation_length_amplitude_minus": C.xi_amplitude("1e-12"),
+             "xi_t_amplitude_plus": C.xi_amplitude("-1e-12"),
+             "xi_t_amplitude_minus": C.xi_amplitude("1e-12"),
              "strip_critical_gap_n256": C.critical_gap_scaled(256),
              "eta_diagonal_loglog": D.diagonal_log_slope(64, 128)}
     g128 = C.critical_gap_scaled(128).mid()
@@ -121,22 +130,26 @@ def _exponents(hooks):
                   "eta_cardy": abs(rich - mp.pi * mp.mpf(eta.numerator) / eta.denominator),
                   "eta_diagonal": abs(balls["eta_diagonal_loglog"].mid()
                                       + mp.mpf(eta.numerator) / eta.denominator)}
-    plus, minus = balls["correlation_length_amplitude_plus"], balls["correlation_length_amplitude_minus"]
-    ratio = certify(lambda: plus.arb / minus.arb, 30)
-    return balls, rich, checks, ratio
+    plus, minus = C.xi_amplitudes()
+    tp, tm = balls["xi_t_amplitude_plus"], balls["xi_t_amplitude_minus"]
+    with mp.workdps(40):     # the finite-t values against the closed forms: O(t) = O(1e-12)
+        checks["xi_amplitudes_t"] = max(abs(tp.mid() - plus.mid()), abs(tm.mid() - minus.mid()))
+    balls.update(correlation_length_amplitude_plus=plus, correlation_length_amplitude_minus=minus,
+                 correlation_length_amplitude_ratio=certify(lambda: plus.arb / minus.arb))
+    return balls, rich, checks
 
 
 def _exp(p):
-    balls, rich, checks, ratio = _exponents(tuple(sorted((k, str(v)) for k, v in
+    balls, rich, checks = _exponents(tuple(sorted((k, str(v)) for k, v in
                                                          {**C._HOOKS, **D._HOOKS}.items())))
     bands = {"nu_above": NU_BAND, "nu_below": NU_BAND, "eta_cardy": CARDY_BAND,
-             "eta_diagonal": ETA_BAND}
+             "eta_diagonal": ETA_BAND, "xi_amplitudes_t": AMP_BAND}
     bad = [k for k in checks if not checks[k] <= bands[k]]
     if bad:
         raise Refusal("no-solution:exponent-mismatch", ", ".join(
             f"{k}: |data - target| = {_s(checks[k], 3)} > {_s(bands[k], 1)}" for k in bad) +
             f" (targets nu = {C._HOOKS['nu']}, eta = {C._HOOKS['eta']})")
-    v, e = _put(**balls, correlation_length_amplitude_ratio=ratio)
+    v, e = _put(**balls)
     return Out({**v, "strip_critical_gap_extrapolated": _s(rich, 15),
                 "exponent_checks": {k: f"{_s(checks[k], 3)} (band {_s(bands[k], 1)})" for k in checks},
                 "exponent_points": "nu: beta - beta_c = -+1e-6, -+1e-8; amplitudes: +-1e-12; "
@@ -184,24 +197,36 @@ _ref = lambda key, k, **params: RefCheck("lattice", key, (lambda k: lambda v: v[
 REFS_2D = [_ref("ising2d_correlation_length_beta0_3", "correlation_length", beta="0.3"),
            _ref("ising2d_correlation_length_beta0_6", "correlation_length", beta="0.6"),
            _ref("ising2d_correlation_length_amplitude_plus", "correlation_length_amplitude_plus"),
+           _ref("ising2d_correlation_length_amplitude_minus", "correlation_length_amplitude_minus"),
            _ref("ising2d_correlation_length_amplitude_ratio", "correlation_length_amplitude_ratio"),
            _ref("ising2d_critical_nn_correlation", "critical_nn_correlation"),
            _ref("ising2d_critical_diagonal_correlation_n1", "critical_diagonal_correlation"),
            _ref("ising2d_critical_diagonal_amplitude", "critical_diagonal_amplitude")]
-_XI_NOTE = ("exact bulk form, certified ball: 2(K* - K) above T_c (Onsager's one-particle gap, "
-            "Eqs. (99)-(101)), 4(K - K*) below (the two-particle gap 2 gamma(0), Eq. (102); the "
-            "identification below T_c taken here from Lyberg & McCoy's form-factor structure, "
-            "consistent with Dohm's xi_0+ / xi_0- = 2)")
+CHPV = ("Caselle, Hasenbusch, Pelissetto & Vicari, arXiv:cond-mat/0106372 (read), Eqs. (2.8), "
+        "(5.1)-(5.4) (concordant above T_c: the pole 4 sinh^2(1/(2 xi)) = M_s^2 gives 2(K* - K))")
+_ABOVE = LIT(f"{XI_CITE}; {CHPV}", "exact bulk form above T_c, certified ball: 1/xi = 2(K* - K), "
+             "Onsager's one-particle gap (Eqs. (99)-(101))")
+_BELOW = CONS(XI_CITE, "4(K - K*) = lim 2 gamma_1 (Onsager Eq. (102)), exact-by-literature as a gap "
+              "(two_particle_gap); its identification with xi derived here (Lyberg-McCoy form-factor "
+              "structure; Dohm ratio 2 near T_c); certified ball of that form")
+_phase_fin = lambda v: _ABOVE if str(v.get("xi_branch", "")).startswith("T > T_c") else _BELOW
+_AMP = lambda which: LIT(f"{DOHM}", f"closed form xi_0{which}, certified ball: from 1/xi = "
+                         "2(K* - K), 4(K - K*) and dK*/dK = -1 at K_c (derived here; xi_0+ printed by "
+                         "Dohm Eq. (30), the ratio 2 by Eq. (46))")
 FIN_2D = {
-    "correlation_length": LIT(XI_CITE, _XI_NOTE),
-    "inverse_correlation_length": LIT(XI_CITE, _XI_NOTE),
+    "correlation_length": _phase_fin,
+    "inverse_correlation_length": _phase_fin,
+    "two_particle_gap": LIT(f"{ONS44}, Eqs. (100), (102)", "4|K - K*| = lim 2 gamma_1, the "
+                            "principal sector's two-particle gap, certified ball"),
     "nu_loglog_above": CONS(XI_CITE, "log-slope of the certified xi between beta - beta_c = -1e-6, "
                             "-1e-8: a consistency check of nu = 1, |slope + 1| < 1e-5"),
     "nu_loglog_below": CONS(XI_CITE, "the same at beta - beta_c = 1e-6, 1e-8"),
-    "correlation_length_amplitude_plus": CONS(DOHM, "xi |t| at K - K_c = -1e-12 (t = K_c/K - 1): "
-                                              "xi_0+ = [2 ln(1 + sqrt 2)]^-1 up to O(t)"),
-    "correlation_length_amplitude_minus": CONS(DOHM, "xi |t| at K - K_c = +1e-12: xi_0- up to O(t)"),
-    "correlation_length_amplitude_ratio": CONS(DOHM, "xi_0+ / xi_0- from the two values: 2 up to O(t)"),
+    "correlation_length_amplitude_plus": _AMP("+ = 1/(4 K_c) = [2 ln(1 + sqrt 2)]^-1"),
+    "correlation_length_amplitude_minus": _AMP("- = 1/(8 K_c)"),
+    "correlation_length_amplitude_ratio": _AMP("+ / xi_0- = 2"),
+    "xi_t_amplitude_plus": CONS(DOHM, "xi |t| at K - K_c = -1e-12 (t = K_c/K - 1): a consistency "
+                                "value, within 1e-11 of the closed form xi_0+ (O(t))"),
+    "xi_t_amplitude_minus": CONS(DOHM, "xi |t| at K - K_c = +1e-12: within 1e-11 of xi_0-"),
     "strip_critical_gap_n256": LIT(f"{ONS44}, Eqs. (95), (99), (100)", "256 ln(lambda_0/lambda_1) of "
                                    "the width-256 strip at beta_c, certified ball (-> pi eta)"),
     "eta_diagonal_loglog": CONS(f"{PERK}; {DIK}, Eq. (106)", "ln[C(128,128)/C(64,64)]/ln 2 from "
