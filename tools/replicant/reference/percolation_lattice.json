@@ -1,0 +1,68 @@
+{
+  "square_bond_pc": {
+    "value": "0.5",
+    "tol": "1e-29",
+    "cite": "bond percolation threshold of the square lattice Z^2, p_H = 1/2 (Harris 1960, Kesten 1980): Bollobas & Riordan, 'A short proof of the Harris-Kesten Theorem', arXiv:math/0410359v3 (PDF read), Theorem 8 (theta(1/2) = 0) and Theorem 10 (P_p(E_oo) = 1 for p > 1/2); the original is Kesten, Comm. Math. Phys. 74, 41 (1980), their ref. [16] (not fetched). Also GM (Grimmett & Manolescu, arXiv:1105.5535v3, PDF read), Theorem 1.1(a): kappa_square(p) = p_h + p_v - 1 = 0. Value: 1/2 exactly; tol 1e-29",
+    "independent_route": "replicant's exact rational (percolation/exact2d.py); the exact duality identity R_h[W x H](p) + R_h[(H + 1) x (W - 1)](1 - p) = 1 of Bollobas & Riordan's Corollary 4 on enumerated lattices (percolation/enumerate2d.py); the Newman-Ziff crossings of R_L and R_2L recover it within the bootstrap band (tests/test_percolation_lattice_slow.py)"
+  },
+  "triangular_site_pc": {
+    "value": "0.5",
+    "tol": "1e-29",
+    "cite": "site percolation threshold of the triangular lattice, p_H = 1/2: Bollobas & Riordan, 'Sharp thresholds and percolation in the plane', arXiv:math/0412510v2 (PDF read), Sec. 4.3, Theorem 14 (theta(p) > 0 for p > 1/2; exponential decay of |C_0| for p < 1/2); Smirnov & Werner, arXiv:math/0109120v2 (PDF read), Sec. 1 ('due to Kesten and Wierman'). Value: 1/2 exactly; tol 1e-29",
+    "independent_route": "replicant's exact rational (percolation/exact2d.py); the exact Hex identity R_h(p) + R_v(1 - p) = 1 on enumerated triangular-lattice rectangles (percolation/enumerate2d.py); the Newman-Ziff crossings recover it within the bootstrap band plus the stated systematic (tests/test_percolation_lattice_slow.py)"
+  },
+  "triangular_bond_pc": {
+    "value": "0.347296355333860697703433253539",
+    "tol": "1e-29",
+    "cite": "bond percolation threshold of the triangular lattice: the critical surface kappa_tri(p0, p1, p2) = p0 + p1 + p2 - p0 p1 p2 - 1 = 0 (Grimmett & Manolescu, 'Inhomogeneous bond percolation on square, triangular and hexagonal lattices', Ann. Probab. 41, 2990 (2013), arXiv:1105.5535v3 (PDF read), Eq. (1.2) and Theorem 1.1(b); complete proof in Grimmett, Percolation (1999), Sec. 11.9; original Wierman, Adv. Appl. Probab. 13, 298 (1981): neither fetched); homogeneous: 3p - p^3 - 1 = 0, the root in (0, 1) is 2 sin(pi/18) (triple-angle identity, derived here). Value: 2 sin(pi/18) by mpmath at 50 digits, rounded to 30 places; tol 1e-29",
+    "independent_route": "replicant's two certified routes (percolation/exact2d.py): 2 sin(pi/18) in arb, and the root of 3p - p^3 - 1 isolated by exact rational bisection (unique in (0, 1)), which must overlap; the star-triangle connection polynomials (exact); the Newman-Ziff crossings recover it within the bootstrap band (slow)"
+  },
+  "honeycomb_bond_pc": {
+    "value": "0.652703644666139302296566746461",
+    "tol": "1e-29",
+    "cite": "bond percolation threshold of the hexagonal (honeycomb) lattice: kappa_hex(p) = -kappa_tri(1 - p0, 1 - p1, 1 - p2) = 0 (Grimmett & Manolescu, arXiv:1105.5535v3 (PDF read), Eq. (1.3) and Theorem 1.1(c); Wierman 1981 not fetched), so p_c = 1 - 2 sin(pi/18). Value: mpmath at 50 digits, rounded to 30 places; tol 1e-29",
+    "independent_route": "replicant: 1 - (the certified root of 3p - p^3 - 1), and kappa_hex evaluated on the ball contains 0 (percolation/exact2d.py); the Newman-Ziff crossings on the brick wall recover it (slow)"
+  },
+  "percolation_2d_nu": {
+    "value": "1.333333333333333333333333333333",
+    "tol": "1e-29",
+    "cite": "correlation-length exponent of site percolation on the triangular lattice, xi(p) = |p - 1/2|^(-4/3 + o(1)): Smirnov & Werner, 'Critical exponents for two-dimensional percolation', arXiv:math/0109120v2 (PDF read), Theorem 1 (iii), (iv). Value: 4/3; tol 1e-29",
+    "independent_route": "replicant's exact rational 1/(2 - 5/4) from the arm exponent of SW Eq. (2) (percolation/exact2d.py, the scaling relations checked exactly); the Newman-Ziff collapse recovers 1/nu = 3/4 within its bootstrap band on the solved lattices (slow)"
+  },
+  "percolation_2d_beta": {
+    "value": "0.138888888888888888888888888889",
+    "tol": "1e-29",
+    "cite": "theta(p) = (p - 1/2)^(5/36 + o(1)) as p -> 1/2+, site percolation on the triangular lattice: Smirnov & Werner, arXiv:math/0109120v2 (PDF read), Theorem 1 (i). Value: 5/36 by mpmath, rounded to 30 places; tol 1e-29",
+    "independent_route": "replicant's exact rational nu a1 = (4/3)(5/48) from SW Eq. (1) (percolation/exact2d.py), with gamma + 2 beta = 2 nu checked exactly"
+  },
+  "percolation_2d_gamma": {
+    "value": "2.388888888888888888888888888889",
+    "tol": "1e-29",
+    "cite": "chi(p) = |p - 1/2|^(-43/18 + o(1)), site percolation on the triangular lattice: Smirnov & Werner, arXiv:math/0109120v2 (PDF read), Theorem 1 (ii). Value: 43/18 by mpmath, rounded to 30 places; tol 1e-29",
+    "independent_route": "replicant's exact rational nu (2 - 2 a1) = (4/3)(43/24) (percolation/exact2d.py), with the hyperscaling identity gamma + 2 beta = 2 nu checked exactly"
+  },
+  "cardy_crossing_square": {
+    "value": "0.5",
+    "tol": "1e-29",
+    "cite": "Cardy's crossing probability between opposite sides of a square: Cardy, 'Critical percolation in finite geometries', arXiv:hep-th/9111026v1 (PDF read, pages 7-9 rendered), Eq. (8): the two printed forms pi(eta) = 1 - pi(1 - eta) coincide at eta = 1/2, which is the square (k = 3 - 2 sqrt 2 on p. 8); a theorem for site percolation on the triangular lattice by Smirnov, arXiv:0909.4499v1 (PDF read), Corollaries 2, 3. Value: 1/2; tol 1e-29",
+    "independent_route": "replicant's certified Eq. (8) with k^2 = lambda(2i) in arb, and the mpmath route (elliptic findroot, regularised incomplete beta) to 1e-25 (percolation/cardy.py); Newman-Ziff crossing probabilities of triangular-site rectangles near aspect 1 (slow)"
+  },
+  "square_bond_self_dual_crossing": {
+    "value": "0.5",
+    "tol": "1e-29",
+    "cite": "an (n + 1) by n rectangle of Z^2 is crossed horizontally with probability exactly 1/2 at p = 1/2: Bollobas & Riordan, arXiv:math/0410359v3 (PDF read), Corollary 5 (from Lemma 3 and Corollary 4). Here n = 1: 3 x 2 vertices, 7 bonds. Value: 1/2; tol 1e-29",
+    "independent_route": "replicant's exhaustive enumeration of the 2^7 bond configurations of the embedded 3 x 2 region (percolation/enumerate2d.py: R(1/2) = 64/128), with the duality identity R_h[3 x 2](p) + R_h[3 x 2](1 - p) = 1 as polynomials; the Newman-Ziff sweeps match the enumeration's n* exactly"
+  },
+  "square_site_pc_nz2000": {
+    "value": "0.59274621",
+    "tol": "1.3e-7",
+    "cite": "site percolation threshold of the square lattice, p_c = 0.59274621 +- 0.00000013: Newman & Ziff, 'Efficient Monte Carlo algorithm and high-precision results for percolation', Phys. Rev. Lett. 85, 4104 (2000), arXiv:cond-mat/0005264v2 (PDF read), Eq. (3) (wrapping probabilities on L = 32 .. 256 tori, fits in L^(-11/4)). Not a closed form; tol = their error bar. Jacobsen 2015 (key square_site_pc_jacobsen2015) is 1.6e-7 lower, inside 1.3 of these error bars",
+    "independent_route": "replicant's Newman-Ziff crossings of R_L and R_2L on open L x L squares, L = 16 .. 128, 48 named seeds x 25 sweeps (slow statistical check; the band, about 1e-2, cannot resolve this value from Jacobsen's: printed in tests/test_percolation_lattice_slow.py)"
+  },
+  "square_site_pc_jacobsen2015": {
+    "value": "0.59274605079210",
+    "tol": "2e-14",
+    "cite": "site percolation threshold of the square lattice, p_c = 0.592 746 050 792 10(2): Jacobsen, 'Critical points of Potts and O(N) models from eigenvalue identities in periodic Temperley-Lieb algebras', arXiv:1507.03027v1 (PDF read), Eq. (2), Sec. 7.1, Tables 2, 4 (transfer-matrix eigenvalue method on n x oo cylinders, n <= 21, extrapolated). Numerical, not a closed form; tol = the quoted error",
+    "independent_route": "replicant's Newman-Ziff crossings on open squares (slow statistical check, the same run as square_site_pc_nz2000)"
+  }
+}

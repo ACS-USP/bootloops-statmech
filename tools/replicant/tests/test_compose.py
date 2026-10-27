@@ -294,6 +294,8 @@ _DOCUMENTED = {
     ("percolation_bethe", "sample"): {"k", "p", "dilution", "N", "seeds", "s_max"},
     ("percolation_graph", "cavity"): {"law", "c", "pk", "tau", "p", "dilution", "s_max"},
     ("percolation_graph", "sample"): {"law", "c", "pk", "tau", "p", "dilution", "N", "seeds", "s_max"},
+    ("percolation_lattice", "exact"): {"lattice", "dilution", "p", "Lx", "Ly", "aspect"},
+    ("percolation_lattice", "sample"): {"lattice", "dilution", "p", "Lx", "Ly", "seeds", "sweeps", "Ls"},
     ("sk_bounds", "bound"): {"beta", "h", "K", "digits"},
     ("online_perceptron", "online"): {"rule", "alpha", "eta", "noise", "noise_estimate", "R0", "Q0",
                                       "N", "seeds"},
