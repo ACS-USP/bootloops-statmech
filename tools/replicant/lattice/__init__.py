@@ -8,8 +8,12 @@
   kaufman.py    Kaufman's finite-torus partition function and its exact integer polynomial
   transfer.py   the exact torus transfer matrix (integers), the 1D Ising ring
   bethe.py      the Bethe lattice / random regular graph: all BP fixed points, certified
+  observables1d.py  1D magnetization, susceptibility, correlations, correlation length; the exact
+                ring and its explicit N -> oo limit
+  onsager_thermo.py 2D energy and specific heat (Onsager 1944), the log divergence's amplitude
+  torus_thermo.py   finite-torus energy and specific heat (Kaufman's Z, the exact polynomial)
 """
-from . import bethe, kaufman, onsager, transfer
+from . import bethe, kaufman, observables1d, onsager, onsager_thermo, torus_thermo, transfer
 from .ball import DIGITS, Ball, certify
 from .bethe import BetheFixedPoint, BetheResult, bethe_critical_beta, bethe_ising_fixed_points, \
     bethe_ising_free_energy
@@ -23,5 +27,6 @@ __all__ = ["BETA_C", "Ball", "BetheFixedPoint", "BetheResult", "DIGITS", "Recove
            "bethe", "bethe_critical_beta", "bethe_ising_fixed_points", "bethe_ising_free_energy",
            "beta_of_x", "certify", "critical_beta", "ising1d_free_energy",
            "ising_transfer_matrix_free_energy", "kaufman", "kaufman_free_energy",
-           "kaufman_partition_function", "kaufman_polynomial", "onsager", "onsager_free_energy",
+           "kaufman_partition_function", "kaufman_polynomial", "observables1d", "onsager",
+           "onsager_free_energy", "onsager_thermo", "torus_thermo",
            "torus_partition_polynomial", "transfer", "yang_magnetization"]

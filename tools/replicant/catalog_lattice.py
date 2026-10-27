@@ -23,6 +23,7 @@ from .lattice.onsager import _ordered, yang_loglog_slope
 from .lattice.coupling import coupling
 from .lattice.transfer import ising1d_ring_balls
 from .spec import ModelSpec
+from . import catalog_lattice_obs as OBS
 
 DC = "Duminil-Copin, arXiv:2208.00864 (2022)"
 ONSAGER = f"Onsager, Phys. Rev. 65, 117 (1944) (not fetched), as printed by {DC}, Eq. (3.6)"
@@ -35,7 +36,7 @@ KAUF = ("Kaufman, Phys. Rev. 76, 1232 (1949) (not fetched), as printed by Izmail
 ONE_D = ("Wang, Diaz-Mendez & Capdevila, arXiv:1907.11701, Eqs. (1), (4)-(12) (read; journal "
          "reference not checked; their derivation is by induction on N, which they show equals the "
          "transfer-matrix trace Z_N = Tr P^N, Eq. (7)); Baxter, Exactly Solved Models (1982), Ch. 2 "
-         "(not fetched)")
+         "(read since I1: the ANU PDF, Eqs. (2.1.10), (2.1.15)-(2.1.17))")
 TM = "Duminil-Copin, arXiv:2208.00864 (2022), Frame 2 (Z of the torus = Tr V^N)"
 DM = "Dembo & Montanari, Ann. Appl. Probab. 20, 565 (2010), arXiv:0804.4726"
 ARB = "python-flint arb through tools/baller (baller.solve / baller.run; acb.integral)"
@@ -124,11 +125,12 @@ def ising2d():
              fstep("ising2d-yang-magnetization", YANG, _yang, when=_above,
                    skip="beta <= beta_c: m* = 0 (paramagnet)"),
              fstep("ising2d-yang-exponent", YANG, _slope),
-             fstep("ising2d-kaufman-vs-transfer-matrix", KAUF, _torus)]
+             fstep("ising2d-kaufman-vs-transfer-matrix", KAUF, _torus)] + OBS.STEPS_2D
     refs = [RefCheck("lattice", "onsager_critical_minus_beta_f", lambda v: v["minus_beta_f"],
                      route="exact"),
             RefCheck("lattice", "beta_c_square", lambda v: v["beta_c"], route="exact"),
-            RefCheck("lattice", "yang_exponent", lambda v: v["yang_exponent_loglog"], route="exact")]
+            RefCheck("lattice", "yang_exponent", lambda v: v["yang_exponent_loglog"], route="exact")
+            ] + OBS.REFS_2D
     lit = lambda cite, note: Stability("exact-by-literature", "exact", cite, note)
     fin = {"beta_c": lit(KW, "self-dual point"),
            "minus_beta_f": lit(ONSAGER, "Onsager's free energy, certified ball"),
@@ -139,14 +141,16 @@ def ising2d():
            "torus_minus_beta_f": lit(KAUF, "Kaufman's finite-torus Z, certified ball"),
            "torus_minus_beta_f_tm": Stability("exact-by-literature", "exact", TM, "exact by "
                                               "construction: the transfer-matrix trace in exact "
-                                              "integers (equal to Kaufman's polynomial)")}
+                                              "integers (equal to Kaufman's polynomial)"),
+           **OBS.FIN_2D}
     spec = ModelSpec("ising2d", "ising", "none", constraint="square lattice, exact solution")
     return entry("ising2d", spec, f"{ONSAGER}; {YANG}; {KAUF}", {"exact": steps}, refs,
                  {"exact": CAVEAT_2D}, "2D Ising model (square lattice, zero field): Onsager's free "
-                 "energy, Yang's magnetization, Kaufman's torus versus the transfer matrix, certified",
+                 "energy, energy and specific heat, Yang's magnetization, Kaufman's torus versus the "
+                 "transfer matrix, certified",
                  default_route="exact", finality=fin,
                  meta=("beta", "slope_points", "torus_size", "torus_coefficients",
-                       "kaufman_max_radius", "kaufman_prec_bits"),
+                       "kaufman_max_radius", "kaufman_prec_bits") + OBS.META_2D,
                  parameters={"exact": ("beta", "L", "Ly")}, rigor={"exact": "certified"})
 
 
@@ -164,16 +168,18 @@ def _one_d(p):
 
 
 def ising1d():
-    steps = [fstep("ising1d-transfer-matrix", ONE_D, _one_d)]
+    steps = [fstep("ising1d-transfer-matrix", ONE_D, _one_d)] + OBS.STEPS_1D
     refs = [RefCheck("lattice", "ising1d_minus_beta_f_beta1_h0", lambda v: v["minus_beta_f"],
-                     route="exact")]
+                     route="exact")] + OBS.REFS_1D
     fin = {"minus_beta_f": Stability("exact-by-literature", "exact", ONE_D, "ln lambda_+, certified"),
-           "ring_Z": Stability("exact-by-literature", "exact", ONE_D, "Tr T^N of the N-spin ring")}
+           "ring_Z": Stability("exact-by-literature", "exact", ONE_D, "Tr T^N of the N-spin ring"),
+           **OBS.FIN_1D}
     spec = ModelSpec("ising1d", "ising", "none", constraint="ring, nearest neighbour, field")
     return entry("ising1d", spec, ONE_D, {"exact": steps}, refs, {"exact": CAVEAT_1D},
-                 "1D Ising model in a field: transfer-matrix free energy, certified",
-                 default_route="exact", finality=fin, meta=("ring_N",),
-                 parameters={"exact": ("beta", "h", "N")}, rigor={"exact": "certified"})
+                 "1D Ising model in a field: transfer-matrix free energy, magnetization, "
+                 "susceptibility, correlations and correlation length, certified",
+                 default_route="exact", finality=fin, meta=("ring_N",) + OBS.META_1D,
+                 parameters={"exact": ("beta", "h", "N", "r")}, rigor={"exact": "certified"})
 
 
 # ---- bethe_ising -------------------------------------------------------------------------------
