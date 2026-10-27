@@ -309,6 +309,8 @@ UNCLAIMED.update({("online_tcm", f"cc95_fig1_es_a{a}"): (
 UNCLAIMED.update({("online_scm", k): "VC97 Fig. 1 points along the optimal learning curve (one ODE run checks them all): "
                   "tests/test_online_optimal_ml.py test_vc97_fig1_learning_curve_and_hessian" for k in (
     *(f"vc97_fig1_eps_{a}" for a in ("a2p5", "a3", "a3p5", "a4", "a5", "a6")), "vc97_fig1_hess_hi_a4", "vc97_fig1_hess_lo_a4")})
+UNCLAIMED.update({("online_scm", f"vc97_fig2_eps_a{a}"): "the K = M = 2 optimal curve takes about a minute: "
+                  "tests/test_online_optimal_ml.py test_k2m2_curve_reaches_the_plateau (slow)" for a in ("10", "12", "16")})
 UNCLAIMED.update({("online_scm", k): f"integrated over a plateau or to K = 12 (seconds): checked in the slow test {t}" for k, t in (
     ("ss_eta_max_coefficient", "tests/test_online_scm.py test_ss_eta_max_first_order_in_one_over_k"),
     ("brw96_eq17_log_slope", "tests/test_online_scm_plateau.py test_brw96_eq17_half_log_slope_and_fig2_shift"),

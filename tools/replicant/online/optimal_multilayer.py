@@ -20,15 +20,17 @@ covariance Sigma = 1 - R^T Q^+ R, and mu ~ N(0, 1 - Sigma), so W depends on Sigm
   M = 2: yhat is a mean over the level curve g(y1) + g(y2) = Sigma_B (info_matrix: two branches split at
          y1 = y2, each a graph with slope <= 1, windowed three times on the Gaussian's support, then Simpson;
          the outer Gauss-Hermite runs over mu and over z, y = mu + Sigma^(1/2) z, n = 12 nodes per axis); a
-         singular Sigma (one direction of y known from x) is a sum over the roots on that line.  Accuracy:
-         the inner integral to ~1e-6, but yhat changes steeply with Sigma_B (the posterior moves between the
-         arms of the level curve), so the outer quadrature converges slowly: W to ~3e-3 (n = 12 vs 20 differ
-         by 2e-3; against an independent dense route, tests); see optimal_ml_flow for the consequence;
+         singular Sigma (one direction of y known from x) is a sum over the roots on that line.  W is assembled
+         as (1 - Sigma) + sum w (yhat - mu)(yhat - mu)^T (positive semidefinite; see _assemble).  Accuracy: the
+         inner integral to ~1e-6; the outer quadrature converges slowly (W to ~3e-3 against an independent
+         dense route away from the identical manifold; the excess information near it to ~25% against an
+         independent clustered grid, tests); optimal_ml_flow states what that means for the curves;
   M >= 3: refused (unsupported:M).
 The ODE limit is self-averaging by assumption (VC97 work 'in the thermodynamic limit'): physics-level, not final.
 
 _PLANT: private planted-error hook (tests only): "w" multiplies W; "dqr" multiplies the R-term of D_ii; "hess"
-multiplies H (0.5: H read as de_g/dQ instead of its second variation 2 de_g/dQ).
+multiplies H (0.5: H read as de_g/dQ instead of its second variation 2 de_g/dQ); "direct" = 1 assembles W
+as sum w yhat yhat^T (the form that keeps the quadrature's cross-term residue; see _assemble).
 """
 import math
 from collections import namedtuple
@@ -41,14 +43,15 @@ from ..core import Refusal
 
 OPTIMALITY_CLASS = (
     "VC97's locally optimal modulation: the functions F_k of the update J_k <- J_k + (F_k / N) S (no weight decay, "
-    "no separate learning rate) that may read every student field x_1..x_K (nonlocal across the hidden units), the "
-    "teacher's output Sigma_B (not its hidden fields), and the exact order parameters (Q, R) and input "
-    "distribution (unknown to a practical algorithm, as VC97 stress); 'optimal' = the stationary point of "
-    "de_g/dalpha at the current state, i.e. greedy (the largest decay per example, VC97's 'local optimisation'; not "
-    "the best trajectory: Saad & Rattray's global optimisation can do better); a maximum of the decay only where "
-    "the functional Hessian H is positive definite, a saddle where H has a negative eigenvalue (early learning, "
-    "VC97 Figs. 1-2 insets)")
-_PLANT = {"w": 1.0, "dqr": 1.0, "hess": 1.0}
+    "no separate learning rate) that may read every student field x_1..x_K (nonlocal across the hidden units; "
+    "'nonlocal' is replicant's term, as for O4's tree committee, not VC97's), the teacher's output Sigma_B (not "
+    "its hidden fields), and the exact order parameters (Q, R) and input distribution (unknown to a practical "
+    "algorithm, as VC97 stress); 'optimal' = the stationary point of de_g/dalpha at the current state, i.e. greedy "
+    "(the largest decay per example, VC97's 'local optimisation'; not the best trajectory: Saad & Rattray's global "
+    "optimisation can do better); a maximum of the decay only where the functional Hessian H is positive definite; "
+    "where H has a negative eigenvalue (early learning, VC97 Figs. 1-2 insets) it is a saddle and no maximiser "
+    "exists in the class (the decay is unbounded along the negative mode)")
+_PLANT = {"w": 1.0, "dqr": 1.0, "hess": 1.0, "direct": 0.0}
 SQ2 = math.sqrt(2.0)
 Plateau = namedtuple("Plateau", "r q eps eigs")
 
@@ -84,8 +87,8 @@ def hessian(Q, R):
 
 def modulation_matrix(Q, R):
     """A = H^-1 G (K x M), the coefficients of F* = A yhat - x."""
-    G = gradients(Q, R)[1]
-    H = hessian(Q, R)
+    D, G = gradients(Q, R)
+    H = 2 * _PLANT["hess"] * D
     if not np.all(np.isfinite(H)) or abs(np.linalg.det(H)) < 1e-300 or np.linalg.cond(H) > 1e14:
         raise Refusal("no-solution:singular-hessian", "the functional Hessian H is singular here: the variational "
                       "equation (VC97 Eq. (4)) has no unique solution")
@@ -159,45 +162,79 @@ def yhat2(mu, s, Sig, nc=32, nf=33, passes=3):
     la, ta, oa = _branch(mu[..., 0], mu[..., 1], sd[0], sd[1], s, Si, nc, nf, passes)
     lb, tb, ob = _branch(mu[..., 1], mu[..., 0], sd[1], sd[0], s, Si[::-1, ::-1], nc, nf, passes)
     top = np.maximum(la.max(-1), lb.max(-1))[..., None]
+    top = np.where(np.isfinite(top), top, 0.0)                   # no support found: Z = 0 below, not inf - inf
     wa, wb = np.exp(la - top), np.exp(lb - top)
     Z = wa.sum(-1) + wb.sum(-1)
-    y = np.stack([((wa * ta).sum(-1) + (wb * ob).sum(-1)) / Z, ((wa * oa).sum(-1) + (wb * tb).sum(-1)) / Z], -1)
-    return y * sg[..., None]
+    ok = Z > 0
+    Zs = np.where(ok, Z, 1.0)
+    y = np.stack([((wa * ta).sum(-1) + (wb * ob).sum(-1)) / Zs, ((wa * oa).sum(-1) + (wb * tb).sum(-1)) / Zs], -1)
+    return np.where(ok[..., None], y, np.nan) * sg[..., None]
 
 
 def _info_singular(Sig, lam, v, n):
-    """Sigma = lam v v^T: y = mu + sqrt(lam) tau v; yhat sums over the roots tau' of g(y1) + g(y2) = s, located
-    by sign changes on a grid of step 0.1 in tau' (|tau'| <= 14) and 40 bisections."""
+    """Sigma = lam v v^T: y = mu + sqrt(lam) tau v; yhat sums over the roots tau' of g(y1) + g(y2) = s.  The
+    extrema of S(tau') are located first (sign changes of S' on a grid of step 0.1, |tau'| <= 14, and 40
+    bisections) and added to the grid, so every monotone piece holds at most one root, even two roots in one cell.
+    Returns (outer weights, mu, yhat) over the nodes."""
     mu, wm = _grid2(n, np.eye(2) - Sig)
     tau, wt = np.polynomial.hermite_e.hermegauss(3 * n)
     wt = wt / math.sqrt(2 * math.pi)
     sv = math.sqrt(lam) * v
     m = np.repeat(mu, len(tau), axis=0)                          # (m n_tau, 2) outer nodes
+    c = math.sqrt(2 / math.pi)
     S = lambda t, k: g(m[k, 0] + t * sv[0]) + g(m[k, 1] + t * sv[1])
+    dS = lambda t, k: c * (np.exp(-(m[k, 0] + t * sv[0]) ** 2 / 2) * sv[0] + np.exp(-(m[k, 1] + t * sv[1]) ** 2 / 2) * sv[1])
     every = np.arange(len(m))
     s = S(np.tile(tau, len(mu)), every)
     grid = np.linspace(-14, 14, 281)
-    f = S(grid[None, :], every[:, None]) - s[:, None]
-    k, j = np.nonzero(np.sign(f[:, :-1]) * np.sign(f[:, 1:]) < 0)   # one root per bracket
-    lo, hi, flo = grid[j], grid[j + 1], f[k, j]
-    for _ in range(40):
-        mid = 0.5 * (lo + hi)
-        fm = S(mid, k) - s[k]
-        left = np.sign(fm) * np.sign(flo) <= 0
-        hi, lo, flo = np.where(left, mid, hi), np.where(left, lo, mid), np.where(left, flo, fm)
-    t = 0.5 * (lo + hi)
+
+    def bisect(lo, hi, flo, fn):
+        for _ in range(40):
+            mid = 0.5 * (lo + hi)
+            fm = fn(mid)
+            left = np.sign(fm) * np.sign(flo) <= 0
+            hi, lo, flo = np.where(left, mid, hi), np.where(left, lo, mid), np.where(left, flo, fm)
+        return 0.5 * (lo + hi)
+    d = dS(grid[None, :], every[:, None])
+    ke, je = np.nonzero(np.sign(d[:, :-1]) * np.sign(d[:, 1:]) < 0)
+    ext = bisect(grid[je], grid[je + 1], d[ke, je], lambda t: dS(t, ke))
+    cnt = np.bincount(ke, minlength=len(m))
+    extra = np.full((len(m), max(1, int(cnt.max(initial=0)))), 14.0)
+    if len(ke):
+        slot = np.arange(len(ke)) - np.repeat(np.cumsum(cnt) - cnt, cnt)
+        extra[ke, slot] = ext
+    pts = np.sort(np.concatenate([np.broadcast_to(grid, (len(m), len(grid))), extra], 1), 1)
+    f = S(pts, every[:, None]) - s[:, None]
+    k, j = np.nonzero(np.sign(f[:, :-1]) * np.sign(f[:, 1:]) < 0)   # one root per monotone bracket
+    t = bisect(pts[k, j], pts[k, j + 1], f[k, j], lambda t: S(t, k) - s[k])
     y1, y2 = m[k, 0] + t * sv[0], m[k, 1] + t * sv[1]
-    dS = np.abs(math.sqrt(2 / math.pi) * (np.exp(-y1 * y1 / 2) * sv[0] + np.exp(-y2 * y2 / 2) * sv[1]))
-    w = np.exp(-t * t / 2) / np.maximum(dS, 1e-300)
+    w = np.exp(-t * t / 2) / np.maximum(np.abs(dS(t, k)), 1e-300)
     Z = np.bincount(k, w, len(m))
-    yh = np.stack([np.bincount(k, w * y1, len(m)), np.bincount(k, w * y2, len(m))], -1) / Z[:, None]
-    return np.einsum("m,ma,mb->ab", np.outer(wm, wt).ravel(), yh, yh)
+    yh = np.stack([np.bincount(k, w * y1, len(m)), np.bincount(k, w * y2, len(m))], -1) / np.where(Z > 0, Z, 1.0)[:, None]
+    return np.outer(wm, wt).ravel(), m, np.where((Z > 0)[:, None], yh, np.nan)
+
+
+def _assemble(Sig, w, mu, yh):
+    """W from the nodes.  The default form W = (1 - Sigma) + sum w (yhat - mu)(yhat - mu)^T is positive
+    semidefinite by construction: its cross term 2 sym E[mu (yhat - mu)^T] vanishes exactly and is dropped.  The
+    direct form sum w yhat yhat^T (_PLANT["direct"] = 1, tests only) keeps the quadrature's residue of that cross
+    term (2-5e-4), as large as the vanishing excess information near the identical-student manifold.  Nodes
+    without posterior support are refused unless their outer weight is below 1e-10."""
+    bad = ~np.all(np.isfinite(yh), -1)
+    if w[bad].sum() > 1e-10:
+        raise Refusal("no-solution:quadrature", f"the level-curve integral found no support on nodes of outer "
+                      f"weight {w[bad].sum():.3g}")
+    yh = np.where(bad[..., None], mu, yh)
+    if _PLANT["direct"]:
+        return np.einsum("n,na,nb->ab", w, yh, yh)
+    d = yh - mu
+    return np.eye(2) - Sig + np.einsum("n,na,nb->ab", w, d, d)
 
 
 def info_matrix(Sig, M, n=12):
     """W = <yhat yhat^T> as a function of Sigma = Cov(y | x) (module docstring)."""
     if M == 1:
-        return _PLANT["w"] * np.ones((1, 1))
+        return _PLANT["w"] * np.ones((1, 1))                       # Sigma_B fixes y (Sigma unused)
     if M != 2:
         raise Refusal("unsupported:M", f"M={M}: the teacher-output posterior is implemented for M = 1, 2")
     Sig = (np.asarray(Sig, float) + np.asarray(Sig, float).T) / 2
@@ -205,12 +242,13 @@ def info_matrix(Sig, M, n=12):
     if lam[1] < 1e-12:
         return _PLANT["w"] * (np.eye(2) - Sig)                     # x fixes y: yhat = y
     if lam[0] < 1e-10:
-        return _PLANT["w"] * _info_singular(Sig, lam[1], U[:, 1], n)
+        return _PLANT["w"] * _assemble(Sig, *_info_singular(Sig, lam[1], U[:, 1], n))
     mu, wm = _grid2(n, np.eye(2) - Sig)
     z, wz = _grid2(n, Sig)
     y = mu[:, None, :] + z[None]
-    yh = yhat2(np.broadcast_to(mu[:, None, :], y.shape), g(y[..., 0]) + g(y[..., 1]), Sig)
-    return _PLANT["w"] * np.einsum("m,z,mza,mzb->ab", wm, wz, yh, yh)
+    M = np.broadcast_to(mu[:, None, :], y.shape)
+    yh = yhat2(M, g(y[..., 0]) + g(y[..., 1]), Sig)
+    return _PLANT["w"] * _assemble(Sig, np.outer(wm, wz).ravel(), M.reshape(-1, 2), yh.reshape(-1, 2))
 
 
 @dataclass(frozen=True)
@@ -231,7 +269,7 @@ class OptimalFlow:
     def rates(self, Q, R):
         """(dQ/dalpha, dR/dalpha) under F* (module docstring)."""
         A = modulation_matrix(Q, R)
-        W = info_matrix(posterior(Q, R)[1], self.M)
+        W = info_matrix(None, 1) if self.M == 1 else info_matrix(posterior(Q, R)[1], self.M)
         return A @ W @ A.T - Q, A @ W - R
 
     def vector_rate(self, y):
@@ -273,9 +311,11 @@ def plateau_k2m2():
 
 def _plateau():
     from scipy.optimize import brentq
-    f = optimal_flow(2, 2)
     at = lambda r: (2 * r * r * np.ones((2, 2)), r * np.ones((2, 2)))
-    r = brentq(lambda r: f.rates(*at(r))[1][0, 0], 0.2, 0.8, xtol=1e-13)
+    Sig = posterior(*at(0.5))[1]                 # the same singular Sigma = 1 - (1/2) 1 1^T for every r on q = 2 r^2
+    assert all(np.abs(posterior(*at(r))[1] - Sig).max() < 1e-12 for r in (0.3, 0.7))
+    W = info_matrix(Sig, 2)
+    r = brentq(lambda r: (modulation_matrix(*at(r)) @ W - at(r)[1])[0, 0], 0.2, 0.8, xtol=1e-13)
     Q, R = at(r)
     return Plateau(r, 2 * r * r, eps_vc(Q, R), tuple(np.linalg.eigvalsh(hessian(Q, R))))
 

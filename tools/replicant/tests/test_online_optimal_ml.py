@@ -165,6 +165,9 @@ def test_optimality_positive_control():
     for F in (lambda x, y: 1.05 * (A @ y[None] - x), lambda x, y: 0.95 * (A @ y[None] - x),
               lambda x, y: wrong @ y[None] - x, lambda x, y: A @ y[None] - x + 0.05 * phi(x, y)):
         assert _decay(Qp, Rp, F) > best + 1e-7
+    with planted(O, hess=0.5):                                     # a wrong F* (H misnormalised) where H > 0
+        bad = O.modulation_matrix(Qp, Rp)
+    assert _decay(Qp, Rp, lambda x, y: bad @ y[None] - x) > best + 1e-6
     d1 = _decay(Qp, Rp, lambda x, y: A @ y[None] - x + 0.02 * phi(x, y)) - best
     d2 = _decay(Qp, Rp, lambda x, y: A @ y[None] - x + 0.04 * phi(x, y)) - best
     assert 3.5 < d2 / d1 < 4.5                                     # second order: the first variation vanishes
@@ -233,23 +236,37 @@ def test_k2m2_plateau_fixed_point():
     assert max(np.abs(dQ).max(), np.abs(dR).max()) < 1e-7
 
 
+def test_singular_posterior_two_roots_in_one_cell():
+    """Regression: Sigma = 0.6 u u^T put both roots of the line search in one grid cell (NaN before); the extrema
+    are now bracketed first.  W is finite, exchange-symmetric and W - (1 - Sigma) is PSD."""
+    u = np.array([1.0, -1.0]) / math.sqrt(2)
+    Sig = 0.6 * np.outer(u, u)
+    W = O.info_matrix(Sig, 2)
+    assert np.all(np.isfinite(W)) and abs(W[0, 0] - W[1, 1]) < 1e-12
+    assert np.linalg.eigvalsh(W - (np.eye(2) - Sig)).min() > -1e-14
+
+
 def test_refusals_and_the_class():
     _refuses(lambda: O.optimal_flow(2, 3), "unsupported:M")
     _refuses(lambda: O.optimal_flow(0, 1), "precondition:K")
     _refuses(lambda: O.modulation_matrix(np.zeros((2, 2)), np.zeros((2, 1))), "no-solution:singular-hessian")
     _refuses(lambda: OF.integrate_optimal(O.optimal_flow(2, 1), -1.0, OF.vc97_initial(2, 1)[:2]), "precondition:alpha")
     _refuses(lambda: OF.vc97_initial(3, 1), "unsupported:init")
-    for word in ("every student field", "teacher's output", "order parameters", "greedy", "saddle", "nonlocal"):
+    for word in ("every student field", "teacher's output", "order parameters", "greedy", "saddle", "nonlocal",
+                 "replicant's term", "no maximiser"):
         assert word in O.OPTIMALITY_CLASS, word
 
 
 @slow
 def test_m2_information_matrix_against_an_independent_route():
-    """W = <yhat yhat^T> (M = 2) by optimal_multilayer's two-branch Simpson route against a dense midpoint rule in
-    v = g(y1) inside a 4-dimensional Gauss-Hermite outer integral (no code shared): they agree to 3e-3, the
-    accuracy of the outer Gauss-Hermite (yhat changes steeply with Sigma_B, so n = 12 vs 20 differ by 2e-3); symmetry W11 = W22 where Sigma
-    is exchange-symmetric; a planted W is caught; the identical-manifold bound w11 + w12 > 2 beta for beta < 1/2
-    (the teacher output adds information), so the plateau needs Sigma singular."""
+    """W = <yhat yhat^T> (M = 2) by optimal_multilayer's route against a dense midpoint rule in v = g(y1) inside a
+    4-dimensional Gauss-Hermite outer integral (no code shared): they agree to 3e-3 away from the identical-student
+    manifold; symmetry W11 = W22 where Sigma is exchange-symmetric; a planted W is caught; the identical-manifold
+    bound w11 + w12 > 2 beta for beta < 1/2 (the teacher output adds information), so the plateau needs Sigma
+    singular.  Near that manifold (Sigma = lb u u^T + ls v v^T, u = (1, -1)/sqrt2, v = (1, 1)/sqrt2) what matters is
+    the excess information v^T W v - (1 - ls) > 0, which vanishes as ls -> 0: the PSD assembly keeps it positive and
+    within 30% of an independent outer grid (sinh-clustered along v), while the direct form sum w yhat yhat^T
+    (planted) keeps the quadrature's cross-term residue and turns it negative."""
     from scipy.special import erf, erfinv
 
     def brute(Sig, nmu=10, nz=16, nv=1500):
@@ -278,22 +295,76 @@ def test_m2_information_matrix_against_an_independent_route():
     for beta in (0.1, 0.3, 0.45, 0.49):
         w = O.info_matrix(np.eye(2) - beta * np.ones((2, 2)), 2)
         assert abs(w[0, 0] - w[1, 1]) < 1e-6 and w[0, 0] + w[0, 1] > 2 * beta + 1e-4, (beta, w)
+    u, v = np.array([1.0, -1.0]) / math.sqrt(2), np.array([1.0, 1.0]) / math.sqrt(2)
+    for ls in (0.02, 0.005, 0.002):
+        Sig = 0.95 * np.outer(u, u) + ls * np.outer(v, v)
+        a, b = (v @ w @ v - (1 - ls) for w in (O.info_matrix(Sig, 2), _w_clustered(Sig)))
+        assert a > 0 and b > 0 and abs(a - b) < 0.3 * b, (ls, a, b)
+    with planted(O, direct=1.0):
+        assert v @ O.info_matrix(0.95 * np.outer(u, u) + 0.002 * np.outer(v, v), 2) @ v - 0.998 < 0
+
+
+def _w_clustered(Sig, na=12, nb=41, nz=12):
+    """An independent outer grid for W: Gauss-Hermite along Sigma's large eigenvector, a sinh-clustered trapezoid
+    (scale sqrt(lam_small)) along the small one, Gauss-Hermite over z; the PSD assembly."""
+    lam, U = np.linalg.eigh(Sig)
+    es, eb = U[:, 0], U[:, 1]
+    xa, wa = np.polynomial.hermite_e.hermegauss(na)
+    a = xa * math.sqrt(max(1 - lam[1], 0.0))
+    c, sdb = math.sqrt(lam[0]), math.sqrt(1 - lam[0])
+    W = math.asinh(9 * sdb / c)
+    w = np.linspace(-W, W, nb)
+    b = c * np.sinh(w)
+    jb = c * np.cosh(w) * (w[1] - w[0]) * np.exp(-b * b / (2 * sdb ** 2)) / (math.sqrt(2 * math.pi) * sdb)
+    jb[0] *= 0.5
+    jb[-1] *= 0.5
+    mu = (a[:, None, None] * eb + b[None, :, None] * es).reshape(-1, 2)
+    wm = (wa[:, None] / math.sqrt(2 * math.pi) * jb[None, :]).ravel()
+    z, wz = _gauss(Sig, nz)
+    y = mu[:, None, :] + z[None]
+    M = np.broadcast_to(mu[:, None, :], y.shape)
+    d = O.yhat2(M, O.g(y[..., 0]) + O.g(y[..., 1]), Sig) - M
+    d = np.where(np.all(np.isfinite(d), -1)[..., None], d, 0.0)
+    return np.eye(2) - Sig + np.einsum("m,z,mza,mzb->ab", wm, wz, d, d)
 
 
 @slow
 def test_k2m2_ode_through_the_spike():
     """VC97 Figs. 2, 3 (K = M = 2): from the paper's initial overlaps the ODE passes the det H = 0 crossing near
     alpha = 0.5 (the lower Hessian eigenvalue changes sign, the norms jump and Q12 turns negative: Fig. 3's
-    'anti-correlated weights'; the jump is ~4 in the ODE, ~13 in the paper's N = 5000 run: a finite-N kick) and is
-    below gradient descent (O5, eta = 1.5) from alpha = 3 on.  Past alpha ~ 4 min eig Sigma drops below
-    SIGMA_RELIABLE and the catalog reports the curve as undetermined (optimal_ml_flow docstring)."""
+    'anti-correlated weights'; the jump is ~4 in the ODE, ~13 in the paper's N = 5000 run) and is below gradient
+    descent (O5, eta = 1.5) at alpha = 3; the catalog reports a curve whose min eig Sigma drops below
+    SIGMA_RELIABLE as undetermined (the threshold raised here so that a short run reaches it)."""
     flow = O.optimal_flow(2, 2)
     Q0, R0, _ = OF.vc97_initial(2, 2)
     tr = OF.integrate_optimal(flow, 3.0, (Q0, R0), alphas=(0.3, 0.6, 1.0, 3.0), rtol=1e-4, atol=1e-6)
     assert tr.eig_lo[0] < 0 < tr.eig_lo[1] and tr.Q[1][0, 1] < -2.0 and tr.Q[1][0, 0] > 2.0
-    assert tr.sig_min[-1] > OF.SIGMA_RELIABLE
     gd = SF.integrate_scm(S.scm_flow(2, 2, 1.5), 3.0, (Q0, R0), alphas=(3.0,), rtol=1e-7)
     assert tr.eps[-1] < gd.eps[-1]
     from replicant.catalog import catalog
-    v = catalog()["online_scm"].run(route="online", rule="optimal", K="2", M="2", alpha="8")
+    saved = OF.SIGMA_RELIABLE
+    try:
+        OF.SIGMA_RELIABLE = 0.5
+        v = catalog()["online_scm"].run(route="online", rule="optimal", K="2", M="2", alpha="1.5")
+    finally:
+        OF.SIGMA_RELIABLE = saved
     assert v["curve_status"] == "undetermined" and "eps" not in v
+
+
+@slow
+def test_k2m2_curve_reaches_the_plateau():
+    """The integrated K = M = 2 curve approaches plateau_k2m2 (e* = 0.011611): within 6e-4 at alpha = 16, and inside
+    the Fig. 2 keys at alpha = 10, 12, 16 (99% one-run bands from replicant's N = 5000 runs).  Planted control: the
+    direct assembly of W (whose cross-term residue fakes a fixed point) stalls above e* + 1e-3."""
+    flow = O.optimal_flow(2, 2)
+    Q0, R0, _ = OF.vc97_initial(2, 2)
+    e_star = O.plateau_k2m2().eps
+    al = (10.0, 12.0, 16.0)
+    tr = OF.integrate_optimal(flow, 16.0, (Q0, R0), alphas=al, rtol=1e-4, atol=1e-6)
+    assert 0 < tr.eps[-1] - e_star < 6e-4 and tr.eps[0] > tr.eps[1] > tr.eps[2]
+    for t, e in zip(("a10", "a12", "a16"), tr.eps):
+        assert _ok(f"vc97_fig2_eps_{t}", e), (t, e)
+    assert tr.sig_min[-1] > OF.SIGMA_RELIABLE
+    with planted(O, direct=1.0):
+        bad = OF.integrate_optimal(flow, 16.0, (Q0, R0), alphas=(16.0,), rtol=1e-4, atol=1e-6)
+    assert bad.eps[0] - e_star > 1e-3, bad.eps

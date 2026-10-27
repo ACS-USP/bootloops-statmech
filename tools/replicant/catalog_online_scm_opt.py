@@ -74,8 +74,10 @@ def state(p):
     lo, hi = np.linalg.eigvalsh(O.hessian(Q0, R0))[[0, -1]]
     vals = {"rule": "optimal", "K": flow.K, "M": flow.M, "eta": eta, "init": "vc97", "Q11_init": q11,
             "eps0": O.eps_vc(Q0, R0), "hess_lo0": float(lo), "hess_hi0": float(hi), "decay0": flow.decay(Q0, R0)}
+    notes = (_CLASS,) + ((f"H has a negative eigenvalue ({lo:.4g}) at the start: F* is a saddle there and decay0 is "
+                          "the stationary value, not a maximal decay",) if lo < 0 else ())
     return Out(vals, f"VC97 optimal SCM K = {flow.K}, M = {flow.M}, from Q11 = {q11:.6g} (Hessian eigenvalues "
-               f"{lo:.4g}, {hi:.4g})", notes=(_CLASS,))
+               f"{lo:.4g}, {hi:.4g})", notes=notes)
 
 
 def plateaus(p):
@@ -100,13 +102,15 @@ def curve(p):
     if not a > 0:
         raise Refusal("precondition:alpha", f"alpha={a!r}: need alpha > 0")
     dip = tuple(x for x in _DIP if x < a) if a > 1.4 else ()
-    tr = OF.integrate_optimal(flow, a, (Q0, R0), alphas=dip + (a,),
-                             **(dict(rtol=1e-4, atol=1e-6) if flow.M == 2 else {}))
+    track = tuple(float(round(x, 10)) for x in np.arange(0.5, a, 0.5) if round(x, 10) not in dip) if flow.M == 2 else ()
+    al = tuple(sorted(dip + track + (a,)))
+    tr = OF.integrate_optimal(flow, a, (Q0, R0), alphas=al,
+                              **(dict(rtol=1e-4, atol=1e-6) if flow.M == 2 else dict(rtol=1e-6)))
     gd = F.integrate_scm(S.scm_flow(flow.K, flow.M, eta), a, (Q0, R0), alphas=(a,), rtol=1e-7)
     Q, R = tr.Q[-1], tr.R[-1]
-    if flow.M == 2 and tr.sig_min[-1] < OF.SIGMA_RELIABLE:
-        why = (f"min eig Sigma = {tr.sig_min[-1]:.3g} < {OF.SIGMA_RELIABLE} at alpha = {a:g}: the M = 2 posterior "
-               "quadrature is not trusted near the identical-student manifold (optimal_ml_flow docstring); the plateau "
+    if flow.M == 2 and tr.sig_min.min() < OF.SIGMA_RELIABLE:
+        why = (f"min eig Sigma = {tr.sig_min.min():.3g} < {OF.SIGMA_RELIABLE} on the way to alpha = {a:g} (checked every "
+               "0.5 in alpha): the M = 2 quadrature of W is not verified there (optimal_ml_flow docstring); the plateau "
                "itself is eps_plateau_opt")
         return Out({"alpha": a, "curve_status": "undetermined"}, why, notes=(why,))
     vals = {"alpha": a, "curve_status": "ok", "eps": float(tr.eps[-1]), "hess_lo": float(tr.eig_lo[-1]),
@@ -114,7 +118,8 @@ def curve(p):
     if flow.K >= 2:
         vals.update(Q12=float(Q[0, 1]), Q22=float(Q[1, 1]))
     if dip:
-        i = int(np.argmin(tr.eig_hi[:-1]))
+        k = [i for i, x in enumerate(tr.alpha) if x in dip]
+        i = k[int(np.argmin(tr.eig_hi[k]))]
         vals.update(hess_hi_dip=float(tr.eig_hi[i]), alpha_hess_hi_dip=float(tr.alpha[i]))
     return Out(vals, f"optimal ODE to alpha = {a:g}: eps = {vals['eps']:.6g} (gradient descent at eta = {eta:g}: "
                f"{vals['eps_gd']:.6g})", notes=(_CLASS,))

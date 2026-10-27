@@ -284,8 +284,8 @@ CLI (from `tools/`):
   descent from the same start, still on its plateau `eps_plateau_gd` 0.016333), `hess_hi_dip` 0.687258 at
   `alpha_hess_hi_dip` 1.08 (Fig. 1's inset: 0.676 at 1.09), `hess_lo` 0.031609, `hess_hi` 0.984161.
   `--param M=1 --param alpha=0.5 --param N=200` -> `eps` 0.162563, `eps_sim` 0.159558 (`eps_sim_halfwidth99`
-  0.0079, 12 named seeds).  `--param alpha=8` (K = M = 2) -> `curve_status` undetermined (the M = 2 posterior
-  quadrature is not trusted near the identical-student manifold; nothing is reported).  `--param M=3` is
+  0.0079, 12 named seeds).  `--param alpha=16` (K = M = 2, about 1 min) -> `eps` 0.011984 (Fig. 2: 0.0119),
+  `curve_status` ok; past min eig Sigma = 1e-3 (alpha ~ 17) the curve is `undetermined`.  `--param M=3` is
   refused `unsupported:M`, `--param sym=none` with `rule=optimal` `precondition:known-parameter`, and
   `--param rule=fast` `unsupported:rule`.  No value is final.
 - Worked example, amp route (`sk`, `teacher_student`; under 1 s each, measured):
@@ -872,7 +872,7 @@ CC95 Eqs. (5), (21), (24), (30), (32) against the TCM route, CKC96's equivalence
 (and a planted wrong mapping failing), the asymptotic constants against K and a K = 3 simulation band
 (O4), the SCM's erf averages against Gauss-Hermite (with planted normalisation errors), the papers'
 fixed points, eigenvalues and critical rates against the ODE, the plateau report (escaped, undetermined,
-none, the rtol check) and a small simulation band with the eta^2 term planted out (O5), VC97's Eq. (3) and its gradients against O5's erf route, the closed ODE against quadrature of the pointwise modulation, the optimality positive control (perturbed modulations decay slower where H is positive definite, one decays faster at the saddle), Fig. 1 and the K = M = 2 plateau against the bank, gradient descent beaten, and a tiny simulation band with H misnormalised planted (O6). `--full` adds 160 `@slow` tests (full-RSB Parisi up to K = 9,
+none, the rtol check) and a small simulation band with the eta^2 term planted out (O5), VC97's Eq. (3) and its gradients against O5's erf route, the closed ODE against quadrature of the pointwise modulation, the optimality positive control (perturbed modulations decay slower where H is positive definite, one decays faster at the saddle), Fig. 1 and the K = M = 2 plateau against the bank, gradient descent beaten, and a tiny simulation band with H misnormalised planted (O6). `--full` adds 161 `@slow` tests (full-RSB Parisi up to K = 9,
 population dynamics at reference sizes, the XORSAT GF(2) crossing at N = 400-2000 and leaf removal at
 N = 100000, the K-SAT SP-population crossing and BP window, the LDPC crossing at N = 20000, the spiked
 AMP and SBM bands at reference sizes, the ridge 1/n bands at n = 400, 1000, the online ODE-vs-simulation
@@ -1542,9 +1542,12 @@ KNOWN HAZARDS:
   diverges: the ODE passes it with a finite jump (integrated in an arclength time), finite-N runs are kicked
   (Fig. 3's Q11 ~ 13 at N = 5000; replicant's ODE jumps to ~4, single N = 1000 runs to ~30), so the bands
   after the crossing are heavy-tailed and the Fig. 1 keys carry 99% one-run prediction tolerances from 16 runs
-  at N = 5000. The M = 2 W quadrature is accurate to ~3e-3 only (yhat changes steeply with Sigma_B); near the
-  identical manifold its error fakes a fixed point (the ODE stalls at e_g = 0.0140 instead of 0.0116), so M = 2
-  curves with min eig Sigma < 0.05 are `undetermined`; the simulation (N = 3000) does reach 0.0117 there.
+  at N = 5000. M = 2: W is assembled as (1 - Sigma) + E[(yhat - mu)(yhat - mu)^T], PSD by construction; the
+  direct form E[yhat yhat^T] kept a quadrature residue (2-5e-4) of a cross term that is zero analytically, as
+  large as the vanishing excess information near the identical manifold, and faked a fixed point at e_g = 0.0140
+  (found by the O6 reviewer). Now the curve from VC97's start reaches e_g = 0.01310, 0.01245, 0.01198 at alpha =
+  10, 12, 16 (Fig. 2: 0.01346, 0.01250, 0.01186; an independent outer grid agrees to 1e-4) and approaches
+  e_g* = 0.011611; curves whose min eig Sigma falls below 1e-3 (not measured there) are `undetermined`.
 - families/sk.py's float64 1RSB functional (`_rsb_phi_e`, 80 x 80 Gauss-Hermite; v1 code, unchanged) is
   inaccurate in the q0 = 0 / large q1 - q0 sector, where the branch points of cosh^m (zeros of cosh at
   Im = pi/2) are not smoothed by an outer Gaussian average. Against the certified balls of bounds/krsb.py:

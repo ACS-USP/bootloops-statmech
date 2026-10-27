@@ -14,12 +14,16 @@ eigenvalue -0.0716 (fig2.ps inset; its top is clipped at the frame).  These two 
 With R = 0 and M = 2 the flow keeps R_i1 = R_i2 (the teachers stay exchangeable), so it reaches the plateau
 and never leaves it: the escape needs an asymmetry the paper's finite N supplies.
 
-Reliability (M = 2): near the identical-student manifold Sigma has the eigenvalue 1 along (1, -1) and a small
-one along (1, 1); there yhat changes steeply with Sigma_B (the posterior jumps between the arms of the level
-curve) and the outer Gauss-Hermite of info_matrix converges slowly.  Its error then fakes a fixed point: from
-VC97's start the flow stalls at e_g = 0.0192 (n = 6) or 0.0140 (n = 12) with min eig Sigma = 0.0073, instead of
-reaching the plateau e_g* = 0.011611 where Sigma is singular.  Trajectory values with min eig Sigma below
-SIGMA_RELIABLE are therefore reported as undetermined by the catalog (sig_min is returned for that).
+Reliability (M = 2): near the identical-student manifold the flow is driven by the excess information
+v^T W v - (1 - lam_s) (v = (1, 1)/sqrt2, lam_s the small eigenvalue of Sigma), which vanishes roughly like
+lam_s^1.3.  info_matrix assembles W = (1 - Sigma) + E[(yhat - mu)(yhat - mu)^T], positive semidefinite by
+construction; the direct form E[yhat yhat^T] carries the quadrature's residue (2-5e-4) of the cross term
+2 sym E[mu (yhat - mu)^T], which is zero analytically, and that residue faked a fixed point (the flow stalled at
+e_g = 0.0140 at n = 12; diagnosed by the O6 reviewer; the earlier diagnosis, the posterior integral's
+resolution, was wrong).  SIGMA_RELIABLE (1e-3) is measured: from VC97's start the n = 12 curve and an
+independent outer grid (Gauss-Hermite along Sigma's large eigenvector, a sinh-clustered trapezoid along the small
+one) agree to <= 1.0e-4 in e_g at alpha = 8, 10, 12, 16 (min eig Sigma 7.9e-3 ... 9.3e-4); below 1e-3 nothing was
+measured, so the catalog reports such curves as undetermined (sig_min is returned for that).
 """
 import math
 from collections import namedtuple
@@ -30,12 +34,12 @@ from ..core import Refusal
 from .optimal_multilayer import eps_vc, hessian, posterior
 
 OptTrajectory = namedtuple("OptTrajectory", "alpha Q R eps eig_lo eig_hi sig_min")
-SIGMA_RELIABLE = 0.05      # M = 2: below this smallest eigenvalue of Sigma the W quadrature is not trusted
+SIGMA_RELIABLE = 1e-3      # M = 2: below this smallest eigenvalue of Sigma the W quadrature is not verified
 _FIG_A0 = {(2, 1): (1, 1.0564), (2, 2): (0, -0.0716)}      # (eigenvalue index, reading) at alpha = 0
 
 
 def _cone(Q, R):
-    C = np.block([[Q, R], [R.T, np.eye(R.shape[1])]])
+    C = np.concatenate([np.concatenate([Q, R], 1), np.concatenate([R.T, np.eye(R.shape[1])], 1)], 0)
     return bool(np.all(np.isfinite(C))) and np.linalg.eigvalsh(C).min() > -1e-12 and np.diag(Q).min() > -1e-12
 
 
@@ -55,6 +59,7 @@ def vc97_initial(K, M, Q11=None):
         Q11 = brentq(f, 1e-3, 0.5, xtol=1e-12)
     if not (isinstance(Q11, (int, float)) and 0 < Q11 < 1):
         raise Refusal("precondition:initial-overlap", f"Q11={Q11!r}: need 0 < Q11 < 1 (VC97: Q11 in [0, 0.5])")
+    # 0.5 <= Q11 < 1 is accepted on purpose (outside VC97's range, for exploration); the fit stays in (0, 0.5]
     return _start(float(Q11), M) + (float(Q11),)
 
 
