@@ -211,6 +211,7 @@ def test_edge_counts_are_checked_and_planted_edges_are_refused():
     finally:
         Model.edges = good
         assert Model.edges is good
+    _plain("percolation_kcore", dilution="bond", p="9/10")   # the unplanted bond run must pass the edge check
     _planted(KT._HOOKS, "edges_exponent_shift", -1, lambda: _refused(
         lambda: _run("percolation_kcore"), "no-solution:route-disagreement"))
     v = _plain("percolation_kcore").values               # JL07 Thm 1.1: e/n -> mu^2 / (2 lambda) at the birth
