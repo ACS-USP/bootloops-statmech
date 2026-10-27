@@ -16,9 +16,15 @@
                 eta consistency checks
   strip_tm.py   the strip transfer matrix built and diagonalised directly (numpy, symmetry sectors)
   critical2d.py critical correlations: nearest neighbour, diagonal (product, Toeplitz, asymptote)
+  anisotropic.py  the anisotropic square lattice: free energy (Kac-Ward, Baxter's diagonal form),
+                critical line, duality; certified bisection
+  tri_honey.py  triangular and honeycomb: free energies, critical points, star-triangle and duality
+                maps, the triangular antiferromagnet's ground-state entropy
+  geom_tori.py  exact finite tori and cylinders of the square, triangular and honeycomb lattices;
+                the star-triangle and four-sector duality identities
 """
-from . import bethe, correlation2d, critical2d, kaufman, observables1d, onsager, onsager_thermo, \
-    strip_tm, torus_thermo, transfer
+from . import anisotropic, bethe, correlation2d, critical2d, geom_tori, kaufman, observables1d, \
+    onsager, onsager_thermo, strip_tm, torus_thermo, transfer, tri_honey
 from .ball import DIGITS, Ball, certify
 from .bethe import BetheFixedPoint, BetheResult, bethe_critical_beta, bethe_ising_fixed_points, \
     bethe_ising_free_energy
@@ -28,7 +34,7 @@ from .kaufman import Recovery, beta_of_x, kaufman_free_energy, kaufman_partition
 from .onsager import critical_beta, onsager_free_energy, yang_magnetization
 from .transfer import ising1d_free_energy, ising_transfer_matrix_free_energy, torus_partition_polynomial
 
-__all__ = ["BETA_C", "Ball", "BetheFixedPoint", "BetheResult", "DIGITS", "Recovery", "XPoint",
+__all__ = ["BETA_C", "Ball", "BetheFixedPoint", "anisotropic", "geom_tori", "tri_honey", "BetheResult", "DIGITS", "Recovery", "XPoint",
            "bethe", "bethe_critical_beta", "bethe_ising_fixed_points", "bethe_ising_free_energy",
            "beta_of_x", "correlation2d", "critical2d", "certify", "critical_beta", "ising1d_free_energy",
            "ising_transfer_matrix_free_energy", "kaufman", "kaufman_free_energy",

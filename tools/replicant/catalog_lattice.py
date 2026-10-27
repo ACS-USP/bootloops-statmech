@@ -249,7 +249,10 @@ def bethe_ising():
 
 
 def lattice_entries():
-    return [ising2d(), ising1d(), bethe_ising()]
+    from .catalog_lattice_aniso import ising2d_anisotropic
+    from .catalog_lattice_geom import ising_honeycomb, ising_triangular
+    return [ising2d(), ising1d(), bethe_ising(), ising2d_anisotropic(), ising_triangular(),
+            ising_honeycomb()]
 
 
 __all__ = ["bethe_ising", "ising1d", "ising2d", "lattice_entries"]

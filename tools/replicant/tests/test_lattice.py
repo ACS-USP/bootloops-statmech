@@ -337,7 +337,8 @@ def test_lattice_entries_are_certified_with_radii_and_others_unchanged():
     from replicant.compose import compose
     cat = catalog()
     for name, params in (("ising2d", {}), ("ising2d", {"beta": "0.6"}), ("ising1d", {}),
-                         ("bethe_ising", {"beta": 1, "h": "0.02"})):
+                         ("bethe_ising", {"beta": 1, "h": "0.02"}), ("ising2d_anisotropic", {}),
+                         ("ising_triangular", {}), ("ising_honeycomb", {})):
         e = cat[name]
         res = compose(e.spec, e.default_route).run(**params)
         assert res.rigor == "certified", (name, res.rigor)
@@ -347,7 +348,8 @@ def test_lattice_entries_are_certified_with_radii_and_others_unchanged():
     # v1 behaviour unchanged: no other entry declares a rigor (E10's sk_bounds is certified too:
     # tests/test_guerra.py), and a run stays physics-level
     assert all(not e.rigor for n, e in cat.items()
-               if n not in ("ising2d", "ising1d", "bethe_ising", "sk_bounds"))
+               if n not in ("ising2d", "ising1d", "bethe_ising", "sk_bounds", "ising2d_anisotropic",
+                            "ising_triangular", "ising_honeycomb"))
     assert compose(cat["rem"].spec).run().rigor == "physics-level"
     # a certified route that returns a value without its radius is refused
     from replicant.catalog import Out, entry, fstep
