@@ -25,6 +25,10 @@
   scm_flow.py  SCM integration, initial conditions, symmetric fixed points, asymptotic modes, critical rates
   plateau.py   plateau detection (BRW's definition), undetermined reports, the rtol check
   simulate_scm.py    finite-N online gradient descent in the SCM (shares no code with the ODEs)
+  optimal_multilayer.py  (O6) VC97's variationally optimal modulation in the SCM: Eq. (3), H, G, the closed
+               optimal flow, the teacher-output posterior W, the K = M = 2 plateau (Vicente-Caticha 1997)
+  optimal_ml_flow.py integration through det H = 0, VC97's initial overlaps
+  simulate_optimal_ml.py finite-N runs of the optimal algorithm (shares no code with the ODEs)
 
 Convention (Biehl & Riegler, Europhys. Lett. 28, 525 (1994)): |B| = 1, xi_j i.i.d. N(0, 1),
 J <- J + (eta / N) F(h, b, Q) b xi, h = J . xi, R = J . B, Q = J . J, eps = arccos(R / sqrt Q) / pi.

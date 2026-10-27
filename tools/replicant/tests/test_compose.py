@@ -295,7 +295,7 @@ _DOCUMENTED = {
                                  "seeds"},
     ("online_tcm", "online"): {"rule", "K", "eta", "R0", "Q0", "alpha", "N", "seeds"},
     ("online_scm", "online"): {"K", "M", "eta", "teacher", "sym", "critical", "init", "X", "Nx", "init_seed", "alpha", "B", "N",
-                               "seeds"},
+                               "seeds", "rule", "Q11"},
     ("viana_bray", "cavity"): {"graph", "k", "c", "J", "beta", "ansatz", "m", "ys", "pop",
                                "inner", "sweeps", "burn_in", "runs", "seed",
                                "require_equilibrated"},

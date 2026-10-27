@@ -19,6 +19,8 @@ Run parameters:
               ss (SS's random overlaps; default otherwise) with init_seed (1)
   alpha       the learning curve to alpha and the plateau report (online/plateau.py), with B (0.05)
   N (seeds)   finite-N simulation at alpha over named seeds (default 0-11): eps_sim
+  rule        gd (default: the above) | optimal (VC97's variationally optimal algorithm, O6:
+              catalog_online_scm_opt.py, which lists its parameters)
 """
 import math
 
@@ -26,6 +28,7 @@ import numpy as np
 
 from .catalog import Out, RefCheck, Stability, entry, fstep, has
 from .catalog_online import _num
+from . import catalog_online_scm_opt as OPT
 from .core import Refusal
 from .csp import _checks
 from .online import plateau as P
@@ -191,18 +194,35 @@ def _asym_ok(p):
     return f.K == f.M and F._isotropic(f)
 
 
+def _gd(when=None):
+    return lambda p: not OPT.is_opt(p) and (when is None or when(p))
+
+
+def _opt(when=None):
+    return lambda p: OPT.is_opt(p) and (when is None or when(p))
+
+
 def online_scm():
-    steps = [fstep("online-scm-state-point", f"{SS}; NIPS Eqs. (1)-(4)", _state),
+    steps = [fstep("online-scm-state-point", f"{SS}; NIPS Eqs. (1)-(4)", _state, when=_gd(), skip="rule=optimal"),
              fstep("online-scm-symmetric-points", f"{SS}, NIPS Eqs. (5)-(8); {BRW}, Eqs. (9)-(21)", _symmetric,
-                   when=_sym_ok, skip="needs K >= 2 and an isotropic teacher"),
+                   when=_gd(_sym_ok), skip="needs K >= 2 and an isotropic teacher"),
              fstep("online-scm-asymptotics", f"{SS}, NIPS p. 307, Fig. 2; {BS}, Eq. (12)", _asymptotics,
-                   when=_asym_ok, skip="needs K = M and an isotropic teacher"),
+                   when=_gd(_asym_ok), skip="needs K = M and an isotropic teacher"),
              fstep("online-scm-critical-rates", f"{SS}, NIPS Eq. (9); {BS}, Secs. 3-4", _critical,
-                   when=has("critical"), skip="no critical given"),
-             fstep("online-scm-learning-curve", f"{BRW}, Eqs. (9)-(17); {SS}, NIPS Fig. 1", _curve, when=has("alpha"),
+                   when=_gd(has("critical")), skip="no critical given"),
+             fstep("online-scm-learning-curve", f"{BRW}, Eqs. (9)-(17); {SS}, NIPS Fig. 1", _curve, when=_gd(has("alpha")),
                    skip="no alpha given"),
              fstep("online-scm-finite-n", "online gradient descent over named seeds (online/simulate_scm.py)", _finite,
-                   when=has("N"), skip="no N given")]
+                   when=_gd(has("N")), skip="no N given")]
+    vc = OPT.VC
+    steps += [fstep("online-scm-optimal-state-point", f"{vc}, Eqs. (1)-(4), Figs. 1-2 captions", OPT.state,
+                    when=_opt(), skip="rule=gd"),
+              fstep("online-scm-optimal-plateaus", f"{vc}, Figs. 2-3; {SS} (gradient descent)", OPT.plateaus,
+                    when=_opt(), skip="rule=gd"),
+              fstep("online-scm-optimal-learning-curve", f"{vc}, Eq. (2), Figs. 1-3", OPT.curve,
+                    when=_opt(has("alpha")), skip="rule=gd or no alpha given"),
+              fstep("online-scm-optimal-finite-n", "VC97's modulation over named seeds (online/simulate_optimal_ml.py)",
+                    OPT.finite, when=_opt(has("N")), skip="rule=gd or no N given")]
     R = lambda key, get, **pr: RefCheck("online_scm", key, get, params=pr, route="online")
     refs = [R("brw96_fig2_height", lambda v: v["eps_sym_identical"]),
             R("brw96_fig1_eps", lambda v: v["eps_sym_permutation"]), R("brw96_fig1_R", lambda v: v["R_sym_permutation"]),
@@ -227,6 +247,16 @@ def online_scm():
         ("bs95_eta_opt_single", "eta_crossing"), ("bs95_eta_opt_single_formula", "eta_crossing"))]
     refs += [R(k, lambda v, g=g: v[g], K="2", M="1", critical="1", sym="none") for k, g in (
         ("bs95_k2_eta_c", "eta_c_specialised"), ("bs95_k2_eta_s", "eta_s_symmetric"))]
+    o22, o21 = dict(rule="optimal", K="2", M="2"), dict(rule="optimal", K="2", M="1")
+    refs += [R(k, lambda v, g=g: v[g], **o22) for k, g in (
+        ("vc97_fig2_eps_plateau", "eps_plateau_opt"), ("vc97_fig2_hess_hi_plateau", "hess_hi_plateau"),
+        ("vc97_fig2_hess_lo_plateau", "hess_lo_plateau"), ("vc97_fig3_q12_plateau", "Q_plateau_opt"),
+        ("vc97_fig2_bp_plateau", "eps_plateau_gd"))]
+    refs += [R("vc97_fig1_bp_plateau", lambda v: v["eps_plateau_gd"], **o21),
+             R("vc97_fig1_hess_lo_a0", lambda v: v["hess_lo0"], **o21)]
+    refs += [R(k, lambda v, g=g: v[g], alpha="8", **o21) for k, g in (
+        ("vc97_fig1_hess_dip", "hess_hi_dip"), ("vc97_fig1_hess_dip_alpha", "alpha_hess_hi_dip"),
+        ("vc97_fig1_hess_hi_a8", "hess_hi"), ("vc97_fig1_hess_lo_a8", "hess_lo"))]
     ode = Stability("not-computed", "online-ode", SS, _ODE_NOTE)
     rate = Stability("not-computed", "online-ode", f"{SS}; {BS}", "roots of numerically differentiated eigenvalues "
                      f"of the ODE; 'optimal' only in scm_flow.OPTIMALITY_CLASS; " + _ODE_NOTE)
@@ -240,16 +270,20 @@ def online_scm():
     fin = {**{k: ode for k in phys}, **{k: rate for k in ("eta_max", "eta_crossing", "eta_fastest", "rate_crossing",
                                                             "rate_fastest", "eta_c_specialised", "eta_s_symmetric")},
            "eps_sim": sim}
+    vcode = Stability("not-computed", "online-ode", OPT.VC, "VC97's optimal modulation in the N -> oo ODE limit "
+                      "(self-averaging assumed; 'optimal' only in optimal_multilayer.OPTIMALITY_CLASS): physics-level, "
+                      "NOT final")
+    fin.update({k: vcode for k in OPT.VALUES})
     meta = ("K", "M", "eta", "teacher", "init", "alpha", "plateau_status", "plateau_branch", "plateau_rtol_spread",
             "plateau_runaway",
-            "eps_sim_halfwidth99", "N", "seeds")
+            "eps_sim_halfwidth99", "N", "seeds") + OPT.META
     spec = ModelSpec("online_scm", "spherical", "gaussian", constraint="online", prior="teacher")
     return entry("online_scm", spec, f"{SS}; {BS}; {BRW}", {"online": steps}, refs, {"online": CAVEAT},
                  "online gradient descent in the soft committee machine (Saad-Solla ODEs, erf units): symmetric "
                  "plateaus (height, escape, BRW's plateau length), asymptotic eigenvalues and critical learning "
                  "rates, finite-N simulation", default_route="online", finality=fin, meta=meta,
                  parameters={"online": ("K", "M", "eta", "teacher", "sym", "critical", "init", "X", "Nx", "init_seed", "alpha",
-                                        "B", "N", "seeds")})
+                                        "B", "N", "seeds", "rule", "Q11")})
 
 
 __all__ = ["online_scm"]

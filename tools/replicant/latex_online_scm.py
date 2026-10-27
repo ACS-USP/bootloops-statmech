@@ -5,6 +5,7 @@ rate equations and the papers' statements without a closed form are cited.
 import numpy as np
 import sympy as sp
 
+from .latex_online_scm_opt import opt_blocks
 from .tex import Check, cited, sym, text
 
 C11, C12, C13, C14, C22, C23, C24, C33, C34, C44 = sp.symbols("C11 C12 C13 C14 C22 C23 C24 C33 C34 C44", real=True)
@@ -86,7 +87,7 @@ def online_scm(route):
              "when seeded below round-off or when the norms run away, "
              "the escape alpha recomputed at rtol x 1e-2; online/simulate_scm.py: online gradient descent with no code "
              "shared with the ODEs, 99% Student-t bands; the ODE without its eta^2 term falls outside them"),
-    ]
+    ] + opt_blocks()
 
 
 __all__ = ["online_scm"]

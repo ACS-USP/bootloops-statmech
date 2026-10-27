@@ -274,6 +274,20 @@ CLI (from `tools/`):
   `--param K=2 --param M=1 --param critical=1` -> `eta_c_specialised` 1.892595, `eta_s_symmetric` 2.169600
   (BS: 1.89, 2.17).  `--param alpha=16 --param N=200` -> `eps_sim` 0.041232 (`eps_sim_halfwidth99` 0.0026,
   12 named seeds) against the ODE's `eps` 0.041104.  No value is final.
+- Worked example, VC97's optimal algorithm (`online_scm`, route `online`, `rule=optimal`; Vicente & Caticha,
+  J. Phys. A 30, L599 (1997), arXiv cond-mat/9706015v1 read; measured 0.6-1.4 s, M = 2 curves about 40 s):
+  `python3 -m replicant run online_scm --route online --param rule=optimal` (K = M = 2) ->
+  `eps_plateau_opt` 0.011611 (identical students with Sigma singular, R = 1/sqrt6, Q = 1/3; VC97 Fig. 2 reads 0.0118 at N = 5000),
+  `hess_hi_plateau` 0.986247, `hess_lo_plateau` ~ 0 (VC97: 'very close to zero'), `eps_plateau_gd` 0.034628
+  (O5's plateau at eta = 1.5; Fig. 2's backpropagation curve: 0.034), `Q11_init` 0.413162 (fitted to Fig. 2's
+  inset at alpha = 0).  `--param M=1 --param alpha=8` -> `eps` 0.000195 against `eps_gd` 0.016843 (gradient
+  descent from the same start, still on its plateau `eps_plateau_gd` 0.016333), `hess_hi_dip` 0.687258 at
+  `alpha_hess_hi_dip` 1.08 (Fig. 1's inset: 0.676 at 1.09), `hess_lo` 0.031609, `hess_hi` 0.984161.
+  `--param M=1 --param alpha=0.5 --param N=200` -> `eps` 0.162563, `eps_sim` 0.159558 (`eps_sim_halfwidth99`
+  0.0079, 12 named seeds).  `--param alpha=8` (K = M = 2) -> `curve_status` undetermined (the M = 2 posterior
+  quadrature is not trusted near the identical-student manifold; nothing is reported).  `--param M=3` is
+  refused `unsupported:M`, `--param sym=none` with `rule=optimal` `precondition:known-parameter`, and
+  `--param rule=fast` `unsupported:rule`.  No value is final.
 - Worked example, amp route (`sk`, `teacher_student`; under 1 s each, measured):
   `python3 -m replicant run sk --route amp --param beta=1.5` -> `q_se` 0.352602 (the SE fixed point,
   `exact-by-literature`: Bayati-Montanari Thm 4 proves SE for AMP on Gaussian J; it is the AMP limit,
@@ -515,6 +529,16 @@ eps)`; `scm_flow.brw_initial(X, N=1000, Qt=0.5, u=(0.2, 1.0))`, `scm_flow.ss_ini
 rtol, exit_rtol_spread, Q_fp, R_fp, eps_end)`; `plateau.SPREAD_TOL` (0.01 tau_esc). `simulate_scm.simulate_scm(K,
 M, N, eta, alphas, seeds, init, teacher)` -> `ScmSimResult(alphas, eps, bands, N, seeds, initial)`. Example:
 `scm_flow.symmetric_fixed_point(scm.scm_flow(2, 2, 2.0), "identical").eps` -> 0.124368 (BRW Eq. (20): 0.124).
+`from replicant.online import optimal_multilayer, optimal_ml_flow, simulate_optimal_ml` (O6; floats, numpy):
+`optimal_multilayer.eps_vc(Q, R)` (VC97 Eq. (3)), `.gradients(Q, R)` -> (D, G), `.hessian(Q, R)` (= 2 D),
+`.modulation_matrix(Q, R)` (A = H^-1 G), `.posterior(Q, R)` -> (R^T Q^+, Sigma), `.info_matrix(Sigma, M, n=12)`
+(W), `.yhat2(mu, s, Sigma)`, `.optimal_flow(K, M)` -> `OptimalFlow` (`.rates(Q, R)`, `.vector_rate`, `.pack`,
+`.unpack`, `.eps`, `.decay(Q, R)`), `.plateau_k2m2()` -> `Plateau(r, q, eps, eigs)`, `.OPTIMALITY_CLASS`;
+`_PLANT` (private: "w" scales W, "dqr" the R-term of D_ii, "hess" H).  `optimal_ml_flow.vc97_initial(K, M,
+Q11=None)` -> (Q0, R0, Q11), `.vc97_initial_eigs(K, M)`, `.integrate_optimal(flow, alpha_max, init, alphas=None,
+rtol=1e-8, atol=1e-11)` -> `OptTrajectory(alpha, Q, R, eps, eig_lo, eig_hi, sig_min)`, `.SIGMA_RELIABLE` (0.05).
+`simulate_optimal_ml.simulate_optimal(K, M, N, alphas, seeds, init, n_p=201)` -> `OptSimResult(alphas, eps,
+bands, N, seeds, Q, R)`.  Example: `optimal_multilayer.plateau_k2m2().eps` -> 0.011611.
 `from replicant.series import ...` (E8; exact `Fraction` coefficients; needs `tools/` on the path for
 `tools/annihilator`): `ising2d_free_energy_series(order, variable="v")` -> [a_0 .. a_order] in v =
 tanh K (`variable="u"`: [b_0 .. b_order] in u = v^2; anything else `unsupported:variable`; order <=
@@ -670,7 +694,10 @@ small_eta: the symmetric points to compute), `critical` (eta_max: only that root
 critical learning rates, K = M or (K, M) = (2, 1)),
 `init` (brw16 (K = M = 2, the default there) with `X` (1e-6) and `Nx` (1000) | ss (default otherwise) with
 `init_seed` (1)), `alpha` (the learning curve and the plateau report), `B` (BRW's plateau threshold, 0.05),
-`N` (finite-N simulation, N >= 20, needs `alpha`) and `seeds` (default 0-11; needs `N`).
+`N` (finite-N simulation, N >= 20, needs `alpha`) and `seeds` (default 0-11; needs `N`); `rule` (gd, the
+default: all of the above | optimal: VC97's algorithm (O6), with `K` (2), `M` (1 or 2; default K), `eta` (the
+gradient-descent comparison, 1.5), `init` (vc97 only), `Q11` (default: fitted to the paper's inset), `alpha`, `N`,
+`seeds`; `sym`, `critical`, `X`, `Nx`, `init_seed`, `B` and a graded teacher are refused with it).
 Without `beta` an entry returns its T = 0 / critical headline values. A composed spec
 (not a catalog entry) does not refuse an unknown name: its notes list "unused parameters [...]".
 
@@ -715,6 +742,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `unsupported:rule`, `unsupported:stationary`, `precondition:drift`, `:drift-kind`, `:optimal-eta`, `:known-parameter`, `:noise`, `:initial-overlap`, `:alpha`, `:averages`, `:overlap`, `undetermined:stationary`, `:small-drift`, `:rho-sign`, `no-solution:no-tracking` | online with drift (`online/drift*.py`, `simulate_drift.py`, `online_drift`): an unknown rule; a stationary state for a callable F(h, b, Q); D < 0 or a schedule where a constant D > 0 is needed (stationary, small drift); a drift other than random / deterministic; a VKC rule at eta != 1 or with noise_estimate; R0 <= 0 or jump_overlap <= 0 for a rule that reads rho (optimal, VKC); jumps outside (0, alpha_max); several stable stationary states; a small-drift log-slope more than 0.01 from the derived exponent; a simulated seed reaching rho <= 0 under a rule that reads rho; plain Hebb under drift (R -> eta a / D while Q grows: no stationary state) |
 | `unsupported:rule`, `unsupported:K`, `precondition:K`, `:eta`, `:optimal-eta`, `:initial-overlap`, `:state-point`, `:alpha`, `:overlap`, `:asymptote`, `:size`, `:known-parameter`, `undetermined:asymptote`, `:rho-sign`, `no-solution:step-size` | tree committee machine (`online/tcm*.py`, `simulate_tcm.py`, `online_tcm`): a rule other than hebb / local_optimal / optimal; the nonlocal rule at K != 3; K not an odd integer >= 1 (or K branch errors missing); eta not > 0, or != 1 for an optimal rule; Q0 <= 0, rho0 >= 1, or R0 <= 0 for an optimal rule; integrating without a state or with alpha <= 0; theta outside (0, pi) (or rho <= 0 for an optimal rule); a rate-limit constant for Hebb; N not a multiple of K with N/K >= 10; seeds without N; a log-slope more than 0.01 from the derived exponent; a simulated branch reaching rho <= 0; the shared integrator's step underflow (e.g. ln Q overshooting from a tiny Q0) |
 | `precondition:K`, `:M`, `:eta`, `:symmetric`, `:state-point`, `:initial-overlap`, `:alpha`, `:threshold`, `:grid`, `:size`, `:known-parameter`, `unsupported:teacher`, `:init`, `:sym`, `:branch`, `no-solution:fixed-point`, `:critical-rate`, `:step-size` | soft committee machine (`online/scm*.py`, `plateau.py`, `simulate_scm.py`, `online_scm`): K or M not an int in 1..16; eta not > 0; symmetric points with K < 2 or a graded teacher (or asymptotics with K != M); integrating without (Q, R) or with a covariance that is not positive semidefinite; alpha <= 0; B outside (0, 1); fewer than 50 plateau grid points; N < 20; seeds without N or N without alpha; a teacher other than isotropic / graded; init brw16 off K = M = 2; a sym entry other than identical / permutation / small_eta; a branch other than identical / permutation; Newton not converging (or the permutation branch merging with Q = C, as without the eta^2 term); no sign change of an eigenvalue in the scanned eta range; the shared integrator's step underflow |
+| `unsupported:rule`, `unsupported:M`, `no-solution:singular-hessian`, `precondition:known-parameter`, `unsupported:init`, `precondition:initial-overlap`, `no-solution:step-size` | VC97's optimal algorithm (`online/optimal_multilayer.py`, `optimal_ml_flow.py`, `simulate_optimal_ml.py`, `online_scm` with `rule=optimal`): a rule other than gd / optimal; M >= 3 (the teacher-output posterior is written for M = 1, 2); the functional Hessian singular at the state; a gradient-descent parameter with rule=optimal; (K, M) other than (2, 1), (2, 2) for VC97's start; overlaps outside the cone; the optimal flow stalling |
 | `precondition:order-parameter`, `:levels`, `:digits`, `:K`, `:temperature-range`, `unsupported:field`, `undetermined:stationary-points`, `ambiguous:minimiser`, `no-solution:certification`, `:radius-stall` | bounds (`bounds/`, `sk_bounds`): q or m outside Guerra's admissible set (q nondecreasing in [0, 1], m nondecreasing in (0, 1]); overlap / Parisi-parameter counts that do not match; digits not an int 1 .. 200; K outside 1 .. 5 (catalog: 1 or 2); K-step staircases outside 1 < beta <= 3 or with h != 0; the stationary points of P_RS not certified complete (a cover or monotone run undecided); two local minima with overlapping values; interval Newton or the precision escalation failing |
 | `precondition:coupling-matrix`, `:pm-one-couplings`, `:enumeration-size`, `:integer-patterns`, `:seed`, `:betas`, `:sweeps`, `:nbetas`, `:windows`, `:sizes`, `:samples`, `:order`, `:supported-disorder-law`, `no-solution:capacity`, `undetermined:ground-states`, `undetermined:equilibration` | Monte Carlo and enumeration (`numerics/`): J not a finite symmetric matrix with zero diagonal (PT: a stack of them), or not +-1/sqrt N for the +-J spectrum; N above the enumeration limit (SK 26, perceptron 30); P not an int >= 0, or alpha N not an integer; a seed not an int >= 0 (or a list of them); betas not positive and strictly increasing (the finite-size thermal route also needs beta > 0.5, `moments.pm_one_gap_limit` 0 <= beta < 1); sweeps / nbetas not an int >= 1 or betas not a sequence (never a silent default); fewer than two samples or a window split that is empty; fewer than three distinct sizes, or a size without >= 2 samples; a closure order other than 2, 3; a law other than `pm_one`, `gaussian`; every drawn pattern stored (draw more); the two PT runs of a sample disagreeing on its ground state (raise sweeps); a size whose late and early energy windows differ beyond the 99% band (raise sweeps) |
 | `unstable:<ansatz>` | `require_final` or `require_stable`: a computed stability is negative (RS replicon or cavity lambda < 0); `unstable:1rsb` also from `pspin_gardner_temperature` when the spherical scan is negative everywhere |
@@ -730,7 +758,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `unbanked:missing-entry`, `:malformed`, `:no-citation`, `:no-independent-route` | a banked reference value is absent or has no citation / no independent route (a value that fed a fit never certifies it) |
 | `tex-engine:failed`, `tex-engine:unavailable` | `--pdf`: the engine ran and failed, or could not reach its offline resources |
 
-CATALOG (24 entries: the 7 of v1, 12 added by the extensions E4-E10 and 5 by the online-learning tasks O1-O5; `list` shows the live table;
+CATALOG (24 entries: the 7 of v1, 12 added by the extensions E4-E10 and 5 by the online-learning tasks O1-O5 (O6 adds `rule=optimal` to `online_scm`); `list` shows the live table;
 values at the default / banked state points):
 
 | entry | routes | headline values | banked references | finality |
@@ -757,7 +785,7 @@ values at the default / banked state points):
 | `online_linear` online versus offline learning of a linear teacher (standard F = b - h and the optimal F = (Q/R) b - h; sphere or unconstrained; greedy eta) | online | at `alpha`: `rho`, `eg`, `R`, `Q`, `eps_sign`, optimal `gamma_temperature`, greedy `eta_greedy`, `rho_offline_standard` / `_optimal`, `eg_offline_*`, `rho_offline_optimal_ridge`, `eg_pinv_ridge`; on the sphere at eta = 1: `rho_inf`, `eg_inf`, optimal `tail_constant`, `alpha_cross`; with `N`: `eg_sim`, `rho_sim` | Kinouchi-Caticha 1995 (preprint IFUSP/P-1157 read): rho_opt = sqrt(1 - e^-alpha) at alpha = 1, 3 (Eq. (19)), rho_std = 1 - e^-1 (Eq. (26)), rho_max 0.8 at M/Q = 4 (Eq. (24)), e_g^oo 0.9 / 0.5 at Q = 4 (Eq. (25)), tail 1/2 (Eq. (31)), offline rho = alpha, sqrt(alpha) and e_g = 1 - alpha, 1 - sqrt(alpha) (Eqs. (27), (49), (53), (54)), the crossing 0.71 (p. 11, tol 0.005) | all not-computed (physics-level ODE limit; offline from the derived zero-energy geometry); `eg_sim` statistical |
 | `online_drift` online learning of a drifting perceptron teacher (random or deterministic drift; the O1 rules and VKC's annealed Hebb, step, symmetric and optimal modulations) | online | without `D`: `eps_exponent`, `eps_coefficient` (small-drift law); with `D`: `eps_inf`, `theta_inf`, perceptron `Q_inf`, the KC93 bound `eps_inf_bound`, annealed Hebb `eps_inf_closed`, optimal `eps_inf_kc93`; at `alpha`: `eps`, `R`, `Q`, `rho`, `eps_bound`; with `N`: `eps_sim` | VKC 1998 (arXiv read): Tables I-II small-drift coefficients and exponents of the four rules (random and deterministic; the deterministic optimal formula as printed is inconsistent with its 0.63, the number is banked), Figs. 4 and 6 read off at two D each (tol 0.003); KC93 (preprint IFUSP/P-1044 read) C = 0.447 (Eq. (25)); VKC p. 15's perceptron delta = 5, 8 banked but UNCLAIMED (replicant derives 3, 4) | all not-computed (physics-level ODE limit); `eps_sim` statistical |
 | `online_tcm` online learning in the tree committee machine (K odd non-overlapping branches, majority vote; CC95's nonlocal optimal rule, the local optimal rule, Hebb) | online | `eps_constant` (optimal rules: the rate limit; Hebb: closed form), `eps_exponent` (local rules, alpha = 1e4), local `eps_constant_perceptron`; local rules: `noise_equivalent`, `time_factor`, at `alpha` `rho_perceptron_mapped`, `equivalence_gap`; at `alpha`: `eps`, `eps_branch`, `R`, `Q`, `rho`; with `N`: `eps_sim` | CC95 (preprint IFUSP/P-1126 read): kappa 0.88 (Eq. (32)) and its printed integral, pseudo-Hebb rho(alpha) (Eq. (30)) at alpha = 1, 5, 20 and sqrt(3/2pi); Fig. 1 read off at four alpha (tol 0.003; UNCLAIMED, slow test); CKC96 (abstract only): exponents 1 (local learning) and 1/2 (Hebb) at finite K | all not-computed (physics-level ODE limit); `eps_sim` statistical |
-| `online_scm` online gradient descent in the soft committee machine (K student, M teacher erf units; Saad-Solla ODEs) | online | K >= 2: `eps_sym_identical`, `eps_sym_permutation` (R, Q, C, `tau_esc`), `plateau_shift_per_100x`, `eps_small_eta`, `tau_small_eta`; K = M: `lambda1`, `lambda2`, `asymptotic_rate`; with `critical`: `eta_max`, `eta_crossing`, `eta_fastest` (K = M) or `eta_c_specialised`, `eta_s_symmetric` (K = 2, M = 1); at `alpha`: `eps`, `plateau_status`, `plateau_height`, `plateau_entry`, `plateau_exit`, `plateau_length`, `plateau_rtol_spread`; with `N`: `eps_sim` | SS (NIPS 1996 / MANNA 1997 read; PRL, PRE not fetched): the small-eta plateau 0.0203 and Eq. (7), tau at K = 2, 3, Fig. 1d heights (read off, tol 0.001), Fig. 2 eigenvalues and eta_max (read off), Eq. (9)'s coefficient (UNCLAIMED, slow), the 1/eta trapping law (UNCLAIMED, slow); BS (preprint read): eta_c = pi sqrt(5/3), eta_opt = 2 eta_c/3, the two-unit eta_c 1.89, eta_s 2.17; BRW (preprint read): Eqs. (20)-(21), Fig. 1 and Fig. 2 read off, Eq. (17)'s half-log slope (UNCLAIMED, slow) | all not-computed (physics-level ODE limit); `eps_sim` statistical |
+| `online_scm` online gradient descent in the soft committee machine (K student, M teacher erf units; Saad-Solla ODEs) | online | K >= 2: `eps_sym_identical`, `eps_sym_permutation` (R, Q, C, `tau_esc`), `plateau_shift_per_100x`, `eps_small_eta`, `tau_small_eta`; K = M: `lambda1`, `lambda2`, `asymptotic_rate`; with `critical`: `eta_max`, `eta_crossing`, `eta_fastest` (K = M) or `eta_c_specialised`, `eta_s_symmetric` (K = 2, M = 1); at `alpha`: `eps`, `plateau_status`, `plateau_height`, `plateau_entry`, `plateau_exit`, `plateau_length`, `plateau_rtol_spread`; with `N`: `eps_sim` | SS (NIPS 1996 / MANNA 1997 read; PRL, PRE not fetched): the small-eta plateau 0.0203 and Eq. (7), tau at K = 2, 3, Fig. 1d heights (read off, tol 0.001), Fig. 2 eigenvalues and eta_max (read off), Eq. (9)'s coefficient (UNCLAIMED, slow), the 1/eta trapping law (UNCLAIMED, slow); BS (preprint read): eta_c = pi sqrt(5/3), eta_opt = 2 eta_c/3, the two-unit eta_c 1.89, eta_s 2.17; BRW (preprint read): Eqs. (20)-(21), Fig. 1 and Fig. 2 read off, Eq. (17)'s half-log slope (UNCLAIMED, slow) ; with `rule=optimal` (VC97, O6): `eps_plateau_opt`, `hess_lo_plateau`, `hess_hi_plateau` (K = M = 2), `eps_plateau_gd`, `hess_lo0`, `Q11_init`; at `alpha`: `eps`, `eps_gd`, `hess_lo`, `hess_hi`, `hess_hi_dip` (M = 1), `curve_status`; VC97 (arXiv TeX and figures read): Figs. 1-3 read from the PostScript vector data, the Fig. 1 curve points UNCLAIMED (one ODE run checks them, default tier) | all not-computed (physics-level ODE limit); `eps_sim` statistical |
 | `viana_bray` sparse +-J | cavity | `beta_c` (3-regular) 0.881374; T = 0 RS `p0` 1/3, `e0` -23/18; factorized 1RSB -1.27231, mu* 0.4174 | those, plus slow/statistical population-dynamics RS and 1RSB at k = 5, T = 0.8 | `beta_c` stable; the rest not-computed |
 
 HELD-OUT EVIDENCE (the test of REUSE; `tests/test_heldout_sk.py`, `tests/test_heldout_perceptron.py`,
@@ -844,7 +872,7 @@ CC95 Eqs. (5), (21), (24), (30), (32) against the TCM route, CKC96's equivalence
 (and a planted wrong mapping failing), the asymptotic constants against K and a K = 3 simulation band
 (O4), the SCM's erf averages against Gauss-Hermite (with planted normalisation errors), the papers'
 fixed points, eigenvalues and critical rates against the ODE, the plateau report (escaped, undetermined,
-none, the rtol check) and a small simulation band with the eta^2 term planted out (O5). `--full` adds 156 `@slow` tests (full-RSB Parisi up to K = 9,
+none, the rtol check) and a small simulation band with the eta^2 term planted out (O5), VC97's Eq. (3) and its gradients against O5's erf route, the closed ODE against quadrature of the pointwise modulation, the optimality positive control (perturbed modulations decay slower where H is positive definite, one decays faster at the saddle), Fig. 1 and the K = M = 2 plateau against the bank, gradient descent beaten, and a tiny simulation band with H misnormalised planted (O6). `--full` adds 160 `@slow` tests (full-RSB Parisi up to K = 9,
 population dynamics at reference sizes, the XORSAT GF(2) crossing at N = 400-2000 and leaf removal at
 N = 100000, the K-SAT SP-population crossing and BP window, the LDPC crossing at N = 20000, the spiked
 AMP and SBM bands at reference sizes, the ridge 1/n bands at n = 400, 1000, the online ODE-vs-simulation
@@ -1496,6 +1524,27 @@ KNOWN HAZARDS:
   K = 3 runs at eta = 0.05-0.2; even rtol 1e-2 moves the BRW escape by only 0.016: the explicit R asymmetry,
   not the integrator, drives it). BRW's Eq. (17) half-log law is reproduced (slope -0.4995 tau_esc
   per ln X).
+- VC97's optimal algorithm (O6, `online/optimal_multilayer.py`, `optimal_ml_flow.py`, `simulate_optimal_ml.py`,
+  `online_scm` with `rule=optimal`). Paper: R. Vicente and N. Caticha, J. Phys. A 30, L599 (1997), read from
+  arXiv cond-mat/9706015v1 (the authors' TeX source and their Xvgr PostScript figures, whose polylines give the
+  plotted data exactly); the IOP typeset version was not fetched. The paper treats the soft committee machine
+  (K = 2, M = 1 and K = M = 2), so `rule=optimal` extends `online_scm`, not `online_tcm`. Convention: SS's model
+  with M_nm = delta_nm and the learning rate folded into F (J_k <- J_k + (F_k/N) S); H_ij = 2 de_g/dQ_ij over
+  ordered pairs, which the Fig. 1 inset confirms (its alpha = 0 eigenvalues fix one Q11 to 0.002). The class:
+  F_k may read every student field (nonlocal), the teacher output (not its hidden fields) and the exact (Q, R);
+  greedy (the largest decay per example); a maximum only where H > 0, a saddle where H has a negative
+  eigenvalue. Derived here, not in VC97: the flow closes to dR = A W - R, dQ = A W A^T - Q (A = H^-1 G,
+  W = <yhat yhat^T>); for M = 1 the teacher output fixes y, so W = 1 and the flow is algebraic; the K = M = 2
+  plateau is identical students along B1 + B2 with Sigma singular, R = 1/sqrt6, Q = 1/3,
+  e_g* = 1/3 - (4/pi) arcsin(1/4) = 0.011611, with H's eigenvalues 4 sqrt15/(5 pi) = 0.986247 and exactly 0 (the
+  paper's 'functional robustness'; the paper's N = 5000 run drifts along that soft mode with unequal norms:
+  Fig. 3's Q11 = 0.42, Q22 = 0.27 at alpha = 16 with det Q ~ 0). Findings: where det H crosses 0 the modulation
+  diverges: the ODE passes it with a finite jump (integrated in an arclength time), finite-N runs are kicked
+  (Fig. 3's Q11 ~ 13 at N = 5000; replicant's ODE jumps to ~4, single N = 1000 runs to ~30), so the bands
+  after the crossing are heavy-tailed and the Fig. 1 keys carry 99% one-run prediction tolerances from 16 runs
+  at N = 5000. The M = 2 W quadrature is accurate to ~3e-3 only (yhat changes steeply with Sigma_B); near the
+  identical manifold its error fakes a fixed point (the ODE stalls at e_g = 0.0140 instead of 0.0116), so M = 2
+  curves with min eig Sigma < 0.05 are `undetermined`; the simulation (N = 3000) does reach 0.0117 there.
 - families/sk.py's float64 1RSB functional (`_rsb_phi_e`, 80 x 80 Gauss-Hermite; v1 code, unchanged) is
   inaccurate in the q0 = 0 / large q1 - q0 sector, where the branch points of cosh^m (zeros of cosh at
   Im = pi/2) are not smoothed by an outer Gaussian average. Against the certified balls of bounds/krsb.py:

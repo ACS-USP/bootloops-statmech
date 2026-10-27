@@ -116,6 +116,11 @@ series` for `series_ising2d`, `--route bound` for `sk_bounds`, and `--pdf` (with
   points, the asymptotic modes, critical learning rates), `plateau.py` (plateau detection by BRW's definition,
   `undetermined` reports, the rtol check), `simulate_scm.py` (finite-N online gradient descent); catalog entry
   `online_scm` (`catalog_online_scm.py`, `latex_online_scm.py`).
+  O6: `optimal_multilayer.py` (VC97's variationally optimal modulation in the soft committee machine: Eq. (3),
+  its gradients and Hessian, the closed optimal flow, the teacher-output posterior W, the K = M = 2 plateau),
+  `optimal_ml_flow.py` (integration through det H = 0, VC97's initial overlaps), `simulate_optimal_ml.py`
+  (finite-N runs of the algorithm); `rule=optimal` of `online_scm` (`catalog_online_scm_opt.py`,
+  `latex_online_scm_opt.py`).
 - `catalog*.py`, `compose.py` (+ `compose_result.py`: `Result` and the finality rule), `cli.py`,
   `__main__.py`: the 24-entry catalog (`catalog_ts.py` holds the teacher-student entry,
   `catalog_pspin.py` the two p-spin entries; LaTeX in `latex_pspin.py`), the composer,
