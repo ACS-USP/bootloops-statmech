@@ -12,7 +12,13 @@ Molloy & Reed, Random Struct. Alg. 6, 161 (1995), p. 161: |C1| = O(n^(2/3)) at M
 Theorem 2 is informative only for delta < (1/15)^(5/3) = 0.011 (else its bound exceeds 1); it is
 tested at delta = 1/100 (bound 0.946) on the sizes N > 200/delta^(3/5) = 3170.
 
-  window_scaling(Ns, seeds, lam=0) -> dict
+  window_scaling(Ns, seeds, lam=0, offset=None) -> dict    (offset: a fixed c = 1 + offset, not scaled
+      with N: the contrast to the window)
+      scaled_agreement: whether mean |C1|/N^(2/3) at the smallest and the largest N agree within the
+      99% Student-t band of their difference plus a stated systematic N_min^(-1/3) x the larger mean
+      (relative corrections of order N^(-1/3): an assumption, not a bound).  Inside the window (fixed
+      lambda) it should agree; a width other than N^(-1/3) (or a fixed offset) makes it drift with N,
+      flagged `drifts` (printed and asserted only in the slow tests).
       per N: mean |C1| / N^(2/3) and its stderr; the log-slope of mean |C1| between the smallest
       and the largest N with its 99% Student-t band (delta method) plus a stated systematic
       N_min^(-1/3) / ln(N_max/N_min) (corrections of relative order N^(-1/3) to E|C1|/N^(2/3): an
@@ -31,6 +37,7 @@ from . import sampling as SM
 from .unionfind import UnionFind
 
 A_NP, DELTA_NP = 9, 0.01
+_HOOKS = {"window_exponent": -4 / 3}      # p = 1/N + lambda N^exponent; planted -5/4: a N^(-1/4) window
 
 
 def largest_component(N, c, seed):
@@ -48,7 +55,7 @@ def np_bound_small(delta):
     return 15 * delta ** 0.6
 
 
-def window_scaling(Ns, seeds, lam=0.0):
+def window_scaling(Ns, seeds, lam=0.0, offset=None):
     from ..csp.xorsat_finite import clopper_pearson
     seeds = SM._seeds(seeds)
     Ns = sorted(int(n) for n in Ns)
@@ -56,9 +63,9 @@ def window_scaling(Ns, seeds, lam=0.0):
         raise Refusal("precondition:n", f"Ns = {Ns}: need >= 2 sizes, each > 1000 (NP Theorem 1)")
     rows, above, total, below, total2 = [], 0, 0, 0, 0
     for N in Ns:
-        c = (N - 1) * (1 / N + lam * N ** (-4 / 3))
+        c = 1 + offset if offset is not None else (N - 1) * (1 / N + lam * N ** _HOOKS["window_exponent"])
         c1 = np.array([largest_component(N, c, s) for s in seeds], dtype=float)
-        if lam == 0:
+        if lam == 0 and offset is None:
             above += int(np.count_nonzero(c1 > A_NP * N ** (2 / 3)))
             total += c1.size
             if N > 200 / DELTA_NP ** 0.6:
@@ -77,7 +84,12 @@ def window_scaling(Ns, seeds, lam=0.0):
            "contains_2_3": abs(slope - 2 / 3) <= band + sys,
            "excludes_1_2": abs(slope - 1 / 2) > band + sys, "excludes_3_4": abs(slope - 3 / 4) > band + sys,
            "kind": "finite-size consistency check (statistical; the systematic is an assumption)"}
-    if lam == 0:
+    diff = abs(l["scaled_mean"] - f["scaled_mean"])
+    aband = tq * math.hypot(f["scaled_se"], l["scaled_se"])
+    asys = f["N"] ** (-1 / 3) * max(f["scaled_mean"], l["scaled_mean"])
+    out["scaled_agreement"] = {"difference": diff, "band99": aband, "systematic": asys,
+                               "agrees": diff <= aband + asys, "drifts": diff > aband + asys}
+    if lam == 0 and offset is None:
         lo, _ = clopper_pearson(above, total)
         out["np_theorem_1"] = {"A": A_NP, "fraction_above": above / total, "cp99_lower": lo,
                                "bound": np_bound(A_NP)}

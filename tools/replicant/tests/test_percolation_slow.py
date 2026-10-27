@@ -60,6 +60,26 @@ def test_er_critical_window_scales_as_n_to_the_two_thirds():
     finally:
         SM._HOOKS["edge_prob_scale"] = saved
         assert SM._HOOKS["edge_prob_scale"] is saved
-    # inside the window (lambda = +-1) the scaled size stays O(1) but moves with lambda
-    up, down = window_scaling([8000, 64000], range(40), lam=1), window_scaling([8000, 64000], range(40), lam=-1)
+
+
+@slow
+def test_er_window_width_is_n_to_the_minus_one_third():
+    """At fixed lambda = +-1 the scaled size E|C1|/N^(2/3) agrees between N = 4000 and 256000 (band plus
+    the stated systematic); a fixed offset c = 1 +- 0.05 and a planted N^(-1/4) window drift."""
+    from replicant.percolation import window as W
+    Ns, seeds = [4000, 256000], range(60)
+    up, down = W.window_scaling(Ns, seeds, lam=1), W.window_scaling(Ns, seeds, lam=-1)
+    assert up["scaled_agreement"]["agrees"] and down["scaled_agreement"]["agrees"], (up, down)
     assert up["rows"][-1]["scaled_mean"] > down["rows"][-1]["scaled_mean"]
+    for delta in (0.05, -0.05):
+        fixed = W.window_scaling(Ns, seeds, offset=delta)
+        print("fixed offset", delta, fixed["scaled_agreement"])
+        assert fixed["scaled_agreement"]["drifts"], fixed["scaled_agreement"]
+    saved = W._HOOKS["window_exponent"]
+    W._HOOKS["window_exponent"] = -5 / 4
+    try:
+        wide = W.window_scaling(Ns, seeds, lam=1)
+    finally:
+        W._HOOKS["window_exponent"] = saved
+        assert W._HOOKS["window_exponent"] is saved
+    assert wide["scaled_agreement"]["drifts"], wide["scaled_agreement"]

@@ -5,7 +5,7 @@ of exactly s vertices) by two algorithms on the generating functions, both in ar
       series H1 <- 1 - t + t x G1(H1) n + 1 times from H1 = 1, then H0 = x G0(H1) and P_s = [x^s] H0.
       (NSW's text says "s + 1 iterations of Eq. (27), starting with H1 = 1"; the equation iterated must
       be (26), the H1 equation, as CNSW's "iterating Eq. (5) n + 1 times" has it: an apparent slip in
-      NSW.)  Each iteration fixes one more coefficient (n iterations suffice for P_n).
+      NSW, checked on the rendered page 6 of the arXiv v2 PDF, not only on extracted text.)  Each iteration fixes one more coefficient (n iterations suffice for P_n).
   Lagrange inversion (derived here): with a = 1 - t and v = H1 - a, v = x t G1(a + v), and
       P_1 = G0(a),   P_s = (1/(s - 1)) [v^(s-2)] G0'(a + v) (t G1(a + v))^(s-1)   (s >= 2).
 Both read the law's G0 / G1 (percolation/laws.py), so a wrong G0 or G1 moves both: the independent

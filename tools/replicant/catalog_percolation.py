@@ -46,6 +46,14 @@ CAVEAT = ("cavity route, certified: the generating-function (cavity) equations o
           "cluster-size algorithm must overlap; the equations are exact for the locally tree-like N -> oo "
           "limit (physics-level for the random graphs: NSW, CNSW); finite graphs: the sample route")
 DERIVED = "derived here (percolation/cavity.py docstring)"
+AD = ("Abraham & Delmas, 'An introduction to Bienayme-Galton-Watson trees and their local limits', "
+      "arXiv:1506.05571v3 (PDF read), Corollary 2.5 and Lemma 2.6 (extinction a.s. for mean m <= 1 unless "
+      "p(1) = 1; P(extinction) = q, the smallest root of g(r) = r in [0, 1])")
+GW = ("the cluster of an occupied root of the Bethe lattice, below the root, is a BGW tree with "
+      "Bin(k - 1, p) offspring (m = (k - 1) p), and u = 1 - p + p q solves u = 1 - p + p u^(k-1) with q "
+      "its extinction probability (" + DERIVED.split(" (")[0] + ")")
+JL = ("Janson & Luczak, arXiv:0707.1786v1 (PDF read; Random Struct. Alg. 34, 197 (2009), journal "
+      "reference as given by the P1 review, not checked), Theorem 2.3 and Remark 2.7")
 
 
 def _p(p, default):
@@ -177,21 +185,32 @@ def _clusters(law_of):
     return go
 
 
-def _stable(cite):
+def _stable(cite, graph):
+    tail = ("; final as the tree-like N -> oo fixed point; its identification with the giant of a finite "
+            "graph is NSW/CNSW physics-level, a theorem for undiluted laws with p_1 > 0 and a finite second "
+            "moment (" + JL + ")") if graph else ""
     return lambda v: Stability("stable" if v.get("selected_stable") else "unstable", "cavity", cite,
-                               "the selected (smallest) fixed point: computed f'(u) = t G1'(u) < 1, "
-                               "certified ball" if v.get("selected_stable") else "unstable selection")
+                               ("the selected (smallest) fixed point: computed f'(u) = t G1'(u) < 1, "
+                                "certified ball" + tail) if v.get("selected_stable") else "unstable selection")
+
+
+def _bethe_theorem(cite):
+    return lambda v: (Stability("exact-by-literature", "cavity", f"{AD}; {cite}", f"{GW}; P_inf = 1 - "
+                                "G0(u) (bond; t times it for site), the root's k branches being independent; "
+                                "certified ball, computed f'(u) < 1") if v.get("selected_stable") else
+                      Stability("unstable", "cavity", cite, "unstable selection"))
 
 
 def _finality(cite, graph):
-    st = _stable(cite)
+    st = _stable(cite, graph)
     tc_note = ("1/G1'(1), an exact rational (radius 0); CNSW Eq. (12) (physics-level); t G1'(1) - 1 has "
                "the sign of the thinned law's Molloy-Reed Q = t (t <k(k-1)> - <k>) (" + DERIVED + ")")
     fin = {"branching_G1p1": Stability("exact-by-literature", "cavity", f"{NSW}: Eq. (9), G1 = G0'/z",
                                        "G1'(1) = <k(k-1)>/<k>, an exact rational"),
-           "p_c": Stability("not-computed", "cavity", f"{MS}, Eq. (3.2)" if not graph else CNSW,
-                            tc_note if graph else "1/(k - 1), exact rational; MS derive it by the "
-                            "branching argument (Fisher & Essam 1961 not fetched)"),
+           "p_c": (Stability("not-computed", "cavity", CNSW, tc_note) if graph else
+                   Stability("exact-by-literature", "cavity", f"{AD}; {MS}, Eq. (3.2)", "1/(k - 1), exact "
+                             f"rational: {GW}, so the cluster is infinite with positive probability iff "
+                             "m = (k - 1) p > 1")),
            "chi_amplitude": Stability("not-computed", "cavity", f"{MS}, Eq. (3.20)" if not graph else CNSW,
                                       "<k> p_c^2 = lim (p_c - p) <s>, exact rational, " + DERIVED),
            "p_inf_slope_at_p_c": Stability("not-computed", "cavity", CNSW if graph else f"{MS}, Eq. (3.15)",
@@ -204,6 +223,8 @@ def _finality(cite, graph):
            **{f"P_s{s}": Stability("not-computed", "cavity", f"{NSW}: Eqs. (26)-(28)", "certified "
                                    "coefficient of H0 (Lagrange inversion, " + DERIVED.split(" (")[0] +
                                    "; = NSW's series iteration); tree-like limit") for s in range(1, 61)}}
+    if not graph:
+        fin.update({k: _bethe_theorem(cite) for k in ("u", "P_inf", "P_inf_closed_form")})
     if graph:
         fin["molloy_reed_Q"] = Stability("exact-by-literature", "cavity", MR, "Q = sum k (k - 2) p_k, an "
                                          "exact rational; Theorem 1: Q > 0 a giant a.s., Q < 0 none (max "

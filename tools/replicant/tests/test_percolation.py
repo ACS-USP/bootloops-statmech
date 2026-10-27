@@ -70,7 +70,7 @@ def test_union_find_matches_breadth_first_search_and_keeps_its_invariants():
         merges = uf.add_edges(edges)
         assert sorted(uf.set_sizes()) == _bfs_components(n, edges)
         assert uf.n_sets == len(uf.set_sizes()) == n - merges
-        assert uf.largest == max(uf.set_sizes())
+        assert uf.largest == max(uf.set_sizes()) and uf.sum_sq == sum(x * x for x in uf.set_sizes())
         lab = uf.labels()
         assert all(uf.parent[x] == lab[x] for x in range(n))          # fully compressed
         assert all(uf.connected(a, b) for a, b in edges)
@@ -146,7 +146,10 @@ def test_extreme_parameters_are_certified():
     _refused(lambda: percolation_giant(("powerlaw", 4), ("bond", 1)), "unsupported:degree-law")
     _refused(lambda: percolation_giant(("bethe", 3), ("bond", "1.5")), "precondition:occupation")
     _refused(lambda: percolation_giant(("finite", "1:1/2,3:1/3"), ("bond", 1)), "precondition:degree-law")
-    _refused(lambda: percolation_giant(("bethe", 2), ("bond", 1)), "ambiguous:critical-point")  # chain
+    r = _refused(lambda: percolation_giant(("bethe", 2), ("bond", 1)), "ambiguous:critical-point")  # cycles
+    assert "every u in [0, 1]" in r.detail
+    r = _refused(lambda: percolation_giant(("bethe", 3), ("bond", F(1, 2))), "ambiguous:critical-point")
+    assert "double, marginal" in r.detail
 
 
 def test_closed_forms_agree_with_the_certified_roots():
@@ -296,8 +299,13 @@ def test_catalog_entries_are_certified_with_per_value_finality():
         assert res.rigor == "certified"
         phys = [k for k in res.values if k not in e.meta]
         assert phys and all(k in res.errors for k in phys)
-        assert res.finality["P_inf"].state == "stable" and res.finality["P_inf"].final
-        assert res.finality["P_s1"].state == "not-computed" and not res.finality["p_c"].final
+        fp, fc = res.finality["P_inf"], res.finality["p_c"]
+        assert fp.final and res.finality["P_s1"].state == "not-computed"
+        if name == "percolation_bethe":       # a BGW theorem (Abraham & Delmas Cor. 2.5, Lemma 2.6)
+            assert fp.state == fc.state == "exact-by-literature" and "1506.05571" in fp.cite
+            assert res.finality["mean_finite_cluster_size"].state == "stable"
+        else:                                 # the tree-like fixed point; Janson & Luczak for the graph
+            assert fp.state == "stable" and "0707.1786" in fp.note and not fc.final
     assert mp.mp.dps == before and ctx.prec == prec
     r = _refused(lambda: compose(cat["percolation_bethe"].spec, "cavity").run(p="1/2"), "ambiguous:critical-point")
     _refused(lambda: compose(cat["percolation_graph"].spec, "cavity").run(law="powerlaw", tau=2),

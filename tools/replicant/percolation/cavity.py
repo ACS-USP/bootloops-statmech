@@ -141,6 +141,11 @@ def _nontrivial(L, t, prec):
 
 def percolation_fixed_points(law, dilution):
     L, kind, t, lam = _t_lambda(law, dilution)
+    if lam == 1 and L.kind != "poisson" and max(L.excess()) <= 1:
+        raise Refusal("ambiguous:critical-point", f"t G1'(1) = 1 with a linear G1 (every degree is 0 or 2, "
+                      f"t = {t}): f(u) = u identically, so every u in [0, 1] is a fixed point; the graphs are "
+                      "unions of cycles (Janson & Luczak, arXiv:0707.1786, Remark 2.7: several "
+                      "behaviours are possible); not certified")
     if lam == 1:
         raise Refusal("ambiguous:critical-point", f"t G1'(1) = 1 exactly (t = {t}, G1'(1) = "
                       f"{L.branching()}): u = 1 is a double, marginal fixed point (f'(1) = 1); the giant "

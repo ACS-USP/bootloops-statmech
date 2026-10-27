@@ -18,12 +18,19 @@ vertex outside the largest cluster (sum s^2 / sum s over the other clusters), an
 its stderr and the 99% Student-t half-width (df = seeds - 1).  Statistical, never final, never
 certified; at finite N the giant fraction carries an O(1/N) bias and inside the critical window
 |t G1'(1) - 1| <~ N^(-1/3) the largest cluster is not a giant at all (window.py).
-Sampler self-checks (refusals; quantile 1 - 1e-4 two-sided, so a correct sampler trips them rarely):
-  no-solution:sampler-degree      the mean degree 2M/N over the seeds against the law's mean (Student-t
-                                  band; exact for "bethe"; the parity redraw allowance k_max/N for
-                                  "finite")
-  no-solution:sampler-occupation  the pooled fraction of kept edges (bond) or occupied sites (site)
-                                  against t (exact Clopper-Pearson interval)
+Exact invariants, checked on every instance (a correct sampler never violates them; a violation is
+refused no-solution:sampler-invariant): "bethe" 2M/N == k; the configuration model's stub count ==
+the degree sum == 2M; G(N, p): exactly the M edges drawn, all distinct, no self-loops.
+Statistical diagnostics (reported in SampleResult.checks with two-sided p-values, never refused in
+the run path, so a correct sampler is never refused): the mean degree 2M/N over the seeds against the
+law's mean (Student-t; for "finite" the parity redraw allowance k_max/N is subtracted first) and the
+pooled kept fraction of edges (bond) or sites (site) against t (exact binomial).
+diagnostic_refusals(result, alpha) turns them into refusals (no-solution:sampler-degree,
+no-solution:sampler-occupation) when a p-value is below alpha: used by the tests on fixed named seeds.
+Laws are validated here (no generating-function code shared): precondition:coordination (Bethe k an
+int in 2 .. 1000), :mean-degree (c rational > 0), :degree-law (finite laws "k:p,k:p" or {k: p} with
+int 0 <= k <= 1000, rational p_k >= 0 summing exactly to 1, mean degree > 0), :tau, :dilution,
+:occupation, :n, :named-seeds; unsupported:degree-law, :infinite-second-moment.
   sample_percolation(law, dilution, N, seeds, s_max=3) -> SampleResult
 _HOOKS["edge_prob_scale"] (1): a planted wrong edge probability of G(N, p); "occupation_scale" (1): a
 planted wrong occupation probability (tests).
@@ -39,7 +46,43 @@ from .unionfind import UnionFind
 
 _HOOKS = {"edge_prob_scale": 1.0, "occupation_scale": 1.0}
 N_MIN, N_MAX = 50, 2_000_000
-Q_CHECK = 1e-4
+MAX_DEGREE = 1000
+
+
+def _q(x, name):
+    """A finite rational from an int / Fraction / decimal or fraction string (precondition:<name>)."""
+    if isinstance(x, bool) or x is None:
+        raise Refusal(f"precondition:{name}", f"{name} = {x!r}: need a number")
+    try:
+        return Fraction(x.strip()) if isinstance(x, str) else Fraction(x)
+    except (ValueError, TypeError, ZeroDivisionError, OverflowError):
+        raise Refusal(f"precondition:{name}", f"{name} = {x!r}: need a finite rational number")
+
+
+def _finite(par):
+    if isinstance(par, str):
+        items = [it for it in par.replace(" ", "").split(",") if it]
+        pairs = [it.split(":") for it in items]
+        if not pairs or any(len(pr) != 2 for pr in pairs):
+            raise Refusal("precondition:degree-law", f"{par!r}: write the finite law as 'k:p,k:p'")
+    elif isinstance(par, dict) and par:
+        pairs = list(par.items())
+    else:
+        raise Refusal("precondition:degree-law", f"{par!r}: a finite law is a nonempty 'k:p,k:p' or {{k: p}}")
+    law = {}
+    for k, p in pairs:
+        if isinstance(k, bool) or not str(k).strip().isdigit() or not 0 <= int(k) <= MAX_DEGREE:
+            raise Refusal("precondition:degree-law", f"degree {k!r}: need an int in 0 .. {MAX_DEGREE}")
+        q = _q(p, "degree-law")
+        if q < 0:
+            raise Refusal("precondition:degree-law", f"p_{k} = {p!r} < 0")
+        law[int(k)] = law.get(int(k), Fraction(0)) + q
+    if sum(law.values()) != 1:
+        raise Refusal("precondition:degree-law", f"the p_k sum to {sum(law.values())}, not 1 (exactly)")
+    if not sum(k * p for k, p in law.items()):
+        raise Refusal("precondition:degree-law", "mean degree 0: no edges")
+    items = sorted((k, p) for k, p in law.items() if p)
+    return np.array([k for k, _ in items]), np.array([float(p) for _, p in items])
 
 
 def _float_law(law):
@@ -47,26 +90,21 @@ def _float_law(law):
         raise Refusal("unsupported:degree-law", f"{law!r}: ('bethe', k), ('poisson', c), ('finite', ...)")
     kind, par = law
     if kind == "bethe":
-        if isinstance(par, bool) or not isinstance(par, int) or par < 2:
-            raise Refusal("precondition:coordination", f"k = {par!r}: need an int >= 2")
+        if isinstance(par, bool) or not isinstance(par, int) or not 2 <= par <= MAX_DEGREE:
+            raise Refusal("precondition:coordination", f"k = {par!r}: need an int in 2 .. {MAX_DEGREE}")
         return kind, np.array([par]), np.array([1.0])
     if kind == "poisson":
-        c = float(Fraction(par))
+        c = _q(par, "mean-degree")
         if not c > 0:
             raise Refusal("precondition:mean-degree", f"c = {par!r}: need c > 0")
-        return kind, c, None
+        return kind, float(c), None
     if kind == "finite":
-        if isinstance(par, str):
-            par = dict(item.split(":") for item in par.replace(" ", "").split(",") if item)
-        items = sorted((int(k), float(Fraction(p))) for k, p in dict(par).items())
-        ks, ps = np.array([k for k, _ in items]), np.array([p for _, p in items])
-        if np.any(ps < 0) or abs(ps.sum() - 1) > 1e-12 or ks.min() < 0:
-            raise Refusal("precondition:degree-law", f"{par!r}: need p_k >= 0 summing to 1, k >= 0")
+        ks, ps = _finite(par)
         return kind, ks, ps / ps.sum()
     if kind == "powerlaw":
-        raise Refusal("unsupported:infinite-second-moment" if float(Fraction(par)) <= 3 else
-                      "unsupported:degree-law", f"power law tau = {par}: not sampled (the cavity route "
-                      "refuses it too)")
+        tau = _q(par, "tau")
+        raise Refusal("unsupported:infinite-second-moment" if tau <= 3 else "unsupported:degree-law",
+                      f"power law tau = {par}: not sampled (the cavity route refuses it too)")
     raise Refusal("unsupported:degree-law", f"{law!r}")
 
 
@@ -84,13 +122,23 @@ def _er_edges(N, c, rng):
         keys = np.unique(np.concatenate([keys, lo.astype(np.int64) * N + hi]))
     if keys.size > M:
         keys = rng.choice(keys, size=M, replace=False)
-    return np.stack([keys // N, keys % N], 1)
+    edges = np.stack([keys // N, keys % N], 1)
+    if not (len(edges) == M and np.unique(keys).size == M and np.all(edges[:, 0] < edges[:, 1])):
+        raise Refusal("no-solution:sampler-invariant", f"G(N, p): {len(edges)} edges for M = {M} drawn, "
+                      "or a repeated pair / self-loop")
+    return edges
 
 
 def _config_edges(deg, rng):
     stubs = np.repeat(np.arange(deg.size), deg)
     rng.shuffle(stubs)
-    return stubs.reshape(-1, 2)
+    if stubs.size % 2:
+        raise Refusal("no-solution:sampler-invariant", f"odd stub count {stubs.size}")
+    edges = stubs.reshape(-1, 2)
+    if not (stubs.size == int(deg.sum()) == 2 * len(edges)):
+        raise Refusal("no-solution:sampler-invariant", f"stub count {stubs.size}, degree sum {deg.sum()}, "
+                      f"edges {len(edges)}")
+    return edges
 
 
 def _degrees(kind, ks, ps, N, rng):
@@ -106,18 +154,24 @@ def _degrees(kind, ks, ps, N, rng):
     return deg
 
 
+def _occupy(n, t, rng):
+    """The keep step: n independent Bernoulli(t) draws (bond: edges; site: vertices)."""
+    return rng.random(n) < t * _HOOKS["occupation_scale"]
+
+
 def _instance(model, dilution, N, s_max, seed):
     kind, ks, ps = model
     rng = np.random.default_rng(seed)
     edges = _er_edges(N, ks, rng) if kind == "poisson" else _config_edges(_degrees(kind, ks, ps, N, rng), rng)
+    if kind == "bethe" and 2 * len(edges) != N * int(ks[0]):
+        raise Refusal("no-solution:sampler-invariant", f"2M/N = {2 * len(edges) / N} != k = {ks[0]}")
     dkind, t = dilution
-    t = t * _HOOKS["occupation_scale"]
     if dkind == "bond":
-        keep = rng.random(len(edges)) < t
+        keep = _occupy(len(edges), t, rng)
         kept, occ = edges[keep], np.ones(N, dtype=bool)
         trials, hits = len(edges), int(keep.sum())
     else:
-        occ = rng.random(N) < t
+        occ = _occupy(N, t, rng)
         kept = edges[occ[edges[:, 0]] & occ[edges[:, 1]]] if len(edges) else edges
         trials, hits = N, int(occ.sum())
     uf = UnionFind(N)
@@ -146,7 +200,7 @@ class SampleResult:
     mean: dict          # key -> mean over seeds
     stderr: dict        # key -> stderr of the mean
     halfwidth99: dict   # key -> 99% Student-t half-width
-    checks: dict        # the sampler self-checks, as reported
+    checks: dict        # the statistical sampler diagnostics, with their p-values (never refused here)
 
 
 def _t(q, df):
@@ -173,19 +227,41 @@ def _law_mean(model, N):
     return float((ks * ps).sum()), float(ks.max()) / N
 
 
+def _binom_p(hits, trials, t):
+    """Two-sided exact binomial p-value: 2 min(P(X <= hits), P(X >= hits)), capped at 1."""
+    from scipy.stats import binom
+    return float(min(1.0, 2 * min(binom.cdf(hits, trials, t), binom.sf(hits - 1, trials, t))))
+
+
+def _t_p(z, df):
+    from scipy.special import stdtr
+    return float(2 * stdtr(df, -abs(z)))
+
+
+def diagnostic_refusals(result, alpha):
+    """Refuse when a diagnostic p-value is below alpha (tests on fixed named seeds only)."""
+    d = result.checks.get("mean_degree", {})
+    if d.get("p_value", 1) < alpha:
+        raise Refusal("no-solution:sampler-degree", f"mean degree {d['sampled']:.6g} vs the law's "
+                      f"{d['law']:.6g}: p = {d['p_value']:.3g} < {alpha}")
+    o = result.checks.get("occupation", {})
+    if o.get("p_value", 1) < alpha:
+        raise Refusal("no-solution:sampler-occupation", f"kept fraction {o['fraction']:.6g} vs t = "
+                      f"{o['t']}: p = {o['p_value']:.3g} < {alpha}")
+
+
 def sample_percolation(law, dilution, N, seeds, s_max=3):
-    from ..csp.xorsat_finite import clopper_pearson
     model = _float_law(law)
     if not (isinstance(dilution, tuple) and len(dilution) == 2 and dilution[0] in ("bond", "site")):
         raise Refusal("precondition:dilution", f"{dilution!r}: need ('bond' | 'site', t)")
-    t = float(Fraction(dilution[1]))
+    t = float(_q(dilution[1], "occupation"))
     if not 0 <= t <= 1:
         raise Refusal("precondition:occupation", f"t = {dilution[1]!r}: need 0 <= t <= 1")
     if isinstance(N, bool) or not isinstance(N, (int, np.integer)) or not N_MIN <= N <= N_MAX:
         raise Refusal("precondition:n", f"N = {N!r}: need an int in {N_MIN} .. {N_MAX}")
     seeds = _seeds(seeds)
     runs = [_instance(model, (dilution[0], t), int(N), s_max, s) for s in seeds]
-    n, tq = len(runs), _t(0.995, len(runs) - 1)
+    n = len(runs)
     mean, se, hw = {}, {}, {}
     for key in runs[0]:
         if key in ("trials", "hits"):
@@ -195,21 +271,19 @@ def sample_percolation(law, dilution, N, seeds, s_max=3):
         if xs.size < 2:
             continue
         mean[key], se[key] = float(xs.mean()), float(xs.std(ddof=1) / math.sqrt(xs.size))
-        hw[key] = tq * se[key]
+        hw[key] = _t(0.995, xs.size - 1) * se[key]          # df of the seeds actually averaged
     want, allow = _law_mean(model, N)
-    band = _t(1 - Q_CHECK / 2, n - 1) * se["mean_degree"] + allow
-    checks = {"mean_degree": {"sampled": mean["mean_degree"], "law": want, "band": band}}
-    if abs(mean["mean_degree"] - want) > band + 1e-12 * want:
-        raise Refusal("no-solution:sampler-degree", f"mean degree {mean['mean_degree']:.6g} over {n} "
-                      f"seeds vs the law's {want:.6g}: outside the band {band:.3g}")
+    excess = max(0.0, abs(mean["mean_degree"] - want) - allow)
+    pdeg = 1.0 if excess <= 1e-12 * want else (_t_p(excess / se["mean_degree"], n - 1)
+                                               if se["mean_degree"] > 0 else 0.0)
+    checks = {"mean_degree": {"sampled": mean["mean_degree"], "law": want, "allowance": allow,
+                              "p_value": pdeg, "kind": "diagnostic (Student-t), not a refusal"}}
     trials, hits = sum(r["trials"] for r in runs), sum(r["hits"] for r in runs)
     if trials:
-        lo, hi = clopper_pearson(hits, trials, conf=1 - Q_CHECK)
-        checks["occupation"] = {"fraction": hits / trials, "t": t, "interval": (lo, hi)}
-        if not lo <= t <= hi:
-            raise Refusal("no-solution:sampler-occupation", f"kept fraction {hits}/{trials} vs t = {t}: "
-                          f"outside the exact interval [{lo:.5g}, {hi:.5g}]")
+        checks["occupation"] = {"fraction": hits / trials, "t": t, "trials": trials,
+                                "p_value": _binom_p(hits, trials, t),
+                                "kind": "diagnostic (exact binomial), not a refusal"}
     return SampleResult(int(N), seeds, mean, se, hw, checks)
 
 
-__all__ = ["SampleResult", "sample_percolation"]
+__all__ = ["SampleResult", "diagnostic_refusals", "sample_percolation"]

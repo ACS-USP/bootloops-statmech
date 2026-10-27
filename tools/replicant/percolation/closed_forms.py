@@ -8,8 +8,8 @@ Lecture Notes in Physics 1029 (2024), Ch. 3 (MS)):
       occupation Q; the same equation for bond, CNSW Eq. (5) with G1 = u^2);
   u for k = 4: t u^3 - u + 1 - t = (u - 1)(t u^2 + t u - (1 - t)), u = (sqrt(t^2 + 4 t (1 - t)) - t)/(2t)
       (derived here);
-  mean cluster size below t_c: (1 + t)/(1 - (k - 1) t) (MS Eq. (3.20); its middle form prints
-      "1 - p p_c" for 1 - p/p_c, a slip recorded in the bank cite);
+  mean cluster size below t_c: (1 + t)/(1 - (k - 1) t) (MS Eq. (3.20), whose three forms
+      (1 + p)/(1 - (Z - 1)p) = (1 + p)/(1 - p/p_c) = p_c (1 + p)/(p_c - p) are consistent);
   P_s = s g_s t^(s-1) (1 - t)^((k-2)s + 2) for an occupied vertex (MS Eq. (3.27): n(s, p) =
       g_s p^s (1 - p)^((Z-2)s+2), and P_s = s n_s / p), with the animal count
       g_s = k ((k - 1) s)! / (s! ((k - 2) s + 2)!)   (derived here by Lagrange inversion; MS leave g_s

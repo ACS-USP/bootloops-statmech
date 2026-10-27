@@ -13,6 +13,8 @@ Interface (elements are the integers 0 .. n - 1):
   uf.n_sets                 the current number of sets
   uf.largest                the size of the largest set (kept up to date by union: O(1), the
                             observable Newman-Ziff reads after every added bond)
+  uf.sum_sq                 sum over sets of size^2 (kept up to date by union: +2ab when sets of sizes
+                            a and b merge), for the mean cluster size sum s^2 / n
   uf.add_edges(edges)       union over an iterable of (x, y) pairs (any int pairs, e.g. an (m, 2)
                             numpy array); returns the number of merges that joined two sets
   uf.labels() -> list       the root of every element (each path compressed)
@@ -26,7 +28,7 @@ from ..core import Refusal
 
 
 class UnionFind:
-    __slots__ = ("n", "parent", "_size", "n_sets", "largest")
+    __slots__ = ("n", "parent", "_size", "n_sets", "largest", "sum_sq")
 
     def __init__(self, n):
         if isinstance(n, bool) or not isinstance(n, int) or n < 0:
@@ -39,6 +41,7 @@ class UnionFind:
         self._size = [1] * self.n
         self.n_sets = self.n
         self.largest = 1 if self.n else 0
+        self.sum_sq = self.n
 
     def _check(self, x):
         if not 0 <= x < self.n:
@@ -63,6 +66,7 @@ class UnionFind:
         if size[rx] < size[ry]:
             rx, ry = ry, rx
         self.parent[ry] = rx
+        self.sum_sq += 2 * size[rx] * size[ry]
         size[rx] += size[ry]
         self.n_sets -= 1
         if size[rx] > self.largest:

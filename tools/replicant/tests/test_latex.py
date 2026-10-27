@@ -36,7 +36,8 @@ CHEAP = {("sk", "cavity"): {"beta": "1.5", "h": "0.3"},
          ("spiked_wigner", "amp"): {"snr": "2"}, ("sbm", "cavity"): {"c": 3},
          ("ridge", "replica"): {"gamma": "2", "lam": "0.1"},
          ("sk_bounds", "bound"): {"beta": 2, "digits": 8},
-         ("online_perceptron", "online"): {"rule": "hebb", "alpha": "2"}}
+         ("online_perceptron", "online"): {"rule": "hebb", "alpha": "2"},
+         ("percolation_bethe", "sample"): {"N": 500}, ("percolation_graph", "sample"): {"N": 500}}
 PM_ONE_SK = ModelSpec("sk", "ising", "pm_one", params={"beta": "0.5"})
 
 
