@@ -836,15 +836,21 @@ final (`beta_c` is exact-by-literature). SW and Wolff stay valid on frustrated o
 (bonds open only on satisfied edges) but lose their efficiency (clusters percolate where spins do not order; this package's statement, unsourced); this entry
 takes the uniform ferromagnet only. Checks (tests/test_mc_cluster.py, default; test_mc_cluster_slow.py,
 slow): stationarity chi^2 (alpha = 0.01, named seeds) of every sampler from exact Boltzmann draws on L <= 4
-(`montecarlo/balance.py`; ergodicity from a fixed start in the slow tier); the enumerated energy histogram
+(`montecarlo/balance.py`; measured power against a +-5% bond-probability error >= 0.95: SW L = 3 with 5000
+samples, Wolff L = 2 with 3000, named seeds 100-139, and the +-5% plant is a default test that must fail);
+ergodicity from a fixed start (default on 2 x 2 with planted non-ergodic updates that must fail: SW that never
+recolours, Wolff at p = 1; the checkerboard Metropolis is genuinely non-ergodic on 2 x 2 and refused below L = 4;
+L = 4 in the slow tier); the enumerated energy histogram
 equals Kaufman's integer polynomial; the FK machinery at q = 1 (`sw_sweep` on P2's open square lattice)
 reproduces P2's exact crossing polynomial (`montecarlo/fk_percolation.py`, ruling A-R7) and samples R(1/2)
 = 43/64 on 3 x 3 within a binomial band; slow: <e>, C at L = 8, 16, 32 against Kaufman in the t-band (+ the
 stated chain-variance bias 2 tau/n of C), <|m|>, <m^2> printed; tau_int against L at beta_c, z per seed in
 a t-band (`stats.power_fit`) printed next to the banked literature (`reference/cluster_mc.json`:
-Nightingale & Blote z = 2.1665(12), LPS 2.1767(5) for Metropolis; LPS z_SW 0.297(3), z_W 0.30(2); Salas &
-Sokal q = 3 SW z_int,E 0.515(6)); asserted only that Metropolis's band excludes the cluster algorithms' and
-holds a literature value; SW's band cannot separate z from a logarithm at L <= 64 (Du, Zheng & Wang,
+Nightingale & Blote z = 2.1665(12) (heat-bath), LPS 2.1767(5) for Metropolis, the identification of the heat-bath
+and Metropolis z ASSUMED (universality of local dynamics, not proved by a fetched source); LPS z_SW 0.297(3), z_W 0.30(2); Salas &
+Sokal q = 3 SW z_int,E 0.515(6)); only runs labelled equilibrated enter a fit; asserted only that every Metropolis size is equilibrated and its
+band excludes the cluster algorithms' and holds a literature value (under that assumption); LPS's SW and Wolff
+values are quench-scaling estimates, not tau_int; SW's band cannot separate z from a logarithm at L <= 64 (Du, Zheng & Wang,
 arXiv:cond-mat/0603038, report a logarithm), so it is printed. Examples: `run cluster_mc --route sample` (SW, Ising, 8 x 8,
 beta_c, 8 seeds x 1000 sweeps); `run cluster_mc --route sample --param algorithm=wolff --param q=3 --param L=3` (with the
 enumeration targets); `run cluster_mc --route sample --param algorithm=metropolis --param L=4 --param beta=2/5`.
@@ -858,8 +864,8 @@ window, n, reliable, text)` (Salas & Sokal Eq. (4.11): the smallest M >= c tau_h
 text)`; `power_fit(Ls, taus)` -> `PowerFit(z, slope_difference, log_difference, separable_from_zero,
 separable_from_log, text)`. Runs: `montecarlo.run.simulate(algorithm, q, L, beta, sweeps, burn_in, seeds)`
 -> `MCRun` (mean, stderr, bands, tau, tau_stderr, equilibration, status, per_seed). Planted hooks:
-`fk._HOOKS["coupling_factor"]` (bond probability), `cluster._HOOKS["flip" | "growth"]` (SW colour per site;
-Wolff growth across colours), `metropolis._HOOKS["acceptance_scale"]`.
+`fk._HOOKS["coupling_factor" | "p_scale"]` (bond probability: K scaled, p scaled), `cluster._HOOKS["flip" |
+"growth"]` (SW colour per site, or no recolouring; Wolff growth across colours), `metropolis._HOOKS["acceptance_scale"]`.
 `from replicant.bounds import ...` (E10; needs python-flint and `tools/baller`; SK conventions of
 families/sk.py, P = -beta f; parameters are taken as the exact rationals they denote, an mpf or float its
 exact binary value): `guerra_rs_bound(beta, h, q, digits=40)` -> `Ball`; `guerra_rs_best_bound(beta, h=0,
@@ -966,7 +972,7 @@ default 16), `Ls` (FSS sizes, >= 3 increasing ints in 4 .. 2048); `percolation_k
 `percolation_bootstrap` (cavity): `d` (3 .. 1000, default 4), `ell` (1 .. d - 1, default 2), `q` (default
 1/20); both (sample): the same plus `N` (default 2000), `seeds` (default 0-7); `cluster_mc` (sample):
 `algorithm` (swendsen_wang | wolff | metropolis, default swendsen_wang), `q` (2 .. 64, default 2), `L` (2 ..
-256, default 8; metropolis: even, q = 2), `beta` ("beta_c", default, or a rational > 0), `seeds` (default
+256, default 8; metropolis: even L >= 4, q = 2; the checkerboard sweep is not ergodic on 2 x 2), `beta` ("beta_c", default, or a rational > 0), `seeds` (default
 0-7), `sweeps` (8 .. 10^6, default 1000), `burn_in` (0 .. 10^6, default 200);
 `sk_bounds` (bound): `beta` (rational > 0, default 2), `h` (default 0), `K` (1 or 2, default 1), `digits`
 (an int 1 .. 200: certified digits of the K-step balls, default 20, else `precondition:digits`; the RS values

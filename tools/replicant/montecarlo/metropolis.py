@@ -7,7 +7,9 @@ current sublattice is proposed for a flip with dE = 2 s h (h the sum of its four
 lie on the other sublattice, so the simultaneous proposals are independent) and accepted with
 probability min(1, exp(-beta dE)).  Each sublattice update leaves the Boltzmann measure invariant, so
 the sweep does (the argument of pt.py's sequential sweep); L must be even (an odd torus breaks the
-checkerboard: precondition:checkerboard).  Nightingale & Blote's z (arXiv:cond-mat/9601059) is for
+checkerboard: precondition:checkerboard).  On the 2 x 2 multigraph torus the sweep is stationary but NOT ergodic
+(from all-up a B-site has h = 0, dE = 0 is always accepted and the two B-sites flip together, so the striped states
+are unreachable: the ergodicity chi^2 shows it); run.check_params therefore refuses metropolis below L = 4.  Nightingale & Blote's z (arXiv:cond-mat/9601059) is for
 random-site heat-bath dynamics; the dynamic exponent is taken as universal across these local
 single-spin dynamics (their 1998 follow-up, not fetched), a physics-level assumption stated here.
 

@@ -14,7 +14,7 @@
       (a drift, or any unreliable tau_int)
 Algorithms: "swendsen_wang" (cluster.py; cluster_fast.py for L >= 16), "wolff" (cluster.py),
 "metropolis" (metropolis.py; q = 2, even L).  Specific heat per seed: beta^2 N Var(e) of the chain
-(the chain's own variance; its bias O(tau / n) is below the seed spread at the default lengths).
+(the chain's own variance, biased low by about 2 tau_int(e) / n; the entry prints that bias in its notes).
 Starting state: iid uniform colours (numpy default_rng(seed)), then burn_in sweeps discarded.
 """
 from dataclasses import dataclass, field
@@ -149,9 +149,9 @@ def check_params(algorithm, q, L, sweeps, burn_in, seeds):
         raise Refusal("precondition:algorithm", f"algorithm = {algorithm!r}: one of {', '.join(ALGORITHMS)}")
     check_q(q)
     L = _int("size", L, 2, L_MAX)
-    if algorithm == "metropolis" and (q != 2 or L % 2):
-        raise Refusal("precondition:algorithm", f"metropolis is the Ising (q = 2) checkerboard sweep: even L, "
-                      f"got q = {q}, L = {L}")
+    if algorithm == "metropolis" and (q != 2 or L % 2 or L < 4):
+        raise Refusal("precondition:algorithm", f"metropolis is the Ising (q = 2) checkerboard sweep: even L >= 4 "
+                      f"(on the 2 x 2 torus it is not ergodic: tests/test_mc_cluster.py), got q = {q}, L = {L}")
     return (algorithm, q, L, _int("sweeps", sweeps, 8, 10 ** 6), _int("burn-in", burn_in, 0, 10 ** 6),
             check_seeds(seeds))
 

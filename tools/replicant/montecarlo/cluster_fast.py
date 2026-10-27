@@ -33,7 +33,8 @@ def sw_sweep_fast(s, q, p, u, v, rng):
     n, lab = connected_components(g, directed=False)
     lab = canonical_labels(lab)
     colours = rng.integers(q, size=N)
-    s[:] = colours if _HOOKS["flip"] == "site" else colours[lab]
+    if _HOOKS["flip"] != "none":
+        s[:] = colours if _HOOKS["flip"] == "site" else colours[lab]
     sizes = np.bincount(lab, minlength=n)
     return int(eq.sum()), int(n), int((sizes.astype(np.int64) ** 2).sum()), lab
 

@@ -14,6 +14,10 @@ energy histogram, Kaufman's integer polynomial at q = 2: exact_small.kaufman_his
       updates each, the final classes against the exact probabilities: a check that pi P^steps from a
       fixed start is pi (it fails for a non-ergodic or non-stationary rule; `steps` must exceed the
       mixing time, which the test states)
+Power (tests/test_mc_cluster.py, measured on named seeds 100-139 at beta_c, alpha = 0.01): a +-5% bond-probability
+error is rejected 39/40 and 38/40 by SW (L = 3, 5000 samples) and 38/40, 40/40 by Wolff (L = 2, 3000 samples); 0/40
+false rejections.  stationarity_chi2 passes any update that leaves the state unchanged; ergodicity_chi2 is the check
+that fails it (planted: SW without recolouring, Wolff at p = 1; unplanted: Metropolis on the 2 x 2 torus).
 """
 import numpy as np
 
@@ -25,8 +29,9 @@ from .fk import beta_value, bond_probability
 from .stats import chi2_gof
 
 
-def _index(s, q):
-    return int(sum(int(c) * q ** k for k, c in enumerate(s)))
+def _indices(finals, q):
+    a = np.asarray(finals, np.int64)
+    return a @ (q ** np.arange(a.shape[1], dtype=np.int64))
 
 
 def _updates(algorithm, q, L, beta, starts, steps, rng_of):
@@ -45,8 +50,8 @@ def _updates(algorithm, q, L, beta, starts, steps, rng_of):
     nb = neighbours(L)
     uf = UnionFind(N)
     res = []
-    for c, st in enumerate(starts):
-        s = [int(x) for x in st]
+    for c, st in enumerate(np.asarray(starts).tolist()):
+        s = st
         rng = rng_of(c)
         for _ in range(steps):
             if algorithm == "swendsen_wang":
@@ -60,7 +65,7 @@ def _updates(algorithm, q, L, beta, starts, steps, rng_of):
 
 
 def _chi2(en, ex, finals, q, alpha):
-    cls = [en.cls[_index(s, q)] for s in finals]
+    cls = en.cls[_indices(finals, q)]
     return chi2_gof(np.bincount(cls, minlength=en.n_cls), ex.class_probs, alpha)
 
 

@@ -1,7 +1,8 @@
 """M1, default tier: cluster algorithms (montecarlo/).  The exact critical points by two routes; the exact small-torus
 distributions against Kaufman's integer polynomial and torus_thermo; detailed balance (stationarity) of
 Swendsen-Wang, Wolff and Metropolis by chi^2 against exact Boltzmann weights on named seeds (alpha = 0.01), with a
-planted wrong bond probability, a wrong Wolff growth rule, a wrong cluster flip and a wrong Metropolis acceptance,
+planted +-5% bond probability (measured power >= 0.95), a wrong Wolff growth rule, a wrong cluster flip, a wrong
+Metropolis acceptance and non-ergodic updates for the ergodicity chi^2,
 each restored with an identity assert; the Wolff cluster against the shared union-find; the vectorised SW against
 the union-find SW trajectory-for-trajectory; the FK machinery at q = 1 against P2's exact crossing polynomial; the
 catalog entry's labels and refusals.  Larger tori, tau_int and z fits: tests/test_mc_cluster_slow.py."""
@@ -30,6 +31,7 @@ from replicant.percolation.unionfind import UnionFind
 
 ALPHA = 0.01
 SEED = 7                          # the named seed of every default-tier chi^2
+SW_N, WOLFF_N = 5000, 3000         # samples of the cases whose +-5% power is measured
 
 
 def _refused(fn, reason):
@@ -93,22 +95,49 @@ def test_enumeration_matches_kaufman_and_torus_thermo():
 
 # ---- detailed balance by chi^2 -------------------------------------------------------------------------
 def test_stationarity_chi2_of_every_sampler():
-    """One update applied to independent exact Boltzmann draws must leave the class distribution exact."""
-    cases = [("swendsen_wang", 2, 3, "beta_c"), ("wolff", 2, 3, "beta_c"), ("swendsen_wang", 3, 2, "beta_c"),
-             ("wolff", 3, 2, "beta_c"), ("metropolis", 2, 2, "beta_c"), ("swendsen_wang", 2, 3, "3/10")]
-    for alg, q, L, beta in cases:
-        r = BL.stationarity_chi2(alg, q, L, beta, 1000, SEED, ALPHA)
+    """One update applied to independent exact Boltzmann draws must leave the class distribution exact.  The first
+    two cases are the ones whose power is measured in test_a_five_percent_bond_probability_error_fails_the_chi2."""
+    cases = [("swendsen_wang", 2, 3, "beta_c", SW_N), ("wolff", 2, 2, "beta_c", WOLFF_N),
+             ("swendsen_wang", 3, 2, "beta_c", 1000), ("wolff", 3, 2, "beta_c", 1000), ("metropolis", 2, 2, "beta_c", 1000)]
+    for alg, q, L, beta, n in cases:
+        r = BL.stationarity_chi2(alg, q, L, beta, n, SEED, ALPHA)
         assert r.ok and r.alpha == ALPHA and r.df >= 3, (alg, q, L, beta, r.text)
+
+
+def test_a_five_percent_bond_probability_error_fails_the_chi2():
+    """Power, measured on named seeds 100-139 (alpha = 0.01, beta_c, q = 2): p x 1.05 / x 0.95 rejected 39/40 and
+    38/40 by SW (L = 3, 5000 samples) and 38/40, 40/40 by Wolff (L = 2, 3000 samples), the unplanted p 0/40 by
+    both; so the default chi^2 rejects a +-5% bond-probability error with power >= 0.95.  Here on seed 7."""
+    for scale in (1.05, 0.95):
+        for alg, L, n in (("swendsen_wang", 3, SW_N), ("wolff", 2, WOLFF_N)):
+            r = _planted(FK._HOOKS, "p_scale", scale, lambda: BL.stationarity_chi2(alg, 2, L, "beta_c", n, SEED, ALPHA))
+            assert not r.ok, (alg, scale, r.text)
 
 
 def test_planted_errors_fail_the_chi2():
     run = lambda alg, L=3: BL.stationarity_chi2(alg, 2, L, "3/10", 1000, SEED, ALPHA)
-    for alg in ("swendsen_wang", "wolff"):                       # p = 1 - e^{-beta}: the missing factor 2
-        assert not _planted(FK._HOOKS, "coupling_factor", 0.5, lambda: run(alg)).ok, alg
     assert not _planted(CL._HOOKS, "flip", "site", lambda: run("swendsen_wang")).ok      # colour per site
     assert not _planted(CL._HOOKS, "growth", "any", lambda: run("wolff")).ok             # grows across colours
     assert not _planted(MT._HOOKS, "acceptance_scale", 0.5, lambda: run("metropolis", 2)).ok
     assert run("wolff").ok                                       # the same seeds pass with the hooks restored
+
+
+def test_ergodicity_chi2_and_its_non_ergodic_updates():
+    """From the all-0 colouring, 150 chains x 10 updates on the 2 x 2 torus at beta_c must reach the exact law for SW
+    and Wolff.  Each of these must fail: SW that never recolours (planted: the identity update, stationary, so the
+    stationarity chi^2 passes it, but not ergodic); Wolff at p = 1 (planted: it alternates between the two ground
+    states); and, unplanted, the checkerboard Metropolis on the 2 x 2 multigraph torus, which is genuinely not ergodic
+    there (from all-up, a B-site sees h = 0 and the two B-sites flip together with probability 1, so the striped
+    states are never reached; found by this test, so run.check_params refuses metropolis below L = 4; L = 4 passes
+    the slow-tier ergodicity chi^2)."""
+    erg = lambda alg: BL.ergodicity_chi2(alg, 2, 2, "beta_c", 150, 10, SEED, ALPHA)
+    for alg in ("swendsen_wang", "wolff"):
+        assert erg(alg).ok, (alg, erg(alg).text)
+    assert not BL.ergodicity_chi2("metropolis", 2, 2, "beta_c", 1000, 10, SEED, ALPHA).ok   # vectorised: 1000 chains
+    assert not _planted(CL._HOOKS, "flip", "none", lambda: erg("swendsen_wang")).ok
+    assert _planted(CL._HOOKS, "flip", "none",
+                    lambda: BL.stationarity_chi2("swendsen_wang", 2, 2, "beta_c", 1000, SEED, ALPHA)).ok
+    assert not _planted(FK._HOOKS, "p_scale", 10, lambda: erg("wolff")).ok
 
 
 def test_wolff_cluster_is_the_unionfind_component():
@@ -196,6 +225,7 @@ def test_entry_labels_finality_and_refusals():
     for bad, reason in (({"algorithm": "heatbath"}, "precondition:algorithm"),
                         ({"algorithm": "metropolis", "q": 3}, "precondition:algorithm"),
                         ({"algorithm": "metropolis", "L": 3}, "precondition:algorithm"),
+                        ({"algorithm": "metropolis", "L": 2}, "precondition:algorithm"),
                         ({"L": 1}, "precondition:size"), ({"sweeps": 2}, "precondition:sweeps"),
                         ({"seeds": (1,)}, "precondition:named-seeds"), ({"q": 1}, "precondition:potts-q"),
                         ({"beta": "0"}, "precondition:beta"), ({"J": 2}, "precondition:known-parameter")):

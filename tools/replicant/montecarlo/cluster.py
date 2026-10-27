@@ -33,7 +33,8 @@ then (q >= 3) the new colour, then uniforms in blocks of 64 as bonds are tested.
       union-find component of the seed over the opened bonds, every tested bond is a torus bond between
       the old colour, every untested aligned bond leaving the cluster is absent, and the cluster now has
       one new colour; else no-solution:sampler-invariant
-_HOOKS (tests, planted errors): "flip" "cluster" | "site" (a new colour per site, not per cluster);
+_HOOKS (tests, planted errors): "flip" "cluster" | "site" (a new colour per site, not per cluster) | "none"
+(no recolouring: the identity update, which is stationary but not ergodic);
 "growth" "aligned" | "any" (Wolff adds neighbours of any colour); fk._HOOKS["coupling_factor"] (the
 bond probability).
 """
@@ -64,20 +65,24 @@ def sw_sweep(s, q, p, u, v, rng, uf):
     uf.reset()
     union = uf.union
     n_sat = 0
-    for k, a in enumerate(u):
-        b = v[k]
+    for a, b, x in zip(u, v, r):
         if s[a] == s[b]:
             n_sat += 1
-            if r[k] < p:
+            if x < p:
                 union(a, b)
     colours = rng.integers(q, size=N).tolist()
     find = uf.find
     canon = {}
-    per_site = _HOOKS["flip"] == "site"
-    for i in range(N):
-        c = canon.setdefault(find(i), len(canon))
-        s[i] = colours[i] if per_site else colours[c]
-    if sum(uf.set_sizes()) != N or uf.n_sets != len(canon):
+    roots = [find(i) for i in range(N)]
+    for rt in roots:
+        if rt not in canon:
+            canon[rt] = len(canon)
+    flip = _HOOKS["flip"]
+    if flip == "cluster":
+        s[:] = [colours[canon[rt]] for rt in roots]
+    elif flip == "site":
+        s[:] = colours
+    if uf.n_sets != len(canon) or sum(uf._size[rt] for rt in canon) != N:
         raise Refusal("no-solution:sampler-invariant", "SW: cluster sizes do not partition the N sites")
     return n_sat, len(canon), uf.sum_sq
 

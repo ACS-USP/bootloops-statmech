@@ -23,7 +23,7 @@ from .spec import ModelSpec
 SS = ("Salas & Sokal, arXiv:hep-lat/9605018v2 (1997) (PDF read), Sec. 2.1, Eqs. (2.1)-(2.5) "
       "(Swendsen-Wang, the Edwards-Sokal joint weight, p = 1 - e^{-beta}), Eqs. (4.11), (4.13) and p. 13 (tau_int, "
       "the self-consistent window c ~ 6)")
-LPS = ("Liu, Polkovnikov & Sandvik, arXiv:1310.6327v3 (2014) (PDF read), Secs. III B, C "
+LPS = ("Liu, Polkovnikov & Sandvik, arXiv:1310.6327v2 (2014) (PDF read), Secs. III B, C "
        "(SW: P = 1 - e^{-2J/T}, clusters flipped with probability 1/2; Wolff: the same bond rule from a random "
        "seed, flipped with probability one), Eq. (27), Table I")
 BDC = ("Beffara & Duminil-Copin, arXiv:1006.5073v2 (PDF read), "
@@ -55,10 +55,12 @@ def _coupling(p):
     bc, detail = FK.critical_beta(g["q"])
     with mp.workdps(40):
         b = FK.beta_value(g["q"], g["beta"])
-        return Out({"beta_c": +bc, "algorithm": g["algorithm"], "q": g["q"], "L": g["L"],
-                    "beta": mp.nstr(b, 20), "bond_probability": FK.bond_probability(g["q"], g["beta"])},
-                   f"{detail}; at beta = {mp.nstr(b, 12)}: p = {FK.bond_probability(g['q'], g['beta']):.10g}",
-                   errors={"beta_c": mp.mpf(10) ** -30})
+        vals = {"beta_c": +bc, "algorithm": g["algorithm"], "q": g["q"], "L": g["L"], "beta": mp.nstr(b, 20)}
+        note = f"{detail}; beta = {mp.nstr(b, 12)}"
+        if g["algorithm"] != "metropolis":          # the FK bond probability means nothing to a local update
+            vals["bond_probability"] = FK.bond_probability(g["q"], g["beta"])
+            note += f": FK bond probability p = {vals['bond_probability']:.10g}"
+        return Out(vals, note, errors={"beta_c": mp.mpf(10) ** -30})
 
 
 def _mc(p):
@@ -74,8 +76,11 @@ def _mc(p):
             "wolff_flips_per_sweep": r.flips if g["algorithm"] == "wolff" else None}
     note = (f"{len(r.seeds)} x {r.sweeps} {g['algorithm']} sweeps, q = {g['q']}, {g['L']} x {g['L']} torus: <e> = "
             f"{r.mean['e']:.5g} +- {r.stderr['e']:.2g}, tau_int(e) = {r.tau['e']:.3g}; {r.status}")
+    bias = 2 * r.tau["e"] / r.sweeps
     notes = (f"statistical: means over named seeds, stderr in errors; 99% Student-t half-widths: {hw}",
-             f"equilibration: {r.equilibration.text}")
+             f"equilibration: {r.equilibration.text}",
+             f"specific_heat_sampled is each chain's own variance, biased low by about 2 tau_int(e) / n = {bias:.2%} "
+             "(not in errors; <= 2% when mc_status is equilibrated, since then n >= 100 tau)")
     return Out({**vals, **meta}, note, errors=errs, statistical=tuple(vals), notes=notes)
 
 

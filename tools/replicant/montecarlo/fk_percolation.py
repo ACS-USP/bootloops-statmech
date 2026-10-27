@@ -14,6 +14,11 @@ from a planar embedding and label propagation: no shared code with sw_sweep or t
   p2_tie(W, H) -> (holds, detail): fk_crossing_counts == enumerate2d.crossing_counts("square", "bond",
       W, H) exactly (integers), with R(1/2) printed
 M = 2 W H - W - H <= 20 (else precondition:exact-size).
+What the exact tie can and cannot see: the scripted uniforms are 0 or 1, so the enumerated polynomial tests the
+open-bond rule (open iff r < p between equal colours), the union-find clusters and the crossing, but NOT the bond
+probability itself (any 0 < p < 1 gives the same polynomial).  A bond-probability error is seen by the sampled
+R(1/2) here (fk_crossing_sampled, a binomial band in tests/test_mc_cluster.py) and, at q >= 2, by the
+stationarity chi^2 of balance.py (which rejects a +-5% p error with measured power >= 0.95 at L = 3).
 """
 from fractions import Fraction
 

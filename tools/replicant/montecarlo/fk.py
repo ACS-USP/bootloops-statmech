@@ -2,7 +2,7 @@
 and the exact critical points of the square-lattice Potts models.
 
 Bond probability.  Ising (q = 2, H = -J sum s_i s_j, J = 1): p = 1 - e^{-2 beta J}, a bond between
-equal spins (Liu, Polkovnikov & Sandvik, arXiv:1310.6327v3 (2014), PDF read,
+equal spins (Liu, Polkovnikov & Sandvik, arXiv:1310.6327v2 (2014), PDF read,
 Sec. III B: "P = 1 - e^{-2J/T}"; the same bond rule for Wolff, Sec. III C).  q-state Potts
 (H = -beta sum (delta(c_i, c_j) - 1)): W = prod_b (1 - p + p delta_b) / Z with p = 1 - e^{-beta}, the
 Edwards-Sokal joint weight prod_b [(1 - p) delta(n_b, 0) + p delta_b delta(n_b, 1)] whose bond marginal is
@@ -22,7 +22,7 @@ at q = 2 in the Ising convention beta_c = (1/2) log(1 + sqrt 2) (lattice/couplin
       string) > 0, else precondition:beta
   bond_probability(q, beta) -> float p = 1 - exp(-K)
 _HOOKS["coupling_factor"] (tests): K = factor x beta x (2 at q = 2); planted 1/2 (p = 1 - e^{-beta} for
-Ising: the missing factor 2).
+Ising: the missing factor 2); _HOOKS["p_scale"]: p multiplied by it (planted 0.95, 1.05: a 5% error).
 """
 import math
 
@@ -31,7 +31,7 @@ import mpmath as mp
 from ..core import Refusal
 from ..lattice.ball import rational
 
-_HOOKS = {"coupling_factor": 1}
+_HOOKS = {"coupling_factor": 1, "p_scale": 1}
 
 
 def check_q(q):
@@ -67,7 +67,7 @@ def coupling_K(q, beta):
 
 
 def bond_probability(q, beta):
-    return -math.expm1(-coupling_K(q, beta_value(q, beta)))
+    return min(1.0, _HOOKS["p_scale"] * -math.expm1(-coupling_K(q, beta_value(q, beta))))
 
 
 __all__ = ["beta_value", "bond_probability", "check_q", "coupling_K", "critical_beta"]
