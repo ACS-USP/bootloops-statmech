@@ -38,7 +38,8 @@ CHEAP = {("sk", "cavity"): {"beta": "1.5", "h": "0.3"},
          ("sk_bounds", "bound"): {"beta": 2, "digits": 8},
          ("online_perceptron", "online"): {"rule": "hebb", "alpha": "2"},
          ("percolation_bethe", "sample"): {"N": 500}, ("percolation_graph", "sample"): {"N": 500},
-         ("percolation_lattice", "sample"): {"Lx": 6, "sweeps": 4}, ("percolation_kcore", "sample"): {"N": 500},
+         ("percolation_lattice", "sample"): {"Lx": 6, "sweeps": 4},
+         ("cluster_mc", "sample"): {"L": 3, "sweeps": 40, "burn_in": 8, "seeds": (0, 1)}, ("percolation_kcore", "sample"): {"N": 500},
          ("percolation_bootstrap", "sample"): {"N": 500}}
 PM_ONE_SK = ModelSpec("sk", "ising", "pm_one", params={"beta": "0.5"})
 

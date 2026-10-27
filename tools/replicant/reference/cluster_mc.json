@@ -1,0 +1,48 @@
+{
+  "potts_beta_c_q3": {
+    "value": "1.00505254",
+    "tol": "5e-9",
+    "cite": "critical inverse temperature of the 3-state Potts model on the square lattice (H = -sum delta): Beffara & Duminil-Copin, 'The self-dual point of the two-dimensional random-cluster model is critical for q >= 1', arXiv:1006.5073v2 (PDF read), Theorem 3: beta_c(q) = log(1 + sqrt q), q >= 2; the decimal value as printed by Salas & Sokal, arXiv:hep-lat/9605018v2 (1997) (PDF read), Eq. (3.1): beta_c = log(1 + sqrt 3) ~ 1.00505254. tol = half a unit of the printed 8th decimal",
+    "independent_route": "replicant's montecarlo/fk.critical_beta(3): log(1 + sqrt 3) and -log(1 - p_sd(3)) with p_sd = sqrt q / (1 + sqrt q) (BDC Theorem 1, the FK coupling p = 1 - e^{-beta} of Salas & Sokal Eq. (2.3)) at 40 digits, required to agree to 1e-30; the sympy block of latex_mc_cluster.py displays log(1 + sqrt q) and is checked against it"
+  },
+  "metropolis_z_2d_ising": {
+    "value": "2.1665",
+    "tol": "0.011",
+    "cite": "dynamic critical exponent of single-spin-flip dynamics of the 2D Ising model: Nightingale & Blote, 'Dynamic exponent of the two-dimensional Ising model and Monte Carlo computation of the subdominant eigenvalue of the stochastic matrix', arXiv:cond-mat/9601059 (1996) (PDF read), abstract and p. 4: z = 2.1665 (12) (random-site heat-bath dynamics, L <= 15, tau from the subdominant eigenvalue). tol 0.011 covers the spread to the disagreeing print (0.0102; Nightingale & Blote's own error is 0.0012). Disagreeing: Liu, Polkovnikov & Sandvik, arXiv:1310.6327v3 (2014) (PDF read), Table I: z_M = 2.1767(5) (Metropolis, Kibble-Zurek quench scaling)",
+    "independent_route": "replicant's checkerboard Metropolis (montecarlo/metropolis.py): tau_int of the energy and of m^2 at beta_c on L = 4 .. 16 tori over named seeds, z per seed by a log-log fit in a 99% Student-t band; small L carry corrections to scaling, so the comparison is printed with its band in tests/test_mc_cluster_slow.py (asserted only: the band excludes 0 and the cluster algorithms' z)",
+    "sources_disagree": [
+      {
+        "value": "2.1767",
+        "cite": "Liu, Polkovnikov & Sandvik 2014, arXiv:1310.6327v3, Table I (Metropolis 2D: 2.1767(5))"
+      }
+    ]
+  },
+  "sw_z_2d_ising": {
+    "value": "0.297",
+    "tol": "0.055",
+    "cite": "dynamic exponent of Swendsen-Wang dynamics of the 2D Ising model: Liu, Polkovnikov & Sandvik, arXiv:1310.6327v3 (2014) (PDF read), Sec. III B and Table I: z_SW = 0.297(3) (quench scaling; their Sec. I B: earlier values 0.2 ~ 0.35, and a logarithmic proposal). LPS's own error is 0.003; tol 0.055 covers the spread of the power-law prints 0.25 .. 0.35 quoted below (sources_disagree). Not a value but a different law, so not in sources_disagree: a logarithm (z = 0 x log): Du, Zheng & Wang, arXiv:cond-mat/0603038v1 (2006) (PDF read), abstract: the exponential relaxation time of SW 'fits well to a logarithmic size dependence up to L = 8192'; Salas & Sokal, arXiv:hep-lat/9605018v2 (PDF read), p. 3, review z_int,E = 0.35 +- 0.01 (their ref. [7], Swendsen & Wang 1987, not fetched) to 0.25 +- 0.01 (their refs. [9, 10], Baillie & Coddington, not fetched) or 0 x log (their ref. [8], not fetched): secondary quotations",
+    "independent_route": "replicant's Swendsen-Wang (montecarlo/cluster.py, cluster_fast.py): tau_int(e) at beta_c on L = 8 .. 64 over named seeds, z in a Student-t band and a log-versus-power curvature diagnostic (stats.power_fit); printed, not asserted, when the band cannot separate z from 0 or from a logarithm (tests/test_mc_cluster_slow.py)",
+    "sources_disagree": [
+      {
+        "value": "0.25",
+        "cite": "Baillie & Coddington as quoted by Salas & Sokal 1997, arXiv:hep-lat/9605018v2, p. 3 (0.25 +- 0.01; secondary)"
+      },
+      {
+        "value": "0.35",
+        "cite": "Swendsen & Wang 1987 as quoted by Salas & Sokal 1997, arXiv:hep-lat/9605018v2, p. 3 (0.35 +- 0.01; secondary)"
+      }
+    ]
+  },
+  "wolff_z_2d_ising": {
+    "value": "0.30",
+    "tol": "0.02",
+    "cite": "dynamic exponent of Wolff single-cluster dynamics of the 2D Ising model in sweep units: Liu, Polkovnikov & Sandvik, arXiv:1310.6327v3 (2014) (PDF read), Sec. III C and Table I: z_W = 0.30(2), shifted by their Eq. (27) z_W = z'_W - (d - gamma/nu) from the single-cluster time unit. tol = their quoted error",
+    "independent_route": "replicant's Wolff (montecarlo/cluster.py) with a sweep of round(N / <|C|>) cluster flips (the same unit change): tau_int(e) at beta_c on L = 8 .. 64 over named seeds, z in a Student-t band (tests/test_mc_cluster_slow.py; printed with its band)"
+  },
+  "potts3_sw_z_int_e": {
+    "value": "0.515",
+    "tol": "0.006",
+    "cite": "Salas & Sokal, 'Dynamic critical behavior of the Swendsen-Wang algorithm: the two-dimensional 3-state Potts model revisited', arXiv:hep-lat/9605018v2 (1997) (PDF read), Eq. (5.12): z_int,E = 0.515 +- 0.006 (fit L >= 128; with L <= 256 and L_min = 64, 0.531 +- 0.005; earlier 0.55 +- 0.03). tol = their quoted error",
+    "independent_route": "replicant's Swendsen-Wang at q = 3, beta_c = log(1 + sqrt 3): tau_int(e) on L = 8 .. 32 over named seeds, z in a Student-t band, printed (small L: strong corrections to scaling, their Sec. 5.2) in tests/test_mc_cluster_slow.py"
+  }
+}

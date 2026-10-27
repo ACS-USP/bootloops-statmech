@@ -296,6 +296,7 @@ _DOCUMENTED = {
     ("percolation_graph", "sample"): {"law", "c", "pk", "tau", "p", "dilution", "N", "seeds", "s_max"},
     ("percolation_lattice", "exact"): {"lattice", "dilution", "p", "Lx", "Ly", "aspect"},
     ("percolation_lattice", "sample"): {"lattice", "dilution", "p", "Lx", "Ly", "seeds", "sweeps", "Ls"},
+    ("cluster_mc", "sample"): {"algorithm", "q", "L", "beta", "seeds", "sweeps", "burn_in"},
     ("percolation_kcore", "cavity"): {"law", "c", "alpha", "pk", "d", "K", "k", "dilution", "p"},
     ("percolation_kcore", "sample"): {"law", "c", "alpha", "pk", "d", "K", "k", "dilution", "p", "N", "seeds"},
     ("percolation_bootstrap", "cavity"): {"d", "ell", "q"},

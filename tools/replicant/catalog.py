@@ -318,6 +318,13 @@ UNCLAIMED.update({("online_scm", k): f"integrated over a plateau or to K = 12 (s
     ("brw96_eq17_log_slope", "tests/test_online_scm_plateau.py test_brw96_eq17_half_log_slope_and_fig2_shift"),
     ("ss_trapping_eta_exponent", "tests/test_online_scm_plateau.py test_ss_fig1_plateau_and_trapping_time"))})
 
+UNCLAIMED.update({("cluster_mc", k): (
+    "a dynamic exponent from tau_int at beta_c against L (minutes of sampling, several sizes): fitted with its 99% "
+    "Student-t band and compared, printed, in tests/test_mc_cluster_slow.py test_critical_slowing_down_z_fits; "
+    "not a pipeline output") for k in ("metropolis_z_2d_ising", "sw_z_2d_ising", "wolff_z_2d_ising",
+                                       "potts3_sw_z_int_e")})
+
+
 def _freeze(p):
     return tuple(sorted((k, tuple(v) if isinstance(v, list) else v) for k, v in p.items()))
 
@@ -368,6 +375,7 @@ def catalog() -> dict:
         from .catalog_entries import dense_entries
         from .catalog_inference import inference_entries
         from .catalog_lattice import lattice_entries
+        from .catalog_mc import mc_entries
         from .catalog_learning import learning_entries
         from .catalog_online import online_entries
         from .catalog_percolation import percolation_entries
@@ -377,7 +385,8 @@ def catalog() -> dict:
         from .catalog_sparse import sparse_entries
         for e in (dense_entries() + sparse_entries() + csp_entries() + inference_entries()
                   + learning_entries() + series_entries() + lattice_entries() + bounds_entries()
-                  + online_entries() + percolation_entries() + [percolation_lattice()] + kcore_entries()):
+                  + online_entries() + percolation_entries() + [percolation_lattice()] + kcore_entries()
+                  + mc_entries()):
             _CATALOG[e.name] = e
     return dict(_CATALOG)
 

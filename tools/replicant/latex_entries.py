@@ -355,6 +355,7 @@ def derivation(name, route):
     """[TexBlock] for catalog entry `name` on `route` (a Refusal if none is written);
     built once per process (the blocks are immutable; callers must not mutate the list)."""
     from .core import Refusal
+    from .latex_mc import MODULES as _MC
     if name == "viana_bray":
         from .latex_cavity import viana_bray
         return viana_bray()
@@ -368,7 +369,7 @@ def derivation(name, route):
            "online_linear": "online_linear", "online_drift": "online_drift", "online_tcm": "online_tcm",
            "online_scm": "online_scm", "percolation_bethe": "percolation",
            "percolation_graph": "percolation", "percolation_lattice": "percolation_lattice",
-           "percolation_kcore": "percolation_kcore", "percolation_bootstrap": "percolation_kcore"}.get(name)
+           "percolation_kcore": "percolation_kcore", "percolation_bootstrap": "percolation_kcore", **_MC}.get(name)
     if mod is not None:
         from importlib import import_module
         return getattr(import_module(f".latex_{mod}", __package__), name)(route)
