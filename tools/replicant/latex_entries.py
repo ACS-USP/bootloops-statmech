@@ -367,7 +367,8 @@ def derivation(name, route):
            "lattice_geom", "ising_honeycomb": "lattice_geom", "sk_bounds": "bounds", "online_perceptron": "online",
            "online_linear": "online_linear", "online_drift": "online_drift", "online_tcm": "online_tcm",
            "online_scm": "online_scm", "percolation_bethe": "percolation",
-           "percolation_graph": "percolation", "percolation_lattice": "percolation_lattice"}.get(name)
+           "percolation_graph": "percolation", "percolation_lattice": "percolation_lattice",
+           "percolation_kcore": "percolation_kcore", "percolation_bootstrap": "percolation_kcore"}.get(name)
     if mod is not None:
         from importlib import import_module
         return getattr(import_module(f".latex_{mod}", __package__), name)(route)

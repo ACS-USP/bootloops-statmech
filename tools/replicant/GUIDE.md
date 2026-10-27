@@ -15,7 +15,7 @@ reader can follow to the paper, a per-value finality label, and a comparison wit
 values. Two levels: (a) a symbolic derivation (replicate, average the disorder, introduce order
 parameters, RS ansatz, n -> 0, stationarity, solve) that works for models you describe, and (b) the
 published pipelines of a catalog of 19 entries, each with a replica route and/or a cavity route (and an
-`amp` route for `sk` and `teacher_student`; the constraint-satisfaction entries `xorsat` and `ksat`, the code entry `ldpc_bec` and the block model `sbm` are cavity-only; the spiked Wigner model `spiked_wigner` is amp-only; the ridge-regression entry `ridge` is replica-only, its RS saddle point a cited closed form, not a level-(a) derivation; the 2D Ising entry `series_ising2d` has the route `series` only: an exact series and its holonomic operator, no replica or cavity step; the solvable lattice entries `ising2d`, `ising1d`, `ising2d_anisotropic`, `ising_triangular` and `ising_honeycomb` have the route `exact` and `bethe_ising` the route `cavity`, all certified in ball arithmetic, `rigor` "certified"; the bound entry `sk_bounds` has the route `bound` only: Guerra's rigorous upper bounds on the SK pressure, certified, and a consistency check of the package's own RS / 1RSB / K-RSB optimisers against them; the percolation entries `percolation_bethe` and `percolation_graph` have the routes `cavity` (certified generating-function fixed points) and `sample` (statistical, finite graphs and union-find), and `percolation_lattice` the routes `exact` (certified 2D thresholds, exponents, Cardy's formula, exact small lattices) and `sample` (statistical, Newman-Ziff sweeps and finite-size scaling); the online-learning entries `online_perceptron`, `online_linear` and `online_drift` have the route `online` only: the N -> oo order-parameter ODEs of online learning in alpha = examples / N, physics-level, checked against finite-N simulation). A composer
+`amp` route for `sk` and `teacher_student`; the constraint-satisfaction entries `xorsat` and `ksat`, the code entry `ldpc_bec` and the block model `sbm` are cavity-only; the spiked Wigner model `spiked_wigner` is amp-only; the ridge-regression entry `ridge` is replica-only, its RS saddle point a cited closed form, not a level-(a) derivation; the 2D Ising entry `series_ising2d` has the route `series` only: an exact series and its holonomic operator, no replica or cavity step; the solvable lattice entries `ising2d`, `ising1d`, `ising2d_anisotropic`, `ising_triangular` and `ising_honeycomb` have the route `exact` and `bethe_ising` the route `cavity`, all certified in ball arithmetic, `rigor` "certified"; the bound entry `sk_bounds` has the route `bound` only: Guerra's rigorous upper bounds on the SK pressure, certified, and a consistency check of the package's own RS / 1RSB / K-RSB optimisers against them; the percolation entries `percolation_bethe` and `percolation_graph` have the routes `cavity` (certified generating-function fixed points) and `sample` (statistical, finite graphs and union-find), and `percolation_lattice` the routes `exact` (certified 2D thresholds, exponents, Cardy's formula, exact small lattices) and `sample` (statistical, Newman-Ziff sweeps and finite-size scaling), and the k-core entries `percolation_kcore` and `percolation_bootstrap` the routes `cavity` (certified core fixed points and birth points) and `sample` (statistical, exact peeling and spreading); the online-learning entries `online_perceptron`, `online_linear` and `online_drift` have the route `online` only: the N -> oo order-parameter ODEs of online learning in alpha = examples / N, physics-level, checked against finite-N simulation). A composer
 matches a model description against the catalog, reuses what applies, adapts what it can through
 registered hooks, and says what it reused, adapted, or could not do. A LaTeX writer turns any run into a
 derivation document. Monte Carlo (parallel tempering) and exact enumeration (`numerics/`) check the
@@ -36,7 +36,7 @@ NOT-FOR:
   results say so (`rigor: "physics-level"`). The `sample` route of the percolation entries is
   `rigor: "statistical"` (means over named seeds, stderr in `errors`, never final). The entries `ising2d`,
   `ising1d`, `bethe_ising`, `ising2d_anisotropic`, `ising_triangular`, `ising_honeycomb`, `sk_bounds` and the
-  `cavity` route of `percolation_bethe` / `percolation_graph` and the `exact` route of `percolation_lattice` are `rigor: "certified"`: ball-arithmetic enclosures (python-flint) of a cited closed
+  `cavity` route of `percolation_bethe` / `percolation_graph` / `percolation_kcore` / `percolation_bootstrap` and the `exact` route of `percolation_lattice` are `rigor: "certified"`: ball-arithmetic enclosures (python-flint) of a cited closed
   form, a cited theorem's formula or a rigorous bound, with the radius in `errors`; that certifies
   the evaluation, not the cited theorem. A value flagged `exact-by-literature` rests on the cited
   paper, not on this package.
@@ -758,6 +758,50 @@ on 3 x 3); `run percolation_lattice --route exact --param lattice=triangular --p
 Planted hooks: `lattice2d._HOOKS["neighbourhood" | "wrap_crossing" | "site_s2_singletons" | "p_inf_norm"
 | "chi_norm"]`, `exact2d._HOOKS["star_prob" | "exponent"]`, `cardy._HOOKS["invert_aspect"]`,
 `enumerate2d._HOOKS["dual_shape"]`.
+K-CORE AND BOOTSTRAP PERCOLATION (P3: `percolation_kcore`, `percolation_bootstrap`, needs python-flint).
+"Bootstrap percolation" here is the infection dynamics, unrelated to the bootstrap resampling of P2's
+`fss2d.py`. `percolation_kcore`: the k-core (every vertex in >= `k` hyperedges) of Erdos-Renyi
+(`law=poisson`, `c` or `alpha` with c = K alpha), configuration-model (`law=finite`, `pk`) and random
+`d`-regular (`law=regular`) graphs, or of `K`-uniform Poisson hypergraphs (K >= 3: the E5 XORSAT
+ensemble), site or bond `dilution` at occupation `p`. Route `cavity` (certified): x = a Psi(b x^(K-1)),
+Psi(y) = sum_j q_j P(Bin(j, y) >= k - 1) (Dorogovtsev-Goltsev-Mendes, arXiv:cond-mat/0509102, Eqs. (2),
+(4); Janson, arXiv:0804.1656, Thms 4.5, 4.6; (a, b) = (t, 1) site, (1, t) bond; K >= 3 derived here).
+Every root in [0, 1] is isolated (monotone enclosure, F' - 1 sign, bisection) and enclosed by interval
+Newton; the LARGEST (the peeling limit, Janson Thm A.1) is selected with its certified F'(x) < 1, and an
+exclusion scan above it must find no other root. `core_fraction` (DGM Eq. (1), (11)), `core_edges`
+(<d> x^2 / 2 site, Janson-Luczak arXiv:math/0508453 Thm 2.3), `x`, `y`, `jacobian`. Birth point:
+`p_c` = min_y y / Psi(y)^(K-1) (Janson Eq. (4.9); DGM Eq. (8)), and for Poisson laws `c_k` = min_mu
+mu / P(Po(mu) >= k - 1)^(K-1) / t^(..) (Pittel-Spencer-Wormald, Janson-Luczak Thm 1.1; `alpha_k` = c_k / K
+for hypergraphs), each a certified global minimum (interval Newton on the stationarity condition, a
+box where it is the only minimum, branch and bound elsewhere using only that Psi increases); the jump:
+`y_at_p_c`, `x_at_p_c`, `core_at_p_c`, `edges_at_p_c`, `mu_at_c_k`, `core_at_c_k`, `edges_at_c_k`
+(not-computed: the t -> t_c+ limit, derived here). k = 2 on graphs is continuous and reuses P1's
+cavity equation (`p_c` = 1/G1'(1)). Second routes, run on every call: DGM's own form in mpmath
+(`percolation/kcore_dgm.py`: Phi_k by derivatives of G1 or the incomplete gamma, 1e-15) for the roots,
+cores and thresholds; at K >= 3, k = 2, p = 1 `csp/xorsat.py` (E5's alpha_d, lambda_d, and V, C, q).
+`percolation_bootstrap`: threshold `ell` infection on the random `d`-regular graph from initial
+infection `q`: the finally uninfected set is the (d + 1 - ell)-core of the initially uninfected one
+(Janson Sec. 5), so `q_c` = 1 - t_c, `final_infected`, `p_hat`, `y_star` (Janson Thm 5.1, stating
+Balogh & Pittel 2007); `q_c_closed_form`, `y_star_closed_form` for ell = 2 (d > 3) and ell = d - 1
+(Bartha & Pete, arXiv:1509.08454, below Eq. (3.1)) must overlap. Route `sample` (statistical):
+sampled graphs (P1's samplers; K >= 3 csp's `xorsat_instance`, Poisson only), the k-core by exact
+peeling, bootstrap percolation by direct spreading; exact identities on every instance (spreading =
+peeling for bootstrap; the peeled 2-core = csp `leaf_removal_core` at K >= 3, k = 2, p = 1; core
+vertices have >= k core hyperedges) refused `no-solution:sampler-invariant`. Finality: on graphs
+(K = 2) `p_c`, `c_k` and the run-point core values exact-by-literature (Janson Thms 4.5, 4.6, Remark
+4.9; Janson-Luczak Thm 1.1; the certified F'(x) < 1 is the theorems' "not a local maximum point"
+condition); hypergraphs: `alpha_k`, `p_c` not-computed, core values stable (computed F' < 1);
+bootstrap `q_c`, `final_infected`, `p_hat`, `y_star` exact-by-literature. Refusals at the jump: a
+double root (p at the jump to 1e-30) `undetermined:near-critical`; a marginal largest root (the
+3-regular graph's 3-core at p = 1) `ambiguous:critical-point`; two minima not separated
+`undetermined:threshold-minimum`. Not enumerated: further first-order transitions above the birth
+point (Janson Remark 4.7); the selected root is always the largest. Examples: `run percolation_kcore
+--route cavity` (ER c = 4, k = 3: `c_k` 3.350919, `core_fraction` 0.664671, `p_c` 0.837730);
+`run percolation_kcore --route cavity --param K=3 --param k=2 --param alpha=1` (`alpha_k` 0.818469,
+`mu_at_c_k` 1.256431, `core_fraction` 0.722740); `run percolation_bootstrap --route cavity` (d = 4,
+ell = 2, q = 1/20: `q_c` 1/9, `final_infected` 0.068782); `run percolation_bootstrap --route sample
+--param N=20000`. Planted hooks: `kcore._HOOKS["k_shift" | "drop_hyperedge" | "drop_root"]`,
+`kcore_threshold._HOOKS["threshold_offset"]`, `kcore_sample._HOOKS["peel_k_shift" | "spread_shift"]`.
 `from replicant.bounds import ...` (E10; needs python-flint and `tools/baller`; SK conventions of
 families/sk.py, P = -beta f; parameters are taken as the exact rationals they denote, an mpf or float its
 exact binary value): `guerra_rs_bound(beta, h, q, digits=40)` -> `Ball`; `guerra_rs_best_bound(beta, h=0,
@@ -858,7 +902,11 @@ default 1; J1 J2 J3 > 0 computed as |J|), `L` (3 .. 6, default 4); `ising_honeyc
 triangular | honeycomb, default square), `dilution` (bond | site, default bond), `p` (default 1/2),
 `aspect` (width / height, 1/64 .. 64, default 1), `Lx`, `Ly` (default 3 x 3, 2^M <= 2^20); (sample):
 `lattice`, `dilution`, `p`, `Lx`, `Ly` (default 16 x 16), `seeds` (default 0-7), `sweeps` (per seed,
-default 16), `Ls` (FSS sizes, >= 3 increasing ints in 4 .. 2048);
+default 16), `Ls` (FSS sizes, >= 3 increasing ints in 4 .. 2048); `percolation_kcore` (cavity): `law`
+(poisson | finite | regular), `c` (default 4) or `alpha` (c = K alpha), `pk`, `d` (default 4), `K` (2 ..
+12, default 2), `k` (2 .. 60, default 3), `dilution` (site | bond, default site), `p` (default 1);
+`percolation_bootstrap` (cavity): `d` (3 .. 1000, default 4), `ell` (1 .. d - 1, default 2), `q` (default
+1/20); both (sample): the same plus `N` (default 2000), `seeds` (default 0-7);
 `sk_bounds` (bound): `beta` (rational > 0, default 2), `h` (default 0), `K` (1 or 2, default 1), `digits`
 (an int 1 .. 200: certified digits of the K-step balls, default 20, else `precondition:digits`; the RS values
 always 40); `online_perceptron` (online): `rule` (required: hebb | perceptron | adatron | optimal), `eta`
@@ -953,10 +1001,12 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `no-solution:sampler-invariant`, `:sampler-degree`, `:sampler-occupation`, `:np-theorem-1`, `:np-theorem-2` | percolation (`sample`): an exact invariant fails (Bethe 2M/N != k; stubs != degree sum; G(N, p) edge count, a repeated pair or self-loop); `diagnostic_refusals(result, alpha)` (tests only; the run path reports p-values in `sampler_checks`); the ER window violates Nachmias-Peres Theorem 1 or 2 beyond its exact 99% interval |
 | `precondition:lattice`, `:lattice-size`, `:exact-size`, `:aspect-ratio`, `:sweeps`, `:fss-sizes` | `percolation_lattice`: a lattice not square / triangular / honeycomb (case-sensitive); Lx, Ly not ints in 1 .. 2048 (exact: 1 .. 64); more than 20 elements to enumerate; width / height outside 1/64 .. 64; sweeps not an int in 1 .. 10^6; Ls not >= 3 increasing ints in 4 .. 2048 (also `:dilution`, `:occupation`, `:named-seeds` as for P1) |
 | `no-solution:star-triangle`, `:scaling-relation`, `:duality-identity`, `:nz-enumeration`, `:route-disagreement`, `:sampler-invariant`, `:certification` | `percolation_lattice`: a star-triangle connection polynomial differs from +-kappa_tri / 0; an exponent breaks a scaling relation; an enumerated crossing polynomial breaks its duality identity; a Newman-Ziff sweep's n*, |C1|(n), S2(n) (or bond set) differs from the enumeration's; 2 sin(pi/18) misses the bisected cubic root, or Cardy's two routes differ by more than 1e-25; a sweep with every element occupied is not one crossing cluster of N vertices; Cardy's float route did not solve for the modulus |
+| `precondition:core-order`, `:hyperedge-size`, `:degree`, `:bootstrap-threshold`, `:infection`, `unsupported:hypergraph-law` | `percolation_kcore` / `percolation_bootstrap`: k not an int in 2 .. 60 or larger than every excess degree + 1 (the core is empty); K not an int in 2 .. 12; d not an int in 3 .. 1000; ell not in 1 .. d - 1; q outside [0, 1]; a non-Poisson law sampled with K >= 3 (also `:mean-degree` for c and alpha both given, and P1's law, dilution, n and seed preconditions) |
+| `undetermined:near-critical`, `ambiguous:critical-point`, `undetermined:threshold-minimum`, `no-solution:dropped-root`, `:route-disagreement`, `:sampler-invariant` | `percolation_kcore` / `percolation_bootstrap`: F(x) = x undecidable at width 1e-30 (a double root: p at the jump); the largest root has F'(x) not < 1; the birth point's minimum not separated from another box at width 1e-25; a root above the selection not excluded; DGM's mpmath form, csp/xorsat.py or a Balogh-Pittel closed form disagrees; spreading != peeling, peeling != csp leaf removal, or a core vertex with < k core hyperedges |
 | `unbanked:missing-entry`, `:malformed`, `:no-citation`, `:no-independent-route` | a banked reference value is absent or has no citation / no independent route (a value that fed a fit never certifies it) |
 | `tex-engine:failed`, `tex-engine:unavailable` | `--pdf`: the engine ran and failed, or could not reach its offline resources |
 
-CATALOG (30 entries: the 7 of v1, 12 added by the extensions E4-E10, 5 by the online-learning tasks O1-O5 (O6 adds `rule=optimal` to `online_scm`), 3 by the Ising task I3, 2 by the percolation task P1 and 1 by P2; `list` shows the live table;
+CATALOG (32 entries: the 7 of v1, 12 added by the extensions E4-E10, 5 by the online-learning tasks O1-O5 (O6 adds `rule=optimal` to `online_scm`), 3 by the Ising task I3, 2 by the percolation task P1, 1 by P2 and 2 by P3; `list` shows the live table;
 values at the default / banked state points):
 
 | entry | routes | headline values | banked references | finality |
@@ -983,6 +1033,8 @@ values at the default / banked state points):
 | `percolation_bethe` bond / site percolation on the Bethe lattice, certified | cavity, sample | `p_c` 1/2, `u`, `P_inf` 0.962963 (k = 3, bond p = 3/4; site 13/18), `mean_finite_cluster_size`, `chi_amplitude`, `p_inf_slope_at_p_c`, `P_s1..6`; sample: `P_inf_sampled` etc. | `bethe_pc_k3`, `bethe_site_p_inf_k3_p3_4`, `bethe_site_p_inf_slope_k3` 6, `bethe_mean_cluster_k3_p1_4` 5/2 (Malthe-Sorenssen 2024, Eqs. (3.2), (3.11), (3.15), (3.20)); slow statistical: the sampled `P_inf` | `p_c`, `u`, `P_inf` exact-by-literature (BGW extinction: Abraham & Delmas Cor. 2.5, Lemma 2.6, with the reduction derived here); `mean_finite_cluster_size`, `jacobian` stable (computed f'(u) < 1); amplitudes, `P_s` not-computed; sampled values not-computed (statistical) |
 | `percolation_graph` Erdos-Renyi / configuration model, certified | cavity, sample | ER c = 2: `P_inf` 0.796812, `mean_finite_cluster_size` 1.684567, `molloy_reed_Q`, `p_c`, `P_s` (Borel); finite laws `pk` | `er_giant_c2`, `er_mean_cluster_c2` (NSW Eqs. (37), (38)), `nsw_eq24_site_threshold` 1148/2271 (CNSW Eq. (12)), `nsw_eq24_molloy_reed_Q` 2.246 (Molloy-Reed 1995) | `u`, `P_inf`, `mean_finite_cluster_size` stable (the tree-like fixed point; the finite graph's giant is a theorem for undiluted laws with p_1 > 0 and finite second moment: Janson & Luczak Thm 2.3); `p_c`, amplitudes, `P_s` not-computed; `branching_G1p1`, `molloy_reed_Q` exact-by-literature (definitions); sampled values statistical |
 | `percolation_lattice` 2D lattice percolation (square, triangular, honeycomb; bond / site), certified and sampled | exact, sample | `p_c` (square bond, triangular site 1/2; triangular bond 0.347296; honeycomb bond 0.652704), `p_c_cubic_root`, `p_c_dual`, `beta` 5/36, `nu` 4/3, `gamma` 43/18, `fractal_dimension` 91/48, `cardy_crossing_h` / `_v` (aspect 1: 1/2), `crossing_exact` (3 x 3 square bond at 1/2: 43/64); sample: `crossing_probability_sampled`, `P_inf_sampled`, `mean_cluster_size_sampled`, with `Ls`: `p_c_crossing`, `p_c_collapse`, `inv_nu_collapse`, `inv_nu_width_slope` | `square_bond_pc`, `triangular_site_pc` (Bollobas & Riordan), `triangular_bond_pc`, `honeycomb_bond_pc` (Grimmett & Manolescu Thm 1.1), `percolation_2d_nu`, `_beta`, `_gamma` (Smirnov & Werner Thm 1), `cardy_crossing_square` (Cardy Eq. (8)), `square_bond_self_dual_crossing` (Bollobas & Riordan Cor. 5); slow statistical: `square_site_pc_nz2000`, `square_site_pc_jacobsen2015` | `p_c` and its second routes exact-by-literature; `beta`, `nu`, `gamma` and Cardy exact-by-literature on triangular site, not-computed (universality, physics-level) elsewhere; `fractal_dimension` not-computed; `crossing_exact` exact by construction (this package's enumeration; no literature value); sampled and FSS values not-computed (statistical) |
+| `percolation_kcore` k-core of random graphs and K-uniform Poisson hypergraphs (site / bond), certified | cavity, sample | ER c = 4, k = 3: `c_k` 3.350919, `p_c` 0.837730, `core_fraction` 0.664671, `core_edges`, `x`, the jump `core_at_p_c`, `core_at_c_k`; K = 3, k = 2: `alpha_k` 0.818469; sample: `core_fraction_sampled`, `core_edges_sampled` | `er_3core_threshold` 3.35, `er_4core_threshold` 5.15 (Janson & Luczak 2008 quoting Pittel-Spencer-Wormald); E5's `xorsat/alpha_d_k3`, `xorsat/lambda_d_k3` (MRZ) | K = 2: `p_c`, `c_k`, core values exact-by-literature (Janson 2009 Thms 4.5, 4.6; Janson & Luczak 2007 Thm 1.1); K >= 3: thresholds not-computed, core values stable; the jump values not-computed; sampled values statistical |
+| `percolation_bootstrap` bootstrap percolation (threshold ell infection) on the random d-regular graph, certified | cavity, sample | d = 4, ell = 2, q = 1/20: `q_c` 1/9, `y_star` 3/4, `final_infected` 0.068782, `p_hat`; `q_c_closed_form`; sample: `final_infected_sampled` | `bootstrap_d4_l2_qc` 1/9, `bootstrap_d4_l3_qc` 2/3 (Bartha & Pete stating Balogh & Pittel; Janson Thm 5.1) | `q_c`, `final_infected`, `p_hat`, `y_star`, closed forms exact-by-literature; `uninfected_at_q_c` not-computed; sampled values statistical |
 | `series_ising2d` 2D Ising (Onsager) free energy, exact series | series | `a4` 1 .. `a20` 8174.2 (v = tanh K); `operator_order` 3, `operator_degree` 8, `elliptic_factor_order` 2; `u_c` 3 - 2 sqrt 2, `v_c` 0.414214, `critical_exponent` 2, `alpha` 0 | `a4`, `a6`, `a8`, `a10` (Finch's table; independently the exact 7 x 7 torus), `v_c` (Kramers-Wannier / Onsager via Duminil-Copin), `alpha` (Onsager via Duminil-Copin, Baxter) | coefficients exact-by-literature (the cited integral, expanded exactly); operator values not-computed (L g = P proved exactly; minimal within bounds only); `u_c`, `v_c`, `alpha` exact-by-literature |
 | `sk_bounds` SK pressure: Guerra's RS and K-step RSB upper bounds, certified | bound | `rs_bound` 1.584786 (beta = 2: min over q of P_RS), `rs_q` 0.530368 and every stationary point; `rsb1_bound` 1.582418 at the package's 1RSB optimiser (`K=2`: `rsb2_bound`); `chain_verdict` | `annealed_pressure_beta_half` (ln 2 + 1/16: Guerra 1992 Thm 3, the annealed value for beta <= 1) | bounds exact-by-literature (Guerra 2003 Thm 3), certified radii; `rs_q` stable iff P_RS''(q*) > 0 certified; the chain verdict is a consistency check (meta), not a theorem |
 | `online_perceptron` online learning of a perceptron teacher (Hebb, perceptron, AdaTron, optimal; output noise) | online | `eps_exponent`, `eps_constant` (alpha = 1e4; noiseless or Hebb), optimal `eps_constant_formula`; at `alpha`: `eps`, `R`, `Q`, `rho` (Hebb: `eps_hebb_closed_form`); optimal with noise: `no_learning_boundary`, `robust_boundary`; with `N`: `eps_sim` | exponents and constants for the four rules (Biehl-Riegler Eqs. (7), (8), (15); 0.88 from VKC 1998 Tables I-II, Kinouchi-Caticha 1992 not fetched); no-learning line 2 lam - 1/2 at lam = 0.3, 0.4 (Copelli et al. p. 5); robust line at lam = 0.2, 0.3, 0.4 READ OFF Copelli et al. Fig. 1a (tol 0.003) | all not-computed (physics-level ODE limit, self-averaging assumed); `eps_sim` statistical |
@@ -1092,7 +1144,7 @@ the replica RS equations is an independent derivation but NOT independent eviden
 
 KNOWN HAZARDS:
 - Rigor: PHYSICS-LEVEL, not proven, except the certified entries (`ising2d`, `ising1d`,
-  `bethe_ising`, the I3 lattices, `sk_bounds`, the percolation `cavity` and `exact` routes); the percolation `sample`
+  `bethe_ising`, the I3 lattices, `sk_bounds`, the percolation and k-core `cavity` and `exact` routes); the percolation `sample`
   route is `statistical`. `rigor` says which on every result; the n -> 0 continuation and the
   RS/RSB ansaetze are assumptions. Do not quote a physics-level result as a theorem; a certified value
   is a rigorous enclosure of the cited formula or bound, not a proof of that formula.

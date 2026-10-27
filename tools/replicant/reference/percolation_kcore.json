@@ -1,0 +1,26 @@
+{
+  "er_3core_threshold": {
+    "value": "3.35",
+    "tol": "0.005",
+    "cite": "mean degree c_3 at which a giant 3-core appears in G(n, c/n): Janson & Luczak, 'Asymptotic normality of the k-core in random graphs', Ann. Appl. Probab. 18, 1085 (2008), arXiv:math/0612827v2 (PDF read), text after Theorem 1.4: 'We have c3 ~ 3.35 and c4 ~ 5.15 as found by Pittel, Spencer and Wormald [27]' (Pittel, Spencer & Wormald, J. Combin. Theory B 67, 111 (1996), not fetched). The threshold is lambda_k = min_(mu > 0) mu / psi_(k-1)(mu), psi_j(mu) = P(Po(mu) >= j) (Janson & Luczak, arXiv:math/0508453v1 (PDF read), Thm 1.1). tol = half a unit in the last printed digit",
+    "independent_route": "replicant's certified global minimum of mu / P(Po(mu) >= 2) (percolation/kcore_threshold.py: interval Newton on the stationarity condition, branch and bound elsewhere): 3.350918871511669 (build); DGM's own form, the maximum of f_k(R) of Dorogovtsev, Goltsev & Mendes, arXiv:cond-mat/0509102 Eq. (8) with the incomplete-gamma Phi_k, in mpmath (percolation/kcore_dgm.py) must agree to 1e-15; sampled ER graphs at c = 4 by peeling (tests)"
+  },
+  "er_4core_threshold": {
+    "value": "5.15",
+    "tol": "0.005",
+    "cite": "mean degree c_4 at which a giant 4-core appears in G(n, c/n): Janson & Luczak, Ann. Appl. Probab. 18, 1085 (2008), arXiv:math/0612827v2 (PDF read), text after Theorem 1.4: 'c4 ~ 5.15 as found by Pittel, Spencer and Wormald' (the original not fetched); definition as for er_3core_threshold (arXiv:math/0508453, Thm 1.1). tol = half a unit in the last printed digit",
+    "independent_route": "replicant's certified global minimum of mu / P(Po(mu) >= 3) (percolation/kcore_threshold.py): 5.149402746986448 (build); DGM's Eq. (8) in mpmath (percolation/kcore_dgm.py)"
+  },
+  "bootstrap_d4_l2_qc": {
+    "value": "0.111111111111111111111111111111",
+    "tol": "1e-29",
+    "cite": "critical initial infection probability of bootstrap percolation with threshold ell = 2 on the random 4-regular graph: p* = 1 - (d-2)^(2d-5) / ((d-1)^(d-2) (d-3)^(d-3)) for k = 2, d > 3 (their k is our ell), the infimum of R(y) = y / P(Binomial(d-1, 1-y) < k) being attained at y* = (d-1)(d-3)/(d-2)^2 = 3/4: Bartha & Pete, 'Noise sensitivity in bootstrap percolation', arXiv:1509.08454v1 (PDF read; page 7 rendered), Sec. 3, Eq. (3.1) and the display below it, stating Balogh & Pittel, Random Struct. Alg. 30, 257 (2007) (not fetched), Thm 3.1. At d = 4: 1 - 2^3/(3^2 1^1) = 1/9. The same infimum form is Janson, arXiv:0804.1656v1 (PDF read), Eq. (5.1), Thm 5.1 (q_c). Value: 1/9 rounded to 30 places; tol 1e-29",
+    "independent_route": "replicant's certified global minimum of y / P(Bin(3, y) >= 2) on (0, 1] for the 3-core of the uninfected set (percolation/kcore_threshold.py), q_c = 1 - t_c; DGM's Eq. (8) in mpmath (percolation/kcore_dgm.py); the closed form evaluated in exact rationals (percolation/kcore_threshold.bootstrap_closed_form) must overlap at run time"
+  },
+  "bootstrap_d4_l3_qc": {
+    "value": "0.666666666666666666666666666667",
+    "tol": "1e-29",
+    "cite": "critical initial infection probability of bootstrap percolation with threshold ell = d - 1 = 3 on the random 4-regular graph: 'for k = d - 1, p* = 1 - 1/(d - 1)' (their k is our ell): Bartha & Pete, arXiv:1509.08454v1 (PDF read; page 7 rendered), Sec. 3 below Eq. (3.1), stating Balogh & Pittel (2007) (not fetched); Janson, arXiv:0804.1656v1 (PDF read), Thm 5.1 and Remark 4.9 (the 2-core threshold E D / E D(D - 1) = 1/(d - 1)). Value: 2/3 rounded to 30 places; tol 1e-29",
+    "independent_route": "replicant's 2-core of the uninfected set through the P1 cavity equation (percolation/cavity.py: t_c = 1/G1'(1) = 1/3 exactly), q_c = 1 - t_c; the closed form must overlap at run time"
+  }
+}

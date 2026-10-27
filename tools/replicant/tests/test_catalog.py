@@ -30,7 +30,8 @@ ROUTES = {"rem": {"replica"}, "sk": {"replica", "cavity", "amp"}, "pspin": {"rep
           "online_tcm": {"online"}, "online_scm": {"online"}, "perceptron": {"replica", "cavity"}, "teacher_student": {"replica", "amp"},
           "hopfield": {"replica", "cavity"}, "viana_bray": {"cavity"},
           "percolation_bethe": {"cavity", "sample"}, "percolation_graph": {"cavity", "sample"},
-          "percolation_lattice": {"exact", "sample"}}
+          "percolation_lattice": {"exact", "sample"}, "percolation_kcore": {"cavity", "sample"},
+          "percolation_bootstrap": {"cavity", "sample"}}
 
 
 def _bank_keys():

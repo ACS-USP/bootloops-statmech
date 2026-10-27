@@ -15,7 +15,13 @@
   enumerate2d.py  exhaustive enumeration of small open lattices: crossing polynomials, duality
                   identities, an exact cross-check of the Newman-Ziff sweep
   lattice2d.py    Newman-Ziff sweeps on square / triangular / honeycomb lattices (union-find)
-  fss2d.py        finite-size scaling: crossings of R_L, a collapse for 1/nu, bootstrap bands
+  fss2d.py        finite-size scaling: crossings of R_L, a collapse for 1/nu, bootstrap(-resampling) bands
+  kcore.py        (P3) the k-core equation of random graphs / K-uniform hypergraphs: every fixed point,
+                  certified, the largest selected; the core's size
+  kcore_threshold.py  the k-core's birth point (a certified global minimum), the jump, and the
+                  Balogh-Pittel closed forms of bootstrap percolation (the infection dynamics)
+  kcore_dgm.py    the second route in Dorogovtsev-Goltsev-Mendes' own form, mpmath
+  kcore_sample.py exact peeling and bootstrap spreading on sampled graphs over named seeds
 """
 from .cavity import FixedPoint, GiantResult, percolation_fixed_points, percolation_giant
 from .clusters import cluster_distribution
