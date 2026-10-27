@@ -34,11 +34,13 @@ Identities (derived here; Baxter, Exactly Solved Models (1982), Secs. 6.3, 6.4 f
       periodic sector alone (Baxter's (6.3.7) as a finite statement) is not exact on the torus: the
       difference is the topology term.
   duality_identity(Lx, Ly) -> DualityCheck;  star_triangle_check(Lx, Ly, L) -> (Ball, Ball)
-_HOOKS: "edge_scale" ((1, 1, 1)): the Boltzmann weight's coupling per class, in both routes (planted
-(2, 1, 1): a wrong lattice weight, invisible to counts = transfer, seen by the identities and the
-bulk sequence).  The duality map is lattice/anisotropic._HOOKS["dual_mobius"].
+_HOOKS: "edge_scale" ((1, 1, 1)): the Boltzmann weight's coupling per class (ints or Fractions), in
+every route (planted (2, 1, 1) or (51/50, 1, 1): a wrong lattice weight, invisible to counts =
+transfer; seen by the high-temperature torus = bulk identity, the star-triangle identity and the
+cylinders).  The duality map is lattice/anisotropic._HOOKS["dual_mobius"].
 """
 from dataclasses import dataclass
+from fractions import Fraction
 from functools import lru_cache
 from math import comb
 
@@ -91,6 +93,12 @@ def class_sizes(geom, Lx, Ly):
 
 # ---- route 1: enumeration ---------------------------------------------------------------------
 def counts(geom, Lx, Ly, sector=(0, 0)):
+    """{(j0, j1, j2): n} by enumeration; memoised (exact integers, no hook enters), a fresh dict."""
+    return dict(_counts(geom, Lx, Ly, tuple(sector)))
+
+
+@lru_cache(maxsize=64)
+def _counts(geom, Lx, Ly, sector):
     t = _check(geom, Lx, Ly)
     n = t * Lx * Ly
     if n > MAX_ENUM:
@@ -102,11 +110,13 @@ def counts(geom, Lx, Ly, sector=(0, 0)):
     chunk = 1 << min(n, 20)
     for start in range(0, 1 << n, chunk):
         cfg = np.arange(start, start + chunk, dtype=np.int64)
-        j = [np.zeros(chunk, dtype=np.int64) for _ in range(3)]
+        bits = [((cfg >> i) & 1).astype(np.uint8) for i in range(n)]
+        j = [np.zeros(chunk, dtype=np.uint8) for _ in range(3)]       # j_c <= E_c <= 66 < 256
         for p, q, c, sg in es:
-            un = ((cfg >> p) ^ (cfg >> q)) & 1
+            un = bits[p] ^ bits[q]
             j[c] += un if sg > 0 else 1 - un
-        hist += np.bincount(j[0] + base[0] * (j[1] + base[1] * j[2]), minlength=hist.size)
+        idx = j[0].astype(np.int32) + base[0] * (j[1].astype(np.int32) + base[1] * j[2].astype(np.int32))
+        hist += np.bincount(idx, minlength=hist.size)
     out = {}
     for idx in np.nonzero(hist)[0]:
         idx = int(idx)
@@ -116,8 +126,7 @@ def counts(geom, Lx, Ly, sector=(0, 0)):
 
 def z_of_counts(cnt, E, Ks):
     """sum n prod_c e^{K_c (E_c - 2 j_c)} (arb couplings Ks)."""
-    sc = _HOOKS["edge_scale"]
-    Ks = [Ks[c] * sc[c] for c in range(3)]
+    Ks = [Ks[c] * arb_q(Fraction(_HOOKS["edge_scale"][c])) for c in range(3)]
     tot = 0 * Ks[0]
     for js, m in cnt.items():
         tot += m * sum(((E[c] - 2 * js[c]) * Ks[c] for c in range(3)), 0 * Ks[0]).exp()
@@ -150,8 +159,7 @@ def transfer_z(geom, Lx, Ly, Ks, sector=(0, 0)):
     """arb: Tr T^(Lx-1) T_seam, T[s, s'] = exp(sum_c K_c (intra_c(s) + inter_c(s, s')))."""
     from flint import arb_mat
     _check(geom, Lx, Ly, MAX_ROW)
-    sc = _HOOKS["edge_scale"]
-    Ks = [Ks[c] * sc[c] for c in range(3)]
+    Ks = [Ks[c] * arb_q(Fraction(_HOOKS["edge_scale"][c])) for c in range(3)]
     m, intra, inter, seam = _row_data(geom, Ly, sector)
     off = 4 * m + 1                     # |n_c| <= 3 m: shift to a non-negative digit
 
@@ -171,18 +179,19 @@ def transfer_z(geom, Lx, Ly, Ks, sector=(0, 0)):
 
 
 @A.memo
-def cylinder_free_energy(geom, Ly, Ks, prec=320, max_squarings=40):
+def cylinder_free_energy(geom, Ly, Ks, prec=128, max_squarings=40):
     """Ball of ln lambda_0 / (t Ly), lambda_0 the Perron root of the row transfer matrix of the
     infinite cylinder of circumference Ly (no 1/N terms, unlike a torus).  Enclosure by
     Collatz-Wielandt: for the positive matrix T and x = T^(2^k) 1 > 0, min_i (T x)_i / x_i <=
-    lambda_0 <= max_i (T x)_i / x_i; k grows until the width is below 1e-30 (or max_squarings)."""
+    lambda_0 <= max_i (T x)_i / x_i; k grows until the relative width is below 1e-12 (or
+    max_squarings) at 128 bits: the sequence it feeds is a 1e-4-level consistency check."""
     from flint import arb, arb_mat
     from .ball import ball_of, baller
     t = GEOM[geom][0]
     if isinstance(Ly, bool) or not isinstance(Ly, int) or not 2 <= Ly or t * Ly > MAX_ROW:
         raise Refusal("precondition:size", f"Ly = {Ly!r}: need 2 <= Ly, {t} Ly <= {MAX_ROW}")
     with baller().hygiene.ctx_guard(prec=prec):
-        Kb = [arb_q(k) * s for k, s in zip(Ks, _HOOKS["edge_scale"])]
+        Kb = [arb_q(k) * arb_q(Fraction(s)) for k, s in zip(Ks, _HOOKS["edge_scale"])]
         m, intra, inter, _ = _row_data(geom, Ly, (0, 0))
         n = 1 << m
         code_w = {}
@@ -203,7 +212,7 @@ def cylinder_free_energy(geom, Ly, Ks, prec=320, max_squarings=40):
             r = [y[i, 0] / x[i, 0] for i in range(n)]
             lo = min((v.lower() for v in r), key=lambda v: v.mid())
             hi = max((v.upper() for v in r), key=lambda v: v.mid())
-            if hi - lo < arb("1e-31") * hi:
+            if hi - lo < arb("1e-12") * hi:
                 break
         return ball_of(lo.union(hi).log() / (t * Ly))
 
@@ -279,7 +288,7 @@ def _poly_pow_pair(j, E, mob):
 class DualityCheck:
     size: tuple
     exact: bool                 # four-sector identity holds coefficient by coefficient
-    terms: int                  # monomials compared
+    terms: int                  # nonzero monomials (of either side) compared
     periodic_only_mismatch: int  # coefficients where the periodic sector alone fails
     mobius: tuple
 
@@ -292,23 +301,16 @@ def duality_identity(Lx=3, Ly=3) -> DualityCheck:
 def _duality_identity(Lx, Ly, mob, _scale):
     N, E = Lx * Ly, class_sizes("triangular", Lx, Ly)
     hc = counts("honeycomb_dual", Lx, Ly)
-    pw = [{} for _ in range(3)]
-    lhs = {}
+    # LHS[e] = sum_j n_j prod_c M_c[j_c, e_c], M_c[j, .] the coefficients of (q + p y)^j (s + r y)^(E_c - j):
+    # three tensor contractions in exact Python integers (object arrays)
+    T3 = np.zeros(tuple(e + 1 for e in E), dtype=object)
+    T3[...] = 0
     for js, m in hc.items():
-        polys = []
-        for c in range(3):
-            if js[c] not in pw[c]:
-                pw[c][js[c]] = _poly_pow_pair(js[c], E[c], mob)
-            polys.append(pw[c][js[c]])
-        for e0, x0 in enumerate(polys[0]):
-            if not x0:
-                continue
-            for e1, x1 in enumerate(polys[1]):
-                if not x1:
-                    continue
-                for e2, x2 in enumerate(polys[2]):
-                    if x2:
-                        lhs[(e0, e1, e2)] = lhs.get((e0, e1, e2), 0) + m * x0 * x1 * x2
+        T3[js] = m
+    for c in range(3):
+        M = np.array([_poly_pow_pair(j, E[c], mob) for j in range(E[c] + 1)], dtype=object)
+        T3 = np.moveaxis(np.tensordot(T3, M, axes=([c], [0])), -1, c)
+    lhs = {tuple(int(i) for i in k): int(v) for k, v in np.ndenumerate(T3) if v}
     scale = 2 ** (sum(E) - N - 1)
     rhs, per = {}, {}
     for a in (0, 1):

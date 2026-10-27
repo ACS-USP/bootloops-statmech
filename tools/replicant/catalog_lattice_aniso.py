@@ -10,12 +10,13 @@ its runs stay byte-identical.
   aniso-free-energy     -beta f (Kac-Ward), = Baxter (11.7.15) (else no-solution:route-disagreement),
                         = Onsager (lattice/onsager.py) when J1 = J2; the duality relation between
                         (K1, K2) and (K1*, K2*) (else no-solution:duality)
-  aniso-torus           the L x L torus (transfer matrix = enumeration), the cylinder sequence
-Run parameters: beta (rational > 0, default 1/5), J1 (default 1), J2 (default 2), L (3 .. 6,
-default 4).
+  aniso-torus           the L x L torus (transfer matrix; = the bulk at beta = 1e-8 within O(K^L),
+                        else no-solution:torus-weight), the cylinder sequence
+Run parameters: beta (rational > 0, default 1/5), J1 (default 1), J2 (default 2; nonzero, computed
+as |J|: gauge), L (3 .. 6, default 4).
 """
 from .catalog import Out, RefCheck, entry, fstep
-from .catalog_lattice_geom import AU, BAX, LIT, TORI, _agree, _put, _s, _side, _torus
+from .catalog_lattice_common import AU, BAX, LIT, TORI, _agree, _put, _raw, _s, _side, _torus, gauge
 from .core import Refusal
 from .lattice import anisotropic as A
 from .lattice.ball import arb_q, baller
@@ -28,18 +29,21 @@ SQ = f"{BAX}, Eqs. (11.7.15), (11.7.16)"
 
 
 def _p(p):
-    beta, Js = p.get("beta", "0.2"), (p.get("J1", 1), p.get("J2", 2))
-    return beta, Js, A.couplings(beta, Js)
+    """beta, |J| (every square plaquette has two edges of each class: any sign pattern is gauge-
+    equivalent to |J|), K, and the gauge note."""
+    beta = p.get("beta", "0.2")
+    Js, note = gauge(_raw(p, 2))
+    return beta, Js, A.couplings(beta, Js), note
 
 
 def _crit(p):
-    beta, Js, (K1, K2) = _p(p)
+    beta, Js, (K1, K2), note = _p(p)
     bc = A.critical_beta(*Js)
     j1, j2 = A.couplings(1, Js)
     with baller().hygiene.ctx_guard(prec=600):
         k1, k2 = bc.arb * arb_q(j1), bc.arb * arb_q(j2)
         m = (2 * k1).cosh() * (2 * k2).cosh() - (2 * k1).sinh() - (2 * k2).sinh()
-        d1, d2 = A.dual_coupling(k2), A.dual_coupling(k1)
+        d1, d2 = A.dual_pair(k1, k2)                 # the map the entry reports (dual_K1, dual_K2)
         fixed = d1.overlaps(k1) and d2.overlaps(k2)
     if not m.contains(0):
         raise Refusal("no-solution:critical-point", f"cosh 2K1 cosh 2K2 - sinh 2K1 - sinh 2K2 = "
@@ -51,13 +55,13 @@ def _crit(p):
     lam = A.criticality(beta, *Js)
     v, e = _put(beta_c=bc, criticality=lam, critical_K2_given_K1=A.critical_coupling(K1))
     phase = "T < T_c" if lam.mid() > 1 else "T > T_c"
-    return Out({**v, "phase": phase}, f"beta_c of J2/J1 = {Js[1]}/{Js[0]}: sinh 2K1 sinh 2K2 = 1 "
+    return Out({**v, "phase": phase, **({"gauge": note} if note else {})}, f"beta_c of J2/J1 = {Js[1]}/{Js[0]}: sinh 2K1 sinh 2K2 = 1 "
                "(certified bisection); the integrand's minimum vanishes there and the duality map "
                f"fixes it; at beta sinh 2K1 sinh 2K2 = {_s(lam.mid())} ({phase})", errors=e)
 
 
 def _free(p):
-    beta, Js, _ = _p(p)
+    beta, Js, _, _ = _p(p)
     f = A.free_energy(beta, *Js)
     balls = {"minus_beta_f": f, "minus_beta_f_baxter": A.free_energy_baxter(beta, *Js)}
     iso = Js[0] == Js[1]
@@ -76,13 +80,14 @@ def _free(p):
 
 
 def _tor(p):
-    beta, Js, ks = _p(p)
+    beta, Js, ks, _ = _p(p)
     L = _side(p, 4, 6)
-    tz, meta = _torus("square", L, ks + [0], A.free_energy(beta, *Js), (3, 4, 5))
+    tz, meta = _torus("square", L, ks + [0], A.free_energy(beta, *Js), (3, 4, 5), tuple(Js) + (0,),
+                      lambda b: A.free_energy(b, *Js))
     v, e = _put(torus_minus_beta_f=tz)
-    return Out({**v, **meta}, f"{L} x {L} anisotropic torus (transfer matrix in balls" +
-               (", = enumeration" if "torus_enumeration" in meta else "") + "); cylinders of "
-               "circumference 3, 4, 5 towards the bulk (consistency check)", errors=e)
+    return Out({**v, **meta}, f"{L} x {L} anisotropic torus (transfer matrix in balls; = the bulk at "
+               "beta = 1e-8 within O(K^L)); cylinders of circumference 3, 4, 5 towards the bulk "
+               "(consistency check)", errors=e)
 
 
 def ising2d_anisotropic():
@@ -117,7 +122,8 @@ def ising2d_anisotropic():
                            "arithmetic; finite tori exact; the cylinder sequence is a consistency check"},
                  "Anisotropic square-lattice Ising model (J1 != J2, zero field): critical line, "
                  "free energy (two routes), duality, finite tori, certified", default_route="exact",
-                 finality=fin, meta=("phase", "torus_size", "torus_enumeration", "cylinder_sequence"),
+                 finality=fin, meta=("phase", "gauge", "torus_size", "torus_high_t_identity",
+                                     "cylinder_sequence"),
                  parameters={"exact": ("beta", "J1", "J2", "L")}, rigor={"exact": "certified"})
 
 

@@ -1,7 +1,10 @@
 """Displayed equations of the I3 entries ising2d_anisotropic, ising_triangular and ising_honeycomb
 (catalog_lattice_aniso.py, catalog_lattice_geom.py).  Each sympy block carries a tex.Check against
 lattice/ (the certified ball's midpoint) at three points; the integrals are cited strings whose
-checks are hand-coded mpmath evaluations of the displayed formula (no arb, no lattice/ code).
+checks are hand-coded mpmath evaluations (no arb, no lattice/ code): Pierre et al.'s blocks evaluate
+the displayed double integral (2D trapezoid), Baxter's and the entropy block the displayed single
+integral, and the Kac-Ward blocks the single-integral reduction of the displayed double integral
+(the inner angle in closed form, derived here; the titles say so).
 """
 import mpmath as mp
 import sympy as sp
@@ -58,7 +61,7 @@ def ising2d_anisotropic(route):
     return [
         text("Exact route", "Square lattice, K1 = beta J1 (horizontal), K2 = beta J2 (vertical); "
              "-beta f = lim ln Z / N; each value is a ball enclosure", source=_AU),
-        cited("Free energy (Kac-Ward, J3 = 0)",
+        cited("Free energy (Kac-Ward, J3 = 0; checked through its inner angle in closed form)",
               r"-\beta f = \ln 2 + \frac{1}{8\pi^2}\int_{[-\pi,\pi]^2}\ln\left[\cosh 2K_1\cosh 2K_2"
               r" - \sinh 2K_1\cos k_1 - \sinh 2K_2\cos k_2\right]dk_1\,dk_2", _AU,
               check=Check((K1, K2), lambda a, b: A.free_energy(1, a, b).mid(),
@@ -93,7 +96,8 @@ def ising_triangular(route):
     return [
         text("Exact route", "Triangular lattice, couplings K1, K2, K3 (horizontal, vertical, "
              "oblique); each value is a ball enclosure", source=_AU),
-        cited("Free energy (Kac-Ward / Houtappel), k3 = k1 + k2",
+        cited("Free energy (Kac-Ward / Houtappel), k3 = k1 + k2 (checked through its inner angle in "
+              "closed form)",
               r"-\beta f = \ln 2 + \frac{1}{8\pi^2}\int_{[-\pi,\pi]^2}\ln\Big[\prod_i\cosh 2K_i + "
               r"\prod_i\sinh 2K_i - \sum_i \sinh 2K_i\cos k_i\Big]dk_1\,dk_2", _AU,
               check=Check((K1, K2, K3), lambda a, b, c: T.triangular_free_energy(1, a, b, c).mid(),
@@ -113,8 +117,10 @@ def ising_triangular(route):
               check=Check((K1,), lambda k: T.triangular_free_energy_pierre(k).mid(),
                           (("0.1",), ("0.2",), ("0.4",)), display=lambda k: _pierre_mp(k, "triangular"),
                           tol=mp.mpf("1e-12"))),
-        cited("Antiferromagnet: ground-state entropy per site",
-              r"s_0 = \frac{2}{\pi}\int_0^{\pi/3}\ln(2\cos\omega)\,d\omega", f"{_PBM}, Sec. 5.2",
+        cited("Antiferromagnet: ground-state entropy per site (reduced here from Pierre et al.'s "
+              "X_k(-1) = 2^4 (9/4 - xi(k)); they print 0.3231)",
+              r"s_0 = \frac{2}{\pi}\int_0^{\pi/3}\ln(2\cos\omega)\,d\omega",
+              f"{_PBM}, Sec. 5.2, Table 5 (the reduction derived here); Zukovic, arXiv:1303.0184",
               check=Check((), lambda: T.wannier_entropy().mid(), ((),), display=lambda: 2 / mp.pi
                           * mp.quad(lambda w: mp.log(2 * mp.cos(w)), [0, mp.pi / 3]))),
     ]

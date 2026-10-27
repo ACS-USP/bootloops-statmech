@@ -37,7 +37,7 @@ to ln 2 + (1/(2pi)) int_0^pi 2 ln max(|cos(k/2)|, 1/2) dk = (2/pi) int_0^{pi/3} 
 
   triangular_free_energy(beta, J1, J2, J3) -> Ball   Kac-Ward (any nonzero signs)
   triangular_free_energy_square(beta, J1, J2, J3)    Baxter (11.7.13): three square lattices
-  triangular_free_energy_pierre(beta, J)             Pierre et al., isotropic, J > 0
+  triangular_free_energy_pierre(beta, J)             Pierre et al., isotropic, J != 0
   honeycomb_free_energy(beta, J1, J2, J3)            star-triangle (6.4.7) from the triangular
   honeycomb_free_energy_duality(beta, J1, J2, J3)    duality (6.3.7) from the triangular
   honeycomb_free_energy_pierre(beta, J)              Pierre et al., isotropic
@@ -156,7 +156,9 @@ def _pierre(v, lattice):
 
 @A.memo
 def triangular_free_energy_pierre(beta, J=1) -> Ball:
-    (k,) = A.couplings(beta, (J,))
+    """Any nonzero J: v = tanh K < 0 is the antiferromagnet (Pierre et al. Sec. 5.2 use the same
+    X_k(v) there)."""
+    (k,) = A.couplings(beta, (J,), positive=False)
     return certify(lambda: _pierre(arb_q(k).tanh(), "triangular"))
 
 

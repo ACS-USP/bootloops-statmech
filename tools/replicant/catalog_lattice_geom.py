@@ -4,18 +4,23 @@ ground-state entropy.  New entries (not run parameters of ising2d), so ising2d s
 
 Every physical value is a python-flint arb ball (lattice/tri_honey.py, lattice/geom_tori.py); the
 second and third routes of a value are values too (each its own ball), and must overlap the first
-(else no-solution:route-disagreement).  Finite tori are exact (transfer matrix in balls, and the
-enumeration of all configurations); the sequence of cylinders towards the bulk is a consistency
-check with no proven bound (reported in meta; refused no-solution:torus-limit when it ends outside its band, 10 x
-its last change).  Run parameters:
+(else no-solution:route-disagreement).  Finite tori are exact (the transfer matrix in balls; the
+enumeration of all configurations in the tests), their weights checked against the bulk at beta =
+1e-8 (no-solution:torus-weight); the sequence of cylinders towards the bulk is a consistency check
+with no proven bound (refused no-solution:torus-limit outside 10 x its last change).  Helpers:
+catalog_lattice_common.py.  Run parameters:
   ising_triangular (exact)  beta (rational > 0, default 1/5), J1, J2, J3 (nonzero rationals, default
-                            1; any sign: the free energy; all > 0: the critical point), L (torus
-                            side 3 .. 6, default 4)
-  ising_honeycomb (exact)   beta (default 2/5), J1, J2, J3 (> 0, default 1), L (3 .. 4, default 3)
+                            1; J1 J2 J3 > 0 is computed as |J| (gauge), J1 J2 J3 < 0 is frustrated:
+                            the free energy only), L (torus side 3 .. 6, default 4)
+  ising_honeycomb (exact)   beta (default 2/5), J1, J2, J3 (nonzero, computed as |J|: bipartite),
+                            L (3 .. 4, default 3)
 """
 import mpmath as mp
 
-from .catalog import Out, RefCheck, Stability, entry, fstep
+from .catalog import Out, RefCheck, entry, fstep
+from .catalog_lattice_common import (AU, BAX, DUAL, LIT, PBM, ST, TORI, ZUK, _agree, _frustrated, _js,
+                                     _put, _raw, _s, _side, _torus, _tri_js, cylinder_sequence, gauge,
+                                     high_t_identity)
 from .core import Refusal
 from .lattice import anisotropic as A
 from .lattice import geom_tori as G
@@ -23,94 +28,14 @@ from .lattice import tri_honey as T
 from .lattice.ball import arb_q, baller, certify
 from .spec import ModelSpec
 
-BAX = "Baxter, Exactly Solved Models (1982) (ANU PDF, page images read)"
-AU = ("Athanasopoulos & Ueltschi, Ann. Henri Poincare (2024), arXiv:2407.05303v2 (read), Theorem "
-      "2.1(b) (Houtappel, Physica 16, 425 (1950), not fetched)")
-PBM = "Pierre, Bernu & Messio, SciPost Phys. 19, 025 (2025), arXiv:2501.18569v2 (PDF read)"
-ST = f"{BAX}, Eqs. (6.4.4)-(6.4.16)"
-DUAL = f"{BAX}, Eqs. (6.3.6)-(6.3.8), (6.5.1)-(6.5.7)"
-TORI = "exact finite tori (lattice/geom_tori.py; derived here)"
-LIT = lambda cite, note: Stability("exact-by-literature", "exact", cite, note)
-CONS = lambda cite, note: Stability("not-computed", "exact", cite, note)
-AF_MAX_K = 3                # |K| beyond which the frustrated integrand is not certified (measured)
-
-
-def _put(**balls):
-    vals, errs = {}, {}
-    for k, b in balls.items():
-        vals[k], errs[k] = b.value_and_error(40)
-    return vals, errs
-
-
-def _s(x, d=6):
-    return mp.nstr(x, d)
-
-
-def _js(p, positive):
-    Js = tuple(p.get(f"J{i}", 1) for i in (1, 2, 3))
-    A.couplings(p.get("beta", "0.2"), Js, positive)       # validates (refusals precondition:J*)
-    return Js
-
-
-def _side(p, default, hi):
-    L = p.get("L", default)
-    if isinstance(L, bool) or not isinstance(L, int) or not 3 <= L <= hi:
-        raise Refusal("precondition:L", f"L = {L!r}: need an int in 3 .. {hi}")
-    return L
-
-
-def _agree(name, first, **others):
-    for k, b in others.items():
-        if not first.overlaps(b):
-            raise Refusal("no-solution:route-disagreement", f"{name}: {k} {b} does not overlap "
-                          f"{first}")
-
-
-def cylinder_sequence(geom, widths, Ks, bulk):
-    """-beta f of infinite cylinders of circumference m (the Perron root of the row transfer
-    matrix, enclosed by Collatz-Wielandt: lattice/geom_tori.cylinder_free_energy), m in `widths`:
-    the sequence, its last change and the offset of its last term from the bulk.  The band is 10 x
-    the last change (heuristic: it covers a geometric tail of ratio <= 0.9); a sequence ending
-    outside it is refused no-solution:torus-limit.  `resolved`: band < 1e-4."""
-    vals = [G.cylinder_free_energy(geom, m, Ks).mid() for m in widths]
-    with mp.workdps(45):
-        est, b = vals[-1], bulk.mid()
-        band = max(10 * abs(vals[-1] - vals[-2]), mp.mpf("1e-30") * max(1, abs(est)))
-        off = abs(est - b)
-    out = {"widths": list(widths), "minus_beta_f": [_s(v, 12) for v in vals], "band": _s(band, 2),
-           "offset": _s(off, 2), "resolved": band < mp.mpf("1e-4"),
-           "kind": "finite-size consistency check (cylinders), no proven bound"}
-    if not off <= band:
-        raise Refusal("no-solution:torus-limit", f"{geom}: the cylinder sequence ends at "
-                      f"{_s(est, 12)}, {_s(off, 2)} from the bulk {_s(b, 12)}, outside its band "
-                      f"{_s(band, 2)} (10 x the last change)")
-    return out
-
-
-def _torus(geom, L, Ks, bulk, sizes):
-    """The L x L torus by the transfer matrix, the enumeration where it is small, the cylinder
-    sequence (circumferences `sizes`) towards the bulk."""
-    tz = G.torus_free_energy(geom, L, L, Ks)
-    t = G.GEOM[geom][0]
-    meta = {"torus_size": f"{L} x {L}"}
-    if t * L * L <= 16:                 # 2^16 configurations (the 18-site honeycomb: tests)
-        E, cnt = G.class_sizes(geom, L, L), G.counts(geom, L, L)
-        ez = certify(lambda: G.z_of_counts(cnt, E, [arb_q(k) for k in Ks]).log() / (t * L * L))
-        if not tz.overlaps(ez):
-            raise Refusal("no-solution:torus-disagreement", f"{geom} {L} x {L}: transfer matrix "
-                          f"{tz} and enumeration {ez} differ")
-        meta["torus_enumeration"] = "equal (all 2^n configurations)"
-    meta["cylinder_sequence"] = cylinder_sequence(geom, sizes, Ks, bulk)
-    return tz, meta
-
 
 # ---- ising_triangular --------------------------------------------------------------------------
-def _ferro(p):
-    return all(A.couplings(1, (j,), False)[0] > 0 for j in _js(p, False))
+def _unfrustrated(p):
+    return not _frustrated(p)
 
 
 def _tri_crit(p):
-    Js = _js(p, True)
+    Js, note = _tri_js(p)
     beta = p.get("beta", "0.2")
     bc = T.triangular_critical_beta(*Js)
     js = A.couplings(1, Js)
@@ -137,30 +62,39 @@ def _tri_crit(p):
                       "Baxter (6.5.2) sinh 2K* = k sinh 2K")
     v, e = _put(beta_c=bc, kappa=kap, self_dual_K1=sd[0], self_dual_K2=sd[1], self_dual_K3=sd[2])
     phase = "T > T_c" if kap.mid() > 1 else "T < T_c"
-    return Out({**v, "phase": phase}, f"beta_c from k = 1 (Baxter (6.4.16), (6.5.5)); the Kac-Ward "
+    return Out({**v, "phase": phase, **({"gauge": note} if note else {})}, f"beta_c from k = 1 (Baxter (6.4.16), (6.5.5)); the Kac-Ward "
                "integrand's minimum vanishes there; K_c is the fixed point of star-triangle o "
                f"duality; at beta: k = {_s(kap.mid())} ({phase}), K* = Baxter (6.5.2)", errors=e)
 
 
-def _tri_f(p):
-    Js, beta = _js(p, False), p.get("beta", "0.2")
-    ks = A.couplings(beta, Js, False)
-    ferro = _ferro(p)
-    if not ferro and max(abs(k) for k in ks) > AF_MAX_K:
-        raise Refusal("precondition:beta", f"frustrated couplings with max |K| = "
-                      f"{float(max(abs(k) for k in ks)):.4g} > {AF_MAX_K}: the integrand's near-zero "
-                      "(the ground-state soft mode) is not certified here; T = 0 is the "
+def _soft_mode(fn):
+    """Run fn; a radius stall of the frustrated integrand is refused under its own name."""
+    try:
+        return fn()
+    except Refusal as r:
+        if r.reason != "no-solution:radius-stall":
+            raise
+        raise Refusal("no-solution:frustrated-soft-mode", "the frustrated Kac-Ward integrand nearly "
+                      "vanishes on the integration path (the ground-state soft mode), and the "
+                      f"certified integrator cannot enclose it at this beta ({r.detail}); T = 0 is "
                       "ground_state_entropy (J1 = J2 = J3 < 0)")
-    f = T.triangular_free_energy(beta, *Js)
+
+
+def _tri_f(p):
+    (Js, note), beta = _tri_js(p), p.get("beta", "0.2")
+    fr = _frustrated(p)
+    f = _soft_mode(lambda: T.triangular_free_energy(beta, *Js))
     balls = {"minus_beta_f": f}
-    if ferro:
+    iso = Js[0] == Js[1] == Js[2]
+    if not fr:
         balls["minus_beta_f_square_route"] = T.triangular_free_energy_square(beta, *Js)
-        if Js[0] == Js[1] == Js[2]:
-            balls["minus_beta_f_pierre"] = T.triangular_free_energy_pierre(beta, Js[0])
+    if iso:          # Pierre et al.'s X_k(v) holds for v < 0 too (their Sec. 5.2)
+        balls["minus_beta_f_pierre"] = _soft_mode(lambda: T.triangular_free_energy_pierre(beta, Js[0]))
     _agree("triangular -beta f", f, **{k: b for k, b in balls.items() if k != "minus_beta_f"})
     v, e = _put(**balls)
-    return Out(v, "-beta f: Kac-Ward single integral" + (", = Baxter (11.7.13) (three square "
-               "lattices through the star-triangle map)" if ferro else "") +
+    return Out({**v, **({"gauge": note} if note else {})}, "-beta f: Kac-Ward single integral" +
+               (", = Baxter (11.7.13) (three square lattices through the star-triangle map)"
+                if not fr else " (frustrated: J1 J2 J3 < 0)") +
                (", = Pierre et al. (19)-(20)" if "minus_beta_f_pierre" in balls else ""), errors=e)
 
 
@@ -177,27 +111,28 @@ def _tri_dual(p):
 
 
 def _tri_torus(p):
-    Js, beta = _js(p, False), p.get("beta", "0.2")
+    (Js, _), beta = _tri_js(p), p.get("beta", "0.2")
     L = _side(p, 4, 6)
     ks = A.couplings(beta, Js, False)
-    bulk = T.triangular_free_energy(beta, *Js)
-    tz, meta = _torus("triangular", L, ks, bulk, (3, 4, 5))
+    bulk = _soft_mode(lambda: T.triangular_free_energy(beta, *Js))
+    tz, meta = _torus("triangular", L, ks, bulk, (3, 4, 5), Js,
+                      lambda b: T.triangular_free_energy(b, *Js))
     v, e = _put(torus_minus_beta_f=tz)
-    return Out({**v, **meta}, f"{L} x {L} triangular torus (transfer matrix in balls" +
-               (", = enumeration" if "torus_enumeration" in meta else "") + "); cylinders of "
-               "circumference 3, 4, 5 towards the bulk (consistency check)", errors=e)
+    return Out({**v, **meta}, f"{L} x {L} triangular torus (transfer matrix in balls; = the bulk "
+               "at beta = 1e-8 within O(K^L)); cylinders of circumference 3, 4, 5 towards the bulk "
+               "(consistency check)", errors=e)
 
 
 def _af(p):
-    Js = _js(p, False)
-    return Js[0] == Js[1] == Js[2] and A.couplings(1, (Js[0],), False)[0] < 0
+    Js = _raw(p)
+    return Js[0] == Js[1] == Js[2] and Js[0] < 0
 
 
 def _wannier(p):
     s0 = T.wannier_entropy()
     beta, (J,) = p.get("beta", "0.2"), _js(p, False)[:1]
     (K,) = A.couplings(beta, (J,), False)
-    f = T.triangular_free_energy(beta, J, J, J)
+    f = _soft_mode(lambda: T.triangular_free_energy(beta, J, J, J))
     with mp.workdps(45):
         excess = f.mid() - abs(mp.mpf(K.numerator) / K.denominator) - s0.mid()
     if not excess >= -f.rad() - s0.rad():
@@ -212,14 +147,15 @@ def _wannier(p):
                                       "ln_count_per_site": _s(mp.log(c[jmax]) / (Lx * Ly), 8)}
     v, e = _put(ground_state_entropy=s0)
     return Out({**v, "ground_state_counts": counts, "entropy_excess_at_beta": _s(excess, 6)},
-               "s0 = (2/pi) int_0^{pi/3} ln(2 cos w) dw (Pierre et al. Table 5: 0.3231); -beta f - "
+               "s0 = (2/pi) int_0^{pi/3} ln(2 cos w) dw (reduced here from Pierre et al.'s X_k(-1) "
+               "= 2^4 (9/4 - xi); their Table 5: 0.3231; Zukovic: 0.32306); -beta f - "
                "beta |e0| >= s0 at the run's beta; the exact ground-state count on the 3 x 3 torus "
                "(finite-size, no bound)", errors=e)
 
 
 def ising_triangular():
-    steps = [fstep("triangular-critical-point", f"{DUAL}; {ST}", _tri_crit, when=_ferro,
-                   skip="a coupling is negative: no ferromagnetic critical point computed"),
+    steps = [fstep("triangular-critical-point", f"{DUAL}; {ST}", _tri_crit, when=_unfrustrated,
+                   skip="frustrated (J1 J2 J3 < 0): no critical point computed"),
              fstep("triangular-free-energy", f"{AU}; {BAX}, Eqs. (11.7.13), (11.7.15); {PBM}",
                    _tri_f),
              fstep("triangular-duality-identity", f"{DUAL}; {TORI}", _tri_dual),
@@ -229,7 +165,9 @@ def ising_triangular():
     rc = lambda key, k, **pp: RefCheck("lattice", key, (lambda k: lambda v: v[k])(k), params=pp,
                                        route="exact")
     refs = [rc("triangular_beta_c", "beta_c"), rc("triangular_minus_beta_f_beta0_2", "minus_beta_f"),
-            rc("triangular_af_ground_state_entropy", "ground_state_entropy", J1=-1, J2=-1, J3=-1)]
+            *(rc(k, "ground_state_entropy", J1=-1, J2=-1, J3=-1) for k in (
+                "triangular_af_ground_state_entropy", "triangular_af_ground_state_entropy_zukovic",
+                "triangular_af_ground_state_entropy_pierre_integral"))]
     crit = f"{BAX}, Eqs. (6.4.16), (6.5.5), (6.5.6)"
     fin = {"beta_c": LIT(crit, "k = 1: closed form (1/2) asinh(3^-1/2)/J when J1 = J2 = J3, else the "
                          "certified root of Baxter's k(beta) = 1 (k decreasing in beta)"),
@@ -241,14 +179,16 @@ def ising_triangular():
                                "here), certified ball"),
            "minus_beta_f_square_route": LIT(f"{BAX}, Eqs. (11.7.13), (11.7.15)", "three square "
                                             "lattices and R, certified ball"),
-           "minus_beta_f_pierre": LIT(f"{PBM}, Eqs. (19), (20), Table 2", "isotropic, certified ball "
-                                      "(inner angle in closed form, derived here)"),
+           "minus_beta_f_pierre": LIT(f"{PBM}, Eqs. (19), (20), Table 2, Sec. 5.2", "isotropic, J of "
+                                      "either sign (v = tanh K < 0: the antiferromagnet), certified "
+                                      "ball (inner angle in closed form, derived here)"),
            "torus_minus_beta_f": LIT(TORI, "exact by construction: ln Z / N of the finite torus, "
                                      "certified ball"),
-           "ground_state_entropy": LIT(f"{PBM}, Sec. 5.2, Table 5 (0.3231; Wannier, Phys. Rev. 79, "
-                                       "357 (1950), not fetched)", "certified ball of (2/pi) "
-                                       "int_0^{pi/3} ln(2 cos w) dw, reduced here from Pierre et "
-                                       "al.'s X_k(-1) = 16 (9/4 - xi(k))")}
+           "ground_state_entropy": LIT(f"{PBM}, Sec. 5.2 (X_k(-1) = 2^nu (9/4 - xi(k)), int ln "
+                                       "X_k(-1) = nu ln 2 - 0.74016), Table 5 (0.3231); "
+                                       f"{ZUK}", "certified ball of (2/pi) int_0^{pi/3} ln(2 cos "
+                                       "w) dw: the single-integral form is reduced here from "
+                                       "Pierre et al.'s X_k(-1) (they do not print it)")}
     spec = ModelSpec("ising_triangular", "ising", "none", constraint="triangular lattice, exact")
     return entry("ising_triangular", spec, f"{AU}; {BAX}, Ch. 6; {PBM}", {"exact": steps}, refs,
                  {"exact": "exact route, certified: Kac-Ward / Baxter / Pierre free energies and "
@@ -257,14 +197,20 @@ def ising_triangular():
                  "Triangular-lattice Ising model (zero field, three couplings): critical point, free "
                  "energy (three routes), exact duality identity, finite tori, the antiferromagnet's "
                  "ground-state entropy, certified", default_route="exact", finality=fin,
-                 meta=("phase", "duality_identity", "torus_size", "torus_enumeration",
+                 meta=("phase", "gauge", "duality_identity", "torus_size", "torus_high_t_identity",
                        "cylinder_sequence", "ground_state_counts", "entropy_excess_at_beta"),
                  parameters={"exact": ("beta", "J1", "J2", "J3", "L")}, rigor={"exact": "certified"})
 
 
 # ---- ising_honeycomb ---------------------------------------------------------------------------
+def _hc_js(p):
+    """Every honeycomb face has two edges of each class, so no sign pattern is frustrated: any
+    negative J maps onto |J| by a gauge flip, and the entry computes with |J| (meta gauge)."""
+    return gauge(_raw(p))
+
+
 def _hc_crit(p):
-    Js, beta = _js(p, True), p.get("beta", "0.4")
+    (Js, note), beta = _hc_js(p), p.get("beta", "0.4")
     bc = T.honeycomb_critical_beta(*Js)
     js = A.couplings(1, Js)
     with baller().hygiene.ctx_guard(prec=600):
@@ -281,13 +227,13 @@ def _hc_crit(p):
     lv = T.honeycomb_l(beta, *Js)
     v, e = _put(beta_c=bc, l=lv)
     phase = "T > T_c" if lv.mid() > 1 else "T < T_c"
-    return Out({**v, "phase": phase}, "beta_c from l = 1 (Baxter (11.7.6)); L_c is the fixed point "
+    return Out({**v, "phase": phase, **({"gauge": note} if note else {})}, "beta_c from l = 1 (Baxter (11.7.6)); L_c is the fixed point "
                "of duality o star-triangle, and its star-triangle image has k = 1 (Baxter (6.4.16)); "
                f"l = {_s(lv.mid())} at beta ({phase})", errors=e)
 
 
 def _hc_f(p):
-    Js, beta = _js(p, True), p.get("beta", "0.4")
+    (Js, _), beta = _hc_js(p), p.get("beta", "0.4")
     f = T.honeycomb_free_energy(beta, *Js)
     balls = {"minus_beta_f": f, "minus_beta_f_duality": T.honeycomb_free_energy_duality(beta, *Js)}
     if Js[0] == Js[1] == Js[2]:
@@ -300,7 +246,7 @@ def _hc_f(p):
 
 
 def _hc_st(p):
-    Js, beta = _js(p, True), p.get("beta", "0.4")
+    (Js, _), beta = _hc_js(p), p.get("beta", "0.4")
     ls = A.couplings(beta, Js)
     # 4 x 3, not L x L: the L x L torus is symmetric under every permutation of the three edge
     # directions, so a K on the wrong edge would pass there
@@ -314,14 +260,15 @@ def _hc_st(p):
 
 
 def _hc_torus(p):
-    Js, beta = _js(p, True), p.get("beta", "0.4")
+    (Js, _), beta = _hc_js(p), p.get("beta", "0.4")
     L = _side(p, 3, 4)
     ks = A.couplings(beta, Js)
-    tz, meta = _torus("honeycomb", L, ks, T.honeycomb_free_energy(beta, *Js), (2, 3))
+    tz, meta = _torus("honeycomb", L, ks, T.honeycomb_free_energy(beta, *Js), (2, 3), Js,
+                      lambda b: T.honeycomb_free_energy(b, *Js))
     v, e = _put(torus_minus_beta_f=tz)
     return Out({**v, **meta}, f"{L} x {L} honeycomb torus ({2 * L * L} sites; transfer matrix in "
-               "balls" + (", = enumeration" if "torus_enumeration" in meta else "") + "); cylinders "
-               "of circumference 2, 3 cells towards the bulk (consistency check)", errors=e)
+               "balls; = the bulk at beta = 1e-8 within O(K^L)); cylinders of circumference 2, 3 "
+               "cells towards the bulk (consistency check)", errors=e)
 
 
 def ising_honeycomb():
@@ -350,9 +297,9 @@ def ising_honeycomb():
                  "Honeycomb-lattice Ising model (zero field, three couplings > 0): critical point, "
                  "free energy (three routes), the star-triangle identity on a finite torus, "
                  "certified", default_route="exact", finality=fin,
-                 meta=("phase", "star_triangle_identity", "torus_size", "torus_enumeration",
-                       "cylinder_sequence"),
+                 meta=("phase", "gauge", "star_triangle_identity", "torus_size",
+                       "torus_high_t_identity", "cylinder_sequence"),
                  parameters={"exact": ("beta", "J1", "J2", "J3", "L")}, rigor={"exact": "certified"})
 
 
-__all__ = ["ising_honeycomb", "ising_triangular", "cylinder_sequence"]
+__all__ = ["cylinder_sequence", "gauge", "high_t_identity", "ising_honeycomb", "ising_triangular"]

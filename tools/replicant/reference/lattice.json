@@ -158,7 +158,19 @@
   "triangular_af_ground_state_entropy": {
     "value": "0.3231",
     "tol": "5e-5",
-    "cite": "ground-state entropy per site of the isotropic triangular Ising antiferromagnet: Pierre, Bernu & Messio, arXiv:2501.18569v2 (PDF read), Table 5 (s0AF = 0.3231 for A333333) and Sec. 5.2 (X_k(-1) = 2^4 (9/4 - xi(k))); Wannier, Phys. Rev. 79, 357 (1950) (Pierre et al.'s Ref. [35]), not fetched. Value: the 4 printed digits; tol 5e-5",
-    "independent_route": "(2/pi) int_0^{pi/3} ln(2 cos w) dw (reduced here from Pierre et al.'s X_k(-1)) certified by acb.integral: 0.32306594721945..; -beta f - beta|e0| of the Kac-Ward free energy at J = -1 tends to it (3.32308675 - 3 at beta = 3); exact ground-state counts on small tori (finite-size)"
+    "cite": "ground-state entropy per site of the isotropic triangular Ising antiferromagnet: Pierre, Bernu & Messio, arXiv:2501.18569v2 (PDF read), Table 5 (s0AF = 0.3231 for A333333) and Sec. 5.2 (X_k(-1) = 2^4 (9/4 - xi(k))); They cite Wannier, Phys. Rev. 79, 357 (1950) (Ref. [35]); its value was corrected in Wannier's erratum, Phys. Rev. B 7, 5017 (1973) (as reported by the I3 review; Zukovic, arXiv:1303.0184, cites both); neither was fetched. Value: the 4 printed digits; tol 5e-5",
+    "independent_route": "(2/pi) int_0^{pi/3} ln(2 cos w) dw, reduced here from Pierre et al.'s X_k(-1) (they do not print the single integral), certified by acb.integral: 0.32306594721945..; the 2D integral ln 2 + (1/2) int d^2k/4pi^2 ln(9/4 - xi) by nested mpmath quadrature agrees (slow test); -beta f - beta|e0| of the Kac-Ward and Pierre free energies at J = -1 tends to it; exact ground-state counts on small tori (finite-size)"
+  },
+  "triangular_af_ground_state_entropy_zukovic": {
+    "value": "0.32306",
+    "tol": "1e-5",
+    "cite": "residual entropy density S0/N = 0.32306 of the spin-1/2 triangular Ising antiferromagnet: Zukovic, Eur. Phys. J. B 86, 283 (2013), arXiv:1303.0184v1 (PDF read), abstract and Sec. 2 ('the residual entropy density S0/N = 0.32306 [4, 18] is known exactly', [4] Wannier, Phys. Rev. 79, 357 (1950), [18] Wannier, Phys. Rev. B 7, 5017 (1973)). Value: the 5 printed digits, which truncate (not round) 0.3230659..; tol 1e-5 covers that (5e-6 would not)",
+    "independent_route": "(2/pi) int_0^{pi/3} ln(2 cos w) dw certified by acb.integral (0.3230659472..); Pierre et al.'s Table 5 0.3231 and their int ln X_k(-1) = nu ln 2 - 0.74016"
+  },
+  "triangular_af_ground_state_entropy_pierre_integral": {
+    "value": "0.32306718056",
+    "tol": "3e-6",
+    "cite": "s0 = ln 2 + I/2 with I = int_BZ d^2k/(4 pi^2) ln(9/4 - xi(k)) = -0.74016: Pierre, Bernu & Messio, arXiv:2501.18569v2 (PDF read), Sec. 5.2 (X_k(-1) = 2^nu (9/4 - xi(k)), nu = 4 for A333333, int ln X_k(-1) = nu ln 2 - 0.74016) with Eqs. (19), (20) at v -> -1 (the reduction s0 = ln 2 + I/2 derived here: -beta f + beta e0, e0 = J per site, Table 5). Value: ln 2 - 0.37008; tol 3e-6 covers the 5 printed decimals of I (2.5e-6 in s0)",
+    "independent_route": "(2/pi) int_0^{pi/3} ln(2 cos w) dw certified by acb.integral: 0.3230659472..; the 2D integral by nested mpmath quadrature (slow test)"
   }
 }

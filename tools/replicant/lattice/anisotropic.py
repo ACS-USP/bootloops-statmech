@@ -44,16 +44,25 @@ _HOOKS: "dual_mobius" (-1, 1, 1, 1): the duality map on x = e^{-2K}, x* = (p y +
 i.e. e^{-2K*} = (1 - e^{-2K})/(1 + e^{-2K}) = tanh K (planted: a wrong duality map, also seen by
 lattice/tri_honey.py and lattice/geom_tori.py); "triple_sign" (+1): the sign of S1 S2 S3 in the
 Kac-Ward integrand (planted 0: the triple product dropped, a wrong triangular lattice weight); "cross_coupling" (False:
-planted True puts S1 where S2 belongs in D, invisible at J1 = J2).
+planted True puts S1 where S2 belongs in D, invisible at J1 = J2); "dual_swapped" (False: planted
+True pairs K1* with K1 instead of K2, Baxter (6.2.14a) read wrongly).
+Memoisation (`memo`): Ball-returning functions of the I3 modules are cached on their arguments and
+on the three I3 `_HOOKS` dicts.  Plant errors only through those dicts, never by monkeypatching a
+function (a patched helper would not change the key); `clear_memo()` empties the cache.
 """
 from fractions import Fraction
 
 from ..core import Refusal
 from .ball import Ball, arb_q, ball_of, baller, certify, rational
 
-_HOOKS = {"dual_mobius": (-1, 1, 1, 1), "triple_sign": 1, "cross_coupling": False}
+_HOOKS = {"dual_mobius": (-1, 1, 1, 1), "triple_sign": 1, "cross_coupling": False,
+          "dual_swapped": False}
 _MAX_PREC = 1 << 13
 _MEMO = {}
+
+
+def clear_memo():
+    _MEMO.clear()
 
 
 def memo(fn):
@@ -184,10 +193,8 @@ def certified_root(g, lo, hi, digits=40) -> Ball:
             lo = m
         else:
             hi = m
-    from flint import arb
     with baller().hygiene.ctx_guard(prec=4 * digits + 128):
-        mid = arb_q((lo + hi) / 2)
-        return ball_of(arb(mid.mid(), arb_q((hi - lo) / 2).mid()))
+        return ball_of(arb_q(lo).union(arb_q(hi)))       # contains [lo, hi], hence the root
 
 
 @memo
@@ -211,10 +218,17 @@ def dual_coupling(K):
     return -((p * y + q) / (r * y + s)).log() / 2
 
 
+def dual_pair(K1, K2):
+    """(K1*, K2*) of Baxter (6.2.14a): tanh K1* = e^{-2 K2}, tanh K2* = e^{-2 K1} (arbs)."""
+    if _HOOKS["dual_swapped"]:                          # planted: K1* from K1
+        return dual_coupling(K1), dual_coupling(K2)
+    return dual_coupling(K2), dual_coupling(K1)
+
+
 @memo
 def dual_couplings(beta, J1=1, J2=1):
     K1, K2 = couplings(beta, (J1, J2))
-    return (certify(lambda: dual_coupling(arb_q(K2))), certify(lambda: dual_coupling(arb_q(K1))))
+    return tuple(certify(lambda i=i: dual_pair(arb_q(K1), arb_q(K2))[i]) for i in (0, 1))
 
 
 @memo
@@ -223,16 +237,16 @@ def duality_relation(beta, J1=1, J2=1):
     K1, K2 = couplings(beta, (J1, J2))
 
     def lhs():
-        d1, d2 = dual_coupling(arb_q(K2)), dual_coupling(arb_q(K1))
+        d1, d2 = dual_pair(arb_q(K1), arb_q(K2))
         return integral3(d1, d2, arb_q(0))
 
     def rhs():
         k1, k2 = arb_q(K1), arb_q(K2)
-        d1, d2 = dual_coupling(k2), dual_coupling(k1)
+        d1, d2 = dual_pair(k1, k2)
         return integral3(k1, k2, arb_q(0)) + (2 * d1.cosh() * d2.cosh()).log() - k1 - k2
     return certify(lhs), certify(rhs)
 
 
-__all__ = ["baxter_square", "certified_root", "couplings", "critical_beta", "critical_coupling",
-           "criticality", "dual_coupling", "dual_couplings", "duality_relation", "free_energy",
+__all__ = ["baxter_square", "certified_root", "clear_memo", "couplings", "critical_beta", "critical_coupling",
+           "criticality", "dual_coupling", "dual_couplings", "dual_pair", "duality_relation", "free_energy",
            "free_energy_baxter", "integral3"]
