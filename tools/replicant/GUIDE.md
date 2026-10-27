@@ -685,6 +685,25 @@ I3 functions are memoised on them; `anisotropic.clear_memo()` empties the cache)
 beta=3/10` (`beta_c` 0.366429, `minus_beta_f` = `minus_beta_f_duality` 0.988237,
 `star_triangle_identity` on the 4 x 3 tori). Every value is final (exact-by-literature, or exact
 by construction for the finite tori); the cylinder sequences are consistency checks in meta.
+PERCOLATION (P1: `percolation/`, needs python-flint): bond or site percolation on the Bethe lattice
+(`percolation_bethe`, coordination k) and on Erdos-Renyi / configuration-model graphs
+(`percolation_graph`). Route `cavity` (certified): u = 1 - t + t G1(u) (Callaway et al. Eq. (15)),
+every root in [0, 1] by interval Newton (complete by convexity), stability the certified f'(u) =
+t G1'(u); P_inf = 1 - G0(u) (bond), t (1 - G0(u)) (site); `mean_finite_cluster_size`; `p_c` =
+1/G1'(1); `molloy_reed_Q`; `chi_amplitude` = <k> p_c^2; `p_inf_slope_at_p_c`; `P_s1 .. P_s{s_max}`
+(series iteration = Lagrange inversion = the Bethe / Borel closed form); second routes
+`P_inf_closed_form` (Bethe k = 3, 4; Lambert W for ER) and a monotone bracket (meta). At p_c
+exactly: `ambiguous:critical-point`; unseparable from u = 1: `undetermined:near-critical`; a power law
+with tau <= 3 (<k^2> = oo): `unsupported:infinite-second-moment`. Route `sample` (statistical):
+union-find (`percolation/unionfind.py`, the shared module) on sampled graphs over named seeds, with the
+sampler self-checks `no-solution:sampler-degree`, `:sampler-occupation`. Examples: `run
+percolation_bethe --route cavity --param dilution=site` (k = 3, p = 3/4: `P_inf` 0.722222 = 13/18,
+`u` 1/3, `p_inf_slope_at_p_c` 6); `run percolation_graph --route cavity` (ER c = 2: `P_inf` 0.796812,
+`mean_finite_cluster_size` 1.684567); `run percolation_graph --route sample --param N=20000`.
+`percolation.window.window_scaling(Ns, seeds)`: the ER critical window, mean |C1| ~ N^(2/3) (log-slope
+with its band and a stated systematic; Nachmias-Peres Theorems 1, 2 checked), slow tests only.
+Planted hooks: `laws._HOOKS["g1_as_g0" | "g0_as_g1" | "coordination_shift"]`,
+`cavity._HOOKS["drop_root"]`, `sampling._HOOKS["edge_prob_scale" | "occupation_scale"]`.
 `from replicant.bounds import ...` (E10; needs python-flint and `tools/baller`; SK conventions of
 families/sk.py, P = -beta f; parameters are taken as the exact rationals they denote, an mpf or float its
 exact binary value): `guerra_rs_bound(beta, h, q, digits=40)` -> `Ball`; `guerra_rs_best_bound(beta, h=0,
@@ -778,6 +797,10 @@ side, 3 .. 6, default 4); `ising_triangular` (exact): `beta` (default 1/5), `J1`
 default 1; J1 J2 J3 > 0 computed as |J|), `L` (3 .. 6, default 4); `ising_honeycomb` (exact): `beta`
 (default 2/5), `J1`, `J2`, `J3` (nonzero, default 1, computed as |J|), `L` (3 .. 4, default 3);
 `ising2d_anisotropic` J1, J2 may be negative too (computed as |J|);
+`percolation_bethe` (cavity): `k` (default 3), `p` (default 3/4), `dilution` (bond | site), `s_max`
+(default 6); `percolation_graph` (cavity): `law` (poisson | finite | powerlaw), `c` (default 2), `pk`
+("k:p,k:p"), `tau`, `p` (default 1), `dilution`, `s_max`; both (sample): the same plus `N` (default
+2000), `seeds` (default 0-7), `s_max` (default 3);
 `sk_bounds` (bound): `beta` (rational > 0, default 2), `h` (default 0), `K` (1 or 2, default 1), `digits`
 (an int 1 .. 200: certified digits of the K-step balls, default 20, else `precondition:digits`; the RS values
 always 40); `online_perceptron` (online): `rule` (required: hebb | perceptron | adatron | optimal), `eta`
@@ -869,7 +892,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `unbanked:missing-entry`, `:malformed`, `:no-citation`, `:no-independent-route` | a banked reference value is absent or has no citation / no independent route (a value that fed a fit never certifies it) |
 | `tex-engine:failed`, `tex-engine:unavailable` | `--pdf`: the engine ran and failed, or could not reach its offline resources |
 
-CATALOG (24 entries: the 7 of v1, 12 added by the extensions E4-E10 and 5 by the online-learning tasks O1-O5 (O6 adds `rule=optimal` to `online_scm`); `list` shows the live table;
+CATALOG (29 entries: the 7 of v1, 12 added by the extensions E4-E10, 5 by the online-learning tasks O1-O5 (O6 adds `rule=optimal` to `online_scm`), 3 by the Ising task I3 and 2 by the percolation task P1; `list` shows the live table;
 values at the default / banked state points):
 
 | entry | routes | headline values | banked references | finality |
@@ -893,6 +916,8 @@ values at the default / banked state points):
 | `ising2d_anisotropic` anisotropic square lattice, certified | exact | `beta_c` 0.304689 (J = (1, 2)), `criticality`, `critical_K2_given_K1`, `minus_beta_f` = `minus_beta_f_baxter` 0.797891 (beta = 1/5; = `minus_beta_f_onsager` when J1 = J2), `minus_beta_f_dual`, `dual_K1`, `dual_K2`, `torus_minus_beta_f` | `aniso_square_beta_c_j1_1_j2_2` (Baxter (6.2.17)), `aniso_square_minus_beta_f_beta0_2_j1_1_j2_2` (Baxter (11.7.15)) | all exact-by-literature (Baxter, Athanasopoulos & Ueltschi); `torus_minus_beta_f` exact by construction |
 | `ising_triangular` triangular lattice, certified | exact | `beta_c` 0.274653, `kappa`, `self_dual_K1..3` (ferromagnet), `minus_beta_f` = `minus_beta_f_square_route` = `minus_beta_f_pierre` 0.775675 (beta = 1/5), `torus_minus_beta_f`, `ground_state_entropy` 0.323066 and `minus_beta_f_pierre` (J1 = J2 = J3 < 0) | `triangular_beta_c` (Baxter (6.5.6)), `triangular_minus_beta_f_beta0_2` (Athanasopoulos & Ueltschi Thm 2.1(b)), `triangular_af_ground_state_entropy` 0.3231 (Pierre et al. Table 5, tol 5e-5), `_zukovic` 0.32306 (Zukovic 2013, tol 1e-5: truncated digits), `_pierre_integral` ln 2 - 0.74016/2 (Pierre et al. Sec. 5.2, tol 3e-6) | all exact-by-literature (Baxter, Athanasopoulos & Ueltschi, Pierre et al.); `torus_minus_beta_f` exact by construction |
 | `ising_honeycomb` honeycomb lattice, certified | exact | `beta_c` 0.658479, `l`, `minus_beta_f` (star-triangle) = `minus_beta_f_duality` = `minus_beta_f_pierre` 0.811676 (beta = 2/5), `torus_minus_beta_f` | `honeycomb_beta_c` (Baxter (6.5.7)), `honeycomb_minus_beta_f_beta0_4` (Pierre et al. Eqs. (19), (20)) | all exact-by-literature (Baxter's maps from the Kac-Ward triangular, Pierre et al.); `torus_minus_beta_f` exact by construction |
+| `percolation_bethe` bond / site percolation on the Bethe lattice, certified | cavity, sample | `p_c` 1/2, `u`, `P_inf` 0.962963 (k = 3, bond p = 3/4; site 13/18), `mean_finite_cluster_size`, `chi_amplitude`, `p_inf_slope_at_p_c`, `P_s1..6`; sample: `P_inf_sampled` etc. | `bethe_pc_k3`, `bethe_site_p_inf_k3_p3_4`, `bethe_site_p_inf_slope_k3` 6, `bethe_mean_cluster_k3_p1_4` 5/2 (Malthe-Sorenssen 2024, Eqs. (3.2), (3.11), (3.15), (3.20)); slow statistical: the sampled `P_inf` | `u`, `P_inf`, `mean_finite_cluster_size` stable (computed f'(u) < 1); `p_c`, amplitudes, `P_s` not-computed; sampled values not-computed (statistical) |
+| `percolation_graph` Erdos-Renyi / configuration model, certified | cavity, sample | ER c = 2: `P_inf` 0.796812, `mean_finite_cluster_size` 1.684567, `molloy_reed_Q`, `p_c`, `P_s` (Borel); finite laws `pk` | `er_giant_c2`, `er_mean_cluster_c2` (NSW Eqs. (37), (38)), `nsw_eq24_site_threshold` 1148/2271 (CNSW Eq. (12)), `nsw_eq24_molloy_reed_Q` 2.246 (Molloy-Reed 1995) | as `percolation_bethe`; `branching_G1p1`, `molloy_reed_Q` exact-by-literature (definitions) |
 | `series_ising2d` 2D Ising (Onsager) free energy, exact series | series | `a4` 1 .. `a20` 8174.2 (v = tanh K); `operator_order` 3, `operator_degree` 8, `elliptic_factor_order` 2; `u_c` 3 - 2 sqrt 2, `v_c` 0.414214, `critical_exponent` 2, `alpha` 0 | `a4`, `a6`, `a8`, `a10` (Finch's table; independently the exact 7 x 7 torus), `v_c` (Kramers-Wannier / Onsager via Duminil-Copin), `alpha` (Onsager via Duminil-Copin, Baxter) | coefficients exact-by-literature (the cited integral, expanded exactly); operator values not-computed (L g = P proved exactly; minimal within bounds only); `u_c`, `v_c`, `alpha` exact-by-literature |
 | `sk_bounds` SK pressure: Guerra's RS and K-step RSB upper bounds, certified | bound | `rs_bound` 1.584786 (beta = 2: min over q of P_RS), `rs_q` 0.530368 and every stationary point; `rsb1_bound` 1.582418 at the package's 1RSB optimiser (`K=2`: `rsb2_bound`); `chain_verdict` | `annealed_pressure_beta_half` (ln 2 + 1/16: Guerra 1992 Thm 3, the annealed value for beta <= 1) | bounds exact-by-literature (Guerra 2003 Thm 3), certified radii; `rs_q` stable iff P_RS''(q*) > 0 certified; the chain verdict is a consistency check (meta), not a theorem |
 | `online_perceptron` online learning of a perceptron teacher (Hebb, perceptron, AdaTron, optimal; output noise) | online | `eps_exponent`, `eps_constant` (alpha = 1e4; noiseless or Hebb), optimal `eps_constant_formula`; at `alpha`: `eps`, `R`, `Q`, `rho` (Hebb: `eps_hebb_closed_form`); optimal with noise: `no_learning_boundary`, `robust_boundary`; with `N`: `eps_sim` | exponents and constants for the four rules (Biehl-Riegler Eqs. (7), (8), (15); 0.88 from VKC 1998 Tables I-II, Kinouchi-Caticha 1992 not fetched); no-learning line 2 lam - 1/2 at lam = 0.3, 0.4 (Copelli et al. p. 5); robust line at lam = 0.2, 0.3, 0.4 READ OFF Copelli et al. Fig. 1a (tol 0.003) | all not-computed (physics-level ODE limit, self-averaging assumed); `eps_sim` statistical |

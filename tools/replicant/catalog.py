@@ -367,11 +367,12 @@ def catalog() -> dict:
         from .catalog_lattice import lattice_entries
         from .catalog_learning import learning_entries
         from .catalog_online import online_entries
+        from .catalog_percolation import percolation_entries
         from .catalog_series import series_entries
         from .catalog_sparse import sparse_entries
         for e in (dense_entries() + sparse_entries() + csp_entries() + inference_entries()
                   + learning_entries() + series_entries() + lattice_entries() + bounds_entries()
-                  + online_entries()):
+                  + online_entries() + percolation_entries()):
             _CATALOG[e.name] = e
     return dict(_CATALOG)
 

@@ -67,7 +67,9 @@ ROUTES = {"replica": "replica method: replicated partition function Z^n, disorde
                    "arithmetic (certified enclosures), checked against the package's own optimisers",
           "online": "online learning: the N -> oo order-parameter ODEs in alpha = examples / N, from "
                     "Gaussian averages over the local fields, integrated, and checked against finite-N "
-                    "simulation over named seeds"}
+                    "simulation over named seeds",
+          "sample": "finite-graph sampling: random graphs over named seeds, percolated and labelled by "
+                    "union-find; means +- stderr (statistical, never certified)"}
 
 
 def _block(b: TexBlock, bib):

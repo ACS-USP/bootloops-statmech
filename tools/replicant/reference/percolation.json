@@ -1,0 +1,50 @@
+{
+  "bethe_pc_k3": {
+    "value": "0.5",
+    "tol": "1e-29",
+    "cite": "bond or site percolation threshold of the Bethe lattice with coordination Z = 3, p_c = 1/(Z - 1): Malthe-Sorenssen, 'Percolation Theory Using Python', Lecture Notes in Physics 1029 (Springer, 2024), Ch. 3 'Infinite-Dimensional Percolation', doi:10.1007/978-3-031-59900-2_3 (open-access chapter PDF read), Eq. (3.2) (a branching argument; Fisher & Essam, J. Math. Phys. 2, 609 (1961), the original, not fetched). Concordant: Saberi, 'Recent advances in percolation theory and its applications', arXiv:1504.02898v2 (PDF read), Sec. 2.1.2 ('pc = 1/(z - 1) for any z >= 3'). Value: 1/2 exactly; tol 1e-29",
+    "independent_route": "replicant's exact rational 1/G1'(1) of the law G1 = x^(k-1) (percolation/laws.py), and the certified fixed-point count (percolation/cavity.py): only u = 1 at p = 0.49, two roots at p = 0.51, and the refusal ambiguous:critical-point at p = 1/2 exactly (tests/test_percolation.py)"
+  },
+  "bethe_site_p_inf_k3_p3_4": {
+    "value": "0.722222222222222222222222222222",
+    "tol": "1e-29",
+    "cite": "site percolation on the Bethe lattice with Z = 3 at p = 3/4: P = p (1 - Q^3), Q = (1 - p)/p for p > p_c = 1/2, so P = (3/4)(1 - 1/27) = 13/18: Malthe-Sorenssen, Percolation Theory Using Python (2024), Ch. 3, doi:10.1007/978-3-031-59900-2_3 (PDF read), Eqs. (3.4), (3.5), (3.8)-(3.11). Value: 13/18 by mpmath at 50 digits, rounded to 30 places; tol 1e-29",
+    "independent_route": "replicant's certified smallest root of u = 1 - t + t u^2 by interval Newton (percolation/cavity.py) and P_inf = t (1 - u^3); the closed form (1 - t)/t evaluated in percolation/closed_forms.py (no generating-function code) must overlap it; the monotone Galton-Watson bracket; sampled random 3-regular graphs, N = 20000 x 16 seeds (slow statistical check)"
+  },
+  "bethe_site_p_inf_slope_k3": {
+    "value": "6",
+    "tol": "1e-29",
+    "cite": "slope of P(p) at p_c+ for site percolation on the Bethe lattice with Z = 3: P ~ 6 (p - p_c), B = 6, beta = 1: Malthe-Sorenssen, Percolation Theory Using Python (2024), Ch. 3, doi:10.1007/978-3-031-59900-2_3 (PDF read), Eqs. (3.12)-(3.16). Value: 6 exactly; tol 1e-29",
+    "independent_route": "replicant's general amplitude p_c 2 <k> G1'(1)^2 / G1''(1) (derived in percolation/cavity.py from the expansion of u = 1 - t + t G1(u) about u = 1), an exact rational; the finite-difference slope of the certified P_inf at p_c + 1e-12 (tests/test_percolation.py)"
+  },
+  "bethe_mean_cluster_k3_p1_4": {
+    "value": "2.5",
+    "tol": "1e-29",
+    "cite": "mean cluster size on the Bethe lattice below p_c: S = (1 + p)/(1 - (Z - 1) p); Z = 3, p = 1/4: S = (5/4)/(1/2) = 5/2: Malthe-Sorenssen, Percolation Theory Using Python (2024), Ch. 3, doi:10.1007/978-3-031-59900-2_3 (PDF read), Eqs. (3.17)-(3.20). Source slip: the middle form of Eq. (3.20) is printed (1 + p)/(1 - p p_c); it should read (1 + p)/(1 - p/p_c), as its own last form p_c (1 + p)/(p_c - p) shows. Discrepant secondary source: Saberi, arXiv:1504.02898v2, Eq. (10) prints chi = [1 - (z - 1) p]^(-1), which is the mean size of a branch-rooted cluster (root with z - 1 children), not of a site's cluster (root with z neighbours): 2 instead of 2.5 here. Value: 5/2 exactly; tol 1e-29",
+    "independent_route": "replicant's certified 1 + <k> t/(1 - t G1'(1)) (percolation/cavity.py, from differentiating H0 = x G0(H1)), the closed form of percolation/closed_forms.py (must overlap), and the sampled mean finite-cluster size on random 3-regular graphs at p = 1/4, N = 20000 x 32 seeds (tests/test_percolation_slow.py)"
+  },
+  "er_giant_c2": {
+    "value": "0.796812130020020046161520937938",
+    "tol": "1e-29",
+    "cite": "giant component of the Erdos-Renyi graph with mean degree z = 2: S = 1 - exp(-z S) (Newman, Strogatz & Watts, Phys. Rev. E 64, 026118 (2001) (journal reference as given in the task brief; not printed in the arXiv PDF), arXiv:cond-mat/0007235v2 (PDF read), Eq. (37), from Eqs. (34), (35)). Value: the positive root of S = 1 - exp(-2 S) by mpmath findroot at 50 digits, rounded to 30 places; tol 1e-29",
+    "independent_route": "replicant's certified smallest root of u = exp(c (u - 1)) by interval Newton (percolation/cavity.py) and S = 1 - u; the Lambert-W closed form S = 1 + W0(-c e^-c)/c in arb (percolation/closed_forms.py, no generating-function code); sampled G(N, 2/(N - 1)) graphs, N = 20000 x 16 seeds (slow statistical check)"
+  },
+  "er_mean_cluster_c2": {
+    "value": "1.684567271446335045213472239697",
+    "tol": "1e-29",
+    "cite": "mean size of the finite component of a random vertex in the Erdos-Renyi graph with z = 2: <s> = 1/(1 - z + z S) (Newman, Strogatz & Watts, arXiv:cond-mat/0007235v2 (PDF read), Eq. (38), the Poisson case of Eq. (36)), with S of Eq. (37). Value: mpmath at 50 digits, rounded to 30 places; tol 1e-29",
+    "independent_route": "replicant's certified 1 + G0'(u) t G1(u)/(G0(u)(1 - t G1'(u))) (percolation/cavity.py) and its fixed-point form (audit); NSW Eq. (38) with the Lambert-W S (percolation/closed_forms.py) must overlap it; the sampled mean finite-cluster size (tests/test_percolation_sample.py)"
+  },
+  "nsw_eq24_site_threshold": {
+    "value": "0.505504183179216204315279612506",
+    "tol": "1e-29",
+    "cite": "site percolation threshold q_c = 1/G1'(1) (Callaway, Newman, Strogatz & Watts, 'Network robustness and fragility: percolation on random graphs', arXiv:cond-mat/0007300v2 (PDF read; journal reference not checked), Eq. (12)) of the degree law of Newman, Strogatz & Watts, arXiv:cond-mat/0007235v2 (PDF read), Eq. (24) (1000 people with 0 .. 5 acquaintances: {86, 150, 363, 238, 109, 54}): G1'(1) = <k(k - 1)>/<k> = (4542/1000)/(2296/1000), q_c = 1148/2271. Value: mpmath at 50 digits, rounded to 30 places; tol 1e-29",
+    "independent_route": "replicant's exact rational from the finite law (percolation/laws.py); the certified fixed points switch from one (u = 1) to two between q = 0.505 and 0.506 (tests/test_percolation.py); the refusal ambiguous:critical-point at q = 1148/2271 exactly"
+  },
+  "nsw_eq24_molloy_reed_Q": {
+    "value": "2.246",
+    "tol": "1e-29",
+    "cite": "Molloy-Reed parameter Q = sum_i i (i - 2) lambda_i (Molloy & Reed, 'A critical point for random graphs with a given degree sequence', Random Struct. Alg. 6, 161 (1995) (PDF read: the 1995 Wiley version), p. 163 and Theorem 1: Q > 0 a.s. a giant component, Q < 0 a.s. none; NSW Eq. (33) is the same criterion) for the degree law of NSW Eq. (24): (-150 + 0 + 3 x 238 + 8 x 109 + 15 x 54)/1000 = 1123/500. Value: exact; tol 1e-29",
+    "independent_route": "replicant's exact rational sum k (k - 2) p_k (percolation/laws.py); it equals <k> (G1'(1) - 1) = (2296/1000)(4542/2296 - 1), an identity checked on random finite laws in tests/test_percolation.py, and the undiluted law has two certified fixed points"
+  }
+}
