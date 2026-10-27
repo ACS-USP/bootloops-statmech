@@ -24,7 +24,8 @@ is refused undetermined:threshold-minimum.  Further first-order transitions abov
 (J09 Remark 4.7: other local maxima of h(p)/p^2) are not enumerated here; the selected root at a
 run point (kcore.py) is always the largest one.  The continuous case k = 2, K = 2 has t_c = 1/G1'(1)
 (an exact rational, J09 Remark 4.9) and no jump.
-_HOOKS["threshold_offset"] (0): a planted offset added to s* (tests).
+_HOOKS["threshold_offset"] (0): a planted offset added to s*; "edges_exponent_shift" (0): the jump's
+edges with x^(K + shift) (tests).
 """
 from dataclasses import dataclass
 from fractions import Fraction
@@ -34,7 +35,7 @@ from ..lattice.ball import Ball, arb_q, ball_of, baller
 from .kcore import PREC, Model
 from .laws import parse_law
 
-_HOOKS = {"threshold_offset": 0}
+_HOOKS = {"threshold_offset": 0, "edges_exponent_shift": 0}
 SCAN = 96
 
 
@@ -189,7 +190,7 @@ def occupation_threshold(law, K, k, kind) -> Threshold:
             x, core, b = tc * M.psi(s), tc * M.core(s), 1
         else:
             x, core, b = M.psi(s), M.core(s), tc
-        edges = arb_q(M.z) / M.K * b * x ** M.K
+        edges = arb_q(M.z) / M.K * b * x ** (M.K + _HOOKS["edges_exponent_shift"])
         out = Threshold("occupation", ball_of(tc), ball_of(s), ball_of(x), ball_of(core),
                         ball_of(edges), endpoint, False, boxes)
     return out
@@ -215,9 +216,23 @@ def degree_threshold(K, k, kind, t) -> Threshold:
             x, core, b = T * M.psi(s), T * M.core(s), 1
         else:
             x, core, b = M.psi(s), M.core(s), T
-        edges = ck / M.K * b * x ** M.K
+        edges = ck / M.K * b * x ** (M.K + _HOOKS["edges_exponent_shift"])
         return Threshold("mean degree", ball_of(ck), ball_of(s), ball_of(x), ball_of(core),
                          ball_of(edges), endpoint, False, boxes)
+
+
+def refuse_at_threshold(law, K, k, kind, t, refusal):
+    """Called when kcore.py cannot separate a double root: if t lies inside the certified t_c ball the
+    run is at the threshold, refused ambiguous:critical-point (P1's convention); otherwise the
+    caller's refusal (undetermined:near-critical) stands."""
+    try:
+        T = occupation_threshold(law, K, k, kind)
+    except Refusal:
+        return
+    if T.value.contains(t):
+        raise Refusal("ambiguous:critical-point", f"t = {t} is the certified threshold t_c = "
+                      f"{T.value.render(15)}: F(x) = x has a double root (the core's jump); not certified "
+                      f"({refusal.detail})")
 
 
 def bootstrap_closed_form(d, ell):
@@ -234,4 +249,5 @@ def bootstrap_closed_form(d, ell):
     return None
 
 
-__all__ = ["Threshold", "bootstrap_closed_form", "degree_threshold", "occupation_threshold"]
+__all__ = ["Threshold", "bootstrap_closed_form", "degree_threshold", "occupation_threshold",
+           "refuse_at_threshold"]

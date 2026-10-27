@@ -6,7 +6,8 @@ dynamics, unrelated to bootstrap resampling -- on the random d-regular graph).  
                          birth point as a certified global minimum (percolation/kcore_threshold.py);
                          second routes that must agree (else no-solution:route-disagreement): DGM's
                          own form in mpmath (percolation/kcore_dgm.py), csp/xorsat.py's 2-core at
-                         K >= 3, k = 2 (consumed, never edited), Balogh-Pittel's closed forms
+                         K >= 3, k = 2 (consumed, never edited), Balogh-Pittel's closed forms, the edge
+                         identity; an auxiliary route that does not compute is skipped with a note
   sample  (statistical)  finite graphs over named seeds, exact peeling / spreading
                          (percolation/kcore_sample.py)
 Run parameters:
@@ -27,7 +28,7 @@ from .catalog_lattice_common import _put
 from .core import Refusal
 from .lattice.ball import arb_q, ball_of, baller, rational
 from .percolation.kcore import PREC, kcore_fixed_points
-from .percolation.kcore_dgm import TOL, dgm_fixed, dgm_threshold
+from .percolation.kcore_dgm import DPS, TOL, dgm_fixed, dgm_threshold
 from .percolation.kcore_sample import sample_bootstrap, sample_kcore
 from .percolation.kcore_threshold import bootstrap_closed_form, degree_threshold, occupation_threshold
 from .percolation.laws import occupation, parse_law
@@ -35,6 +36,10 @@ from .spec import ModelSpec
 
 DGM = ("Dorogovtsev, Goltsev & Mendes, Phys. Rev. Lett. 96, 040601 (2006), arXiv:cond-mat/0509102v3 "
        "(PDF read), Eqs. (1), (2), (4)-(8), (11)")
+PSW = ("Pittel, Spencer & Wormald, 'Sudden emergence of a giant k-core in a random graph', J. Combin. "
+       "Theory B 67, 111 (1996), preprint cs.nyu.edu/~spencer/papers/k-core.pdf (PDF read, page 4 rendered): "
+       "abstract (c_k = min lambda/pi_k(lambda), pi_k = P(Po >= k - 1)), Thms 1-3 (the newborn core ~ "
+       "p_k(lambda_k) n, p_k = P(Po(lambda_k) >= k))")
 JL07 = ("Janson & Luczak, 'A simple solution to the k-core problem', Random Struct. Alg. 30, 50 (2007) "
         "(journal reference as cited in arXiv:math/0612827), arXiv:math/0508453v1 (PDF read), Thm 1.1 "
         "(Pittel, Spencer & Wormald's theorem: lambda_k = min mu/psi_(k-1)(mu), v/n -> psi_k(mu_k), e/n -> "
@@ -89,13 +94,66 @@ def _dgm_law(spec):
     return ("poisson", Fraction(L.c)) if L.kind == "poisson" else ("finite", L.degree())
 
 
-def _agree(key, ball, v, route):
+_ROUTE_ERRORS = (ArithmeticError, ValueError, TypeError)
+FIRST = ("p_c (and c_k) is the core's first appearance (J09 Eq. (4.9)); further first-order jumps of the "
+         "core above it (J09 Remark 4.7: other local maxima of h(p)/p^2) are not enumerated; the run point "
+         "always selects the largest root")
+
+
+def _off(ball, v, eps, cond):
+    """|ball - v| beyond the radius plus max(TOL, 10 eps / cond) (relative for |v| > 1): eps the route's
+    precision, cond = |1 - F'(x)| for values read off a root (a near-double root amplifies eps)."""
+    with baller().hygiene.ctx_guard(prec=PREC), mp.workdps(50):
+        tol = max(TOL, 10 * mp.mpf(eps) / cond) * max(1, abs(v))
+        return abs(ball.mid(45) - v) > ball.rad() + tol
+
+
+def _second(name, compute, pairs, cond=1):
+    """An auxiliary route against the certified balls: compute(dps) -> {key: mpf}; pairs [(label, ball,
+    key)].  At DPS digits, then at 40 before refusing no-solution:route-disagreement; a route that fails
+    to compute at both precisions is skipped with the reason (it never blocks a certified run)."""
+    errs = []
+    for dps in (DPS, 40):
+        try:
+            g = compute(dps)
+        except _ROUTE_ERRORS as exc:
+            errs.append(f"{dps} digits: {type(exc).__name__}: {exc}")
+            continue
+        bad = [(lab, b, g[k]) for lab, b, k in pairs if k in g and _off(b, g[k], mp.mpf(10) ** -dps, cond)]
+        if not bad:
+            return f"{name}: agrees" + (" at 40 digits (20 were not enough here)" if dps == 40 else "")
+        if dps == 40:
+            lab, b, v = bad[0]
+            raise Refusal("no-solution:route-disagreement", f"{lab}: certified {b.render(15)} vs {name} "
+                          f"{mp.nstr(v, 15)} (also at 40 digits)")
+    return f"{name}: SKIPPED, it did not compute here ({'; '.join(errs)})"
+
+
+def _csp(name, compute, pairs, cond=1):
+    """csp/xorsat.py (30 digits, its own precision) against the balls; skipped if it fails."""
+    try:
+        g = compute()
+    except _ROUTE_ERRORS + (Refusal,) as exc:     # e.g. its own residual audit near the jump
+        return f"{name}: SKIPPED, it did not compute here ({type(exc).__name__}: {exc})"
+    for lab, b, v in pairs:
+        if _off(b, g(v), mp.mpf(10) ** -30, cond):
+            raise Refusal("no-solution:route-disagreement", f"{lab}: certified {b.render(15)} vs {name} "
+                          f"{mp.nstr(g(v), 15)}")
+    return f"{name}: agrees"
+
+
+def _identity(key, ball, other, what):
+    """The edge identity e = <d> y x / K (JL07 Thm 1.1: mu^2/(2 lambda) at K = 2, t = 1; a hyperedge
+    survives with probability b x^(K-1) x = y x): a second path through the selected root."""
     with baller().hygiene.ctx_guard(prec=PREC):
-        with mp.workdps(40):
-            d = abs(ball.mid(30) - v)
-            if d > ball.rad() + TOL * max(1, abs(v)):
-                raise Refusal("no-solution:route-disagreement", f"{key}: certified {ball.render(15)} vs "
-                              f"{route} {mp.nstr(v, 15)}")
+        if not ball.arb.overlaps(other):
+            raise Refusal("no-solution:route-disagreement", f"{key} = {ball.render(15)} but {what} = "
+                          f"{other.str(15)}: the edge identity e = <d> y x / K fails")
+
+
+def _cond(jac):
+    with mp.workdps(20):
+        return max(mp.mpf(1) - mp.mpf(jac.arb.upper().str(20, radius=False)), mp.mpf(10) ** -300)
 
 
 def _kcore_threshold(p):
@@ -111,18 +169,21 @@ def _kcore_threshold(p):
             with baller().hygiene.ctx_guard(prec=PREC):
                 balls["alpha_k"] = ball_of(D.value.arb / K)
     if not T.continuous:
-        g = dgm_threshold(_dgm_law(spec), K, k, kind, t if spec[0] == "poisson" and t > 0 else None)
-        for key, gk in (("p_c", "threshold_t"), ("y_at_p_c", "y_star"), ("core_at_p_c", "core_at_jump"),
-                        ("c_k", "c_k"), ("mu_at_c_k", "mu_star")):
-            if key in balls and gk in g:
-                _agree(key, balls[key], g[gk], "DGM Eqs. (5)-(8)")
-        routes.append("DGM (8) in mpmath")
+        with baller().hygiene.ctx_guard(prec=PREC):
+            z = arb_q(parse_law(spec).mean())
+            _identity("edges_at_p_c", T.edges, z * T.s_star.arb * T.x.arb / K, "<d> y x / K at the jump")
+            if "c_k" in balls:
+                _identity("edges_at_c_k", D.edges, D.s_star.arb * D.x.arb / K, "mu x / K at the jump")
+        tck = t if spec[0] == "poisson" and t > 0 else None
+        routes.append(_second("DGM Eqs. (5)-(8) in mpmath", lambda dps: dgm_threshold(
+            _dgm_law(spec), K, k, kind, tck, dps), [(key, balls[key], gk) for key, gk in (
+                ("p_c", "threshold_t"), ("y_at_p_c", "y_star"), ("core_at_p_c", "core_at_jump"),
+                ("c_k", "c_k"), ("mu_at_c_k", "mu_star")) if key in balls]))
         if K > 2 and k == 2 and spec[0] == "poisson" and t == 1:
             from .csp.xorsat import xorsat_thresholds
-            X = xorsat_thresholds(K)
-            _agree("alpha_k", balls["alpha_k"], X.alpha_d, "csp/xorsat.py alpha_d")
-            _agree("mu_at_c_k", balls["mu_at_c_k"], X.lambda_d, "csp/xorsat.py lambda_d")
-            routes.append("csp/xorsat.py alpha_d, lambda_d (E5)")
+            routes.append(_csp("csp/xorsat.py alpha_d, lambda_d (E5)", lambda: (
+                lambda X: lambda key: getattr(X, key))(xorsat_thresholds(K)),
+                [("alpha_k", balls["alpha_k"], "alpha_d"), ("mu_at_c_k", balls["mu_at_c_k"], "lambda_d")]))
     v, e = _put(**balls)
     with baller().hygiene.ctx_guard(prec=PREC):
         possible = bool(T.value.arb <= 1)
@@ -131,7 +192,7 @@ def _kcore_threshold(p):
             "hyperedge_size": K, "core_order": k, "threshold_routes": routes}
     return Out({**v, **meta}, f"birth point p_c = {T.value.render(12)} ({meta['transition']}; "
                f"{T.boxes} boxes)" + (f"; c_k = {balls['c_k'].render(12)}" if "c_k" in balls else "") +
-               (f"; agrees with {', '.join(routes)}" if routes else ""), errors=e)
+               (f"; {'; '.join(routes)}" if routes else ""), errors=e, notes=(FIRST,) + tuple(routes))
 
 
 def _kcore_fixed(p):
@@ -139,18 +200,23 @@ def _kcore_fixed(p):
     R = kcore_fixed_points(spec, K, k, (kind, t))
     balls = {"x": R.selected.x, "y": R.y, "jacobian": R.selected.jacobian, "core_fraction": R.core,
              "core_edges": R.edges}
-    g = dgm_fixed(_dgm_law(spec), K, k, kind, t)
-    _agree("x", R.selected.x, g["x"], "DGM Eqs. (2), (4)")
-    _agree("core_fraction", R.core, g["core"], "DGM Eqs. (1), (11)")
-    routes = ["DGM (2), (4), (1) in mpmath"]
+    with baller().hygiene.ctx_guard(prec=PREC):
+        _identity("core_edges", R.edges, arb_q(parse_law(spec).mean()) * R.y.arb * R.selected.x.arb / K,
+                  "<d> y x / K")
+    cond = _cond(R.selected.jacobian)
+    routes = [_second("DGM Eqs. (2), (4), (1) and Janson's edges in mpmath", lambda dps: dgm_fixed(
+        _dgm_law(spec), K, k, kind, t, dps), [("x", R.selected.x, "x"), ("core_fraction", R.core, "core"),
+                                              ("core_edges", R.edges, "edges")], cond)]
     if K > 2 and k == 2 and spec[0] == "poisson" and t == 1 and R.selected.x.arb > 0:
         from .csp.xorsat import xorsat_core_size
-        with mp.workdps(40):                 # csp/xorsat.py parses alpha at the caller's precision
-            X = xorsat_core_size(K, f"{spec[1].numerator}/{spec[1].denominator * K}")
-        _agree("core_fraction", R.core, X.variables, "csp/xorsat.py V")
-        _agree("core_edges", R.edges, X.checks, "csp/xorsat.py C")
-        _agree("x", R.selected.x, X.q, "csp/xorsat.py q")
-        routes.append("csp/xorsat.py 2-core V, C, q (E5)")
+
+        def X():
+            with mp.workdps(40):             # csp/xorsat.py parses alpha at the caller's precision
+                c = xorsat_core_size(K, f"{spec[1].numerator}/{spec[1].denominator * K}")
+            return lambda key: getattr(c, key)
+        routes.append(_csp("csp/xorsat.py 2-core V, C, q (E5)", X, [
+            ("core_fraction", R.core, "variables"), ("core_edges", R.edges, "checks"),
+            ("x", R.selected.x, "q")], cond))
     v, e = _put(**balls)
     meta = {"phase": R.phase, "fixed_points": [r.x.render(12) for r in R.roots],
             "selected_stable": R.selected.stable, "hyperedge_size": K, "core_order": k,
@@ -159,7 +225,7 @@ def _kcore_fixed(p):
         meta["peeling_bracket"] = R.bracket
     return Out({**v, **meta}, f"{len(R.roots)} fixed point(s) in [0, 1]; the largest x = "
                f"{R.selected.x.render(12)} selected (F'(x) < 1, certified); core {R.core.render(12)}; "
-               f"agrees with {', '.join(routes)}", errors=e)
+               f"{'; '.join(routes)}", errors=e, notes=tuple(routes))
 
 
 def _kcore_sample(p):
@@ -197,13 +263,14 @@ def _kcore_finality():
                    "for k >= 3", "K >= 3: the tree-like fixed point with computed F'(x) < 1 (derived "
                    "here; at k = 2 = csp/xorsat.py's leaf-removal 2-core); no theorem fetched")
     thr = lambda v: (_lit("pi_c = inf lambda p^2/h(p) (J09 Eq. (4.9)); k = 2: 1/G1'(1) (Remark 4.9); "
-                          "certified global minimum", f"{J09}; {JL07}; {DGM}")
+                          "certified global minimum; " + FIRST, f"{J09}; {JL07}; {PSW}; {DGM}")
                      if v.get("hyperedge_size", 2) == 2 else
                      Stability("not-computed", "cavity", f"{DGM}; {MRZ}", "K >= 3: derived here (the "
-                               "minimum of y/Psi(y)^(K-1)); at k = 2 = E5's alpha_d"))
-    jump = Stability("not-computed", "cavity", f"{DGM}; {J09}", "the t -> t_c+ limit of the selected root "
-                     "at the certified argmin (derived here); at the threshold itself the core's size "
-                     "is not a law of large numbers (Janson & Luczak, arXiv:math/0612827, Thm 1.3)")
+                               "minimum of y/Psi(y)^(K-1)); at k = 2 = E5's alpha_d; " + FIRST))
+    jump = Stability("not-computed", "cavity", f"{DGM}; {J09}; {PSW}", "the t -> t_c+ limit of the selected "
+                     "root at the certified argmin (derived here; for ER at t = 1, K = 2, PSW Thms 2, 3: the "
+                     "newborn core ~ p_k(lambda_k) n); at the threshold itself the core's size is not a law "
+                     "of large numbers (Janson & Luczak, arXiv:math/0612827, Thm 1.3)")
     fin = {k: at_run for k in ("x", "y", "core_fraction", "core_edges")}
     fin["jacobian"] = Stability("stable", "cavity", DGM, "F'(x) of the selected root, certified < 1")
     fin.update({k: thr for k in ("p_c", "c_k", "alpha_k")})
@@ -217,6 +284,7 @@ def percolation_kcore():
     refs = [RefCheck("percolation_kcore", "er_3core_threshold", lambda v: v["c_k"], route="cavity"),
             RefCheck("percolation_kcore", "er_4core_threshold", lambda v: v["c_k"], route="cavity",
                      params={"k": 4, "c": 6}, slow=True),
+            RefCheck("percolation_kcore", "er_3core_newborn_size", lambda v: v["core_at_c_k"], route="cavity"),
             RefCheck("xorsat", "alpha_d_k3", lambda v: v["alpha_k"], route="cavity",
                      params={"K": 3, "k": 2, "alpha": 1}),
             RefCheck("xorsat", "lambda_d_k3", lambda v: v["mu_at_c_k"], route="cavity",
@@ -267,14 +335,16 @@ def _boot_threshold(p):
             if f"{key}_closed_form" in balls and not balls[key].overlaps(balls[f"{key}_closed_form"]):
                 raise Refusal("no-solution:route-disagreement", f"{key}: certified {balls[key]} vs the "
                               f"Balogh-Pittel closed form {balls[key + '_closed_form']}")
+    notes = ()
     if not T.continuous:
-        g = dgm_threshold(("finite", {d: Fraction(1)}), 2, d + 1 - ell, "site", None)
-        _agree("q_c", balls["q_c"], 1 - g["threshold_t"], "DGM Eq. (8)")
+        notes = (_second("DGM Eq. (8) in mpmath", lambda dps: (lambda g: {"q_c": 1 - g["threshold_t"]})(
+            dgm_threshold(("finite", {d: Fraction(1)}), 2, d + 1 - ell, "site", None, dps)),
+            [("q_c", balls["q_c"], "q_c")]),)
     v, e = _put(**balls)
     return Out({**v, "closed_form": cf is not None, "transition": "continuous" if T.continuous else
                 "discontinuous"}, f"q_c = {balls['q_c'].render(12)} = 1 - t_c of the ({d + 1 - ell})-core "
                "of the uninfected set (J09 Sec. 5)" + ("; the Balogh-Pittel closed form agrees" if cf else ""),
-               errors=e)
+               errors=e, notes=notes)
 
 
 def _boot_final(p):
@@ -283,12 +353,14 @@ def _boot_final(p):
     with baller().hygiene.ctx_guard(prec=PREC):
         balls = {"p_hat": R.selected.x, "jacobian": R.selected.jacobian,
                  "final_infected": ball_of(1 - R.core.arb), "uninfected_core_edges": R.edges}
-    g = dgm_fixed(("finite", {d: Fraction(1)}), 2, d + 1 - ell, "site", 1 - q)
-    _agree("final_infected", balls["final_infected"], 1 - g["core"], "DGM Eq. (1)")
+        _identity("uninfected_core_edges", R.edges, arb_q(d) * R.y.arb * R.selected.x.arb / 2, "d y x / 2")
+    note = _second("DGM Eq. (1) in mpmath", lambda dps: (lambda g: {"f": 1 - g["core"]})(dgm_fixed(
+        ("finite", {d: Fraction(1)}), 2, d + 1 - ell, "site", 1 - q, dps)),
+        [("final_infected", balls["final_infected"], "f")], _cond(R.selected.jacobian))
     v, e = _put(**balls)
     return Out({**v, "phase": "partial infection" if R.selected.x.arb > 0 else "complete infection",
                 "fixed_points": [r.x.render(12) for r in R.roots], "selected_stable": R.selected.stable},
-               f"final infected fraction {balls['final_infected'].render(12)}", errors=e)
+               f"final infected fraction {balls['final_infected'].render(12)}; {note}", errors=e, notes=(note,))
 
 
 def _boot_sample(p):

@@ -29,10 +29,11 @@ bisection: an interval is discarded when the monotone enclosure [F(lo) - hi, F(h
 excludes 0; it holds exactly one root when F' - 1 (arb interval extension) excludes 0 and F - x
 changes sign at its ends; that root is enclosed by interval Newton (>= 40 digits).  An interval
 that cannot be decided at width 1e-30 (a near-double root: t at the jump) is refused
-undetermined:near-critical.  x = 0 is always a root (F'(0) = 0 exactly); x = 1 is one iff F(1) = 1
+undetermined:near-critical (ambiguous:critical-point when t lies in the certified threshold ball,
+kcore_threshold.refuse_at_threshold).  x = 0 is always a root (F'(0) = 0 exactly); x = 1 is one iff F(1) = 1
 exactly (decided in rationals).  The selected largest root must have the certified F'(x) < 1
 (else ambiguous:critical-point: the largest root is marginal), and an exclusion scan of
-(x*, 1] must find no other root (else no-solution:dropped-root).
+(x*, 1] must find no other root (else no-solution:dropped-root; percolation/kcore_audit.py).
 Continuous case k = 2, K = 2: x = 1 - u with u = 1 - t + t G1(u) (site; bond: x = (1 - u)/t), the
 P1 cavity equation, whose fixed points percolation/cavity.py certifies (reused, not duplicated).
 Second route of the selection (rigorous): the peeling iteration h_{n+1} = upper(F(h_n)) from 1 and
@@ -50,6 +51,8 @@ from math import comb, factorial
 
 from ..core import Refusal
 from ..lattice.ball import Ball, arb_q, ball_of, baller
+from .kcore_audit import bracket as _bracket
+from .kcore_audit import no_root_above as _no_root_above
 from .laws import occupation, parse_law
 
 DIGITS = 40
@@ -299,54 +302,6 @@ def _newton(M, lo, hi):
     raise Refusal("undetermined:near-critical", f"interval Newton did not contract near x = {x.str(15)}")
 
 
-def _no_root_above(M, start, xs):
-    """Exclusion scan of [start, 1] (start: the selected root's isolating upper end, where F < x is
-    certified, or x0): a box is excluded when F(hi) < lo (F increasing), or when F - x < 0 at both
-    ends and F' - 1 excludes 0 on the box; a box that is neither, down to width 1e-30, is refused
-    no-solution:dropped-root."""
-    from flint import arb
-    stack = [(start, arb(1))]
-    width = arb_q(MIN_WIDTH)
-    n = 0
-    while stack:
-        lo, hi = stack.pop()
-        n += 1
-        if M.F(hi).upper() < lo:
-            continue
-        if (M.F(lo) - lo).upper() < 0 and (M.F(hi) - hi).upper() < 0 and \
-                not (M.dF(lo.union(hi)) - 1).contains(0):
-            continue                                   # F - x < 0 at both ends and monotone between
-        if xs.arb == 1:
-            break
-        if hi == 1 and M.F1_exact() == 1 and M.dF(lo.union(hi)).upper() < 1 and (M.F(lo) - lo) < 0:
-            continue
-        if hi - lo < width or n > 20000:
-            raise Refusal("no-solution:dropped-root", f"a fixed point of F above the selected root "
-                          f"{xs.render(12)} cannot be excluded on [{lo.str(10)}, {hi.str(10)}]: the "
-                          "largest root was not selected")
-        mid = ((lo + hi) / 2).mid()
-        stack += [(lo, mid), (mid, hi)]
-
-
-def _bracket(M, iv_lo, x, rate):
-    """The peeling iteration from 1 (upper) and from the isolating lower end (lower)."""
-    from flint import arb
-    h, lo = arb(1), iv_lo
-    steps = 1 if rate.upper() > 1 - arb(70) / 2000 else 2000
-    eps = arb_q(Fraction(1, 10 ** 30))
-    n = 0
-    for n in range(1, steps + 1):
-        h, lo = M.F(h).upper(), M.F(lo).lower()
-        if h - lo < eps:
-            break
-    if not lo.union(h).overlaps(x) or not (lo <= x.upper() and h >= x.lower()):
-        raise Refusal("no-solution:route-disagreement", f"the peeling bracket [{lo.str(12)}, {h.str(12)}] "
-                      f"excludes the interval-Newton root {x.str(15)}")
-    return {"lower": lo.str(12, radius=False), "upper": h.str(12, radius=False), "iterations": n,
-            "resolved": bool(h - lo < eps), "kind": "peeling iteration from x = 1 (upper) and from "
-            "the isolating interval (lower): rigorous monotone bracket, second route of x*"}
-
-
 def _continuous(M, law, dilution):
     from .cavity import percolation_fixed_points
     fps = percolation_fixed_points(law, dilution)
@@ -369,7 +324,12 @@ def kcore_fixed_points(law, K, k, dilution) -> KcoreResult:
         ivs = None
     else:
         with baller().hygiene.ctx_guard(prec=PREC):
-            ivs = _isolate(M)
+            try:
+                ivs = _isolate(M)
+            except Refusal as r:
+                from .kcore_threshold import refuse_at_threshold
+                refuse_at_threshold(law, K, k, M.kind, M.t, r)
+                raise
             roots = [Root(ball_of(arb(0)), ball_of(arb(0)), True)]
             for lo, hi, at1 in ivs:
                 x = arb(1) if at1 else _newton(M, lo, hi)

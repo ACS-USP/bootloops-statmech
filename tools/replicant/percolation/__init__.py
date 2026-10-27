@@ -20,6 +20,7 @@
                   certified, the largest selected; the core's size
   kcore_threshold.py  the k-core's birth point (a certified global minimum), the jump, and the
                   Balogh-Pittel closed forms of bootstrap percolation (the infection dynamics)
+  kcore_audit.py  the selection's audits: the exclusion scan above it and the peeling bracket
   kcore_dgm.py    the second route in Dorogovtsev-Goltsev-Mendes' own form, mpmath
   kcore_sample.py exact peeling and bootstrap spreading on sampled graphs over named seeds
 """

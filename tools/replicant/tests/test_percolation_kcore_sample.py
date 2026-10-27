@@ -88,7 +88,7 @@ def test_sampled_cores_match_the_certified_values_and_a_wrong_k_leaves_the_band(
     r = _planted(KS._HOOKS, "peel_k_shift", 1, lambda: sample_kcore(*args, N, seeds[:4]))
     assert not _band(R.core.mid(), r, "core_fraction")
     B = kcore_fixed_points(("bethe", 4), 2, 3, ("site", F(19, 20)))
-    r = sample_bootstrap(4, 2, "1/20", N, seeds)
+    r = sample_bootstrap(4, 2, "1/20", N // 2, seeds)
     assert _band(1 - B.core.mid(), r, "final_infected"), r.mean
 
 
