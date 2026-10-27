@@ -4,25 +4,35 @@ stated systematic that is an assumption, not a bound; never final.
 
 Data: for each L, `sweeps` NZ sweeps per named seed (lattice2d.sweep, stopped at the first crossing)
 on the open L x L region; n* per sweep.  Per seed, the canonical R_L(p) (NZ Eq. (1)) on a fine grid of
-p; the estimate is the mean over seeds; the bootstrap resamples seeds (numpy default_rng(boot_seed)).
+p; the estimate is the mean over seeds.  Bootstrap: BOOT = 1000 resamplings of the seeds (numpy
+default_rng(boot_seed)); every band is the LEVEL = 99% percentile interval of the replicates and every
+stderr their standard deviation.
   crossing p_c     the p where R_L - R_L' changes sign (linear interpolation on the grid) for
-                   consecutive sizes L < L'; the estimate is the largest pair's, the band its 99%
-                   bootstrap interval (0.5 / 99.5 percentiles of BOOT = 200 replicates), the systematic
-                   |p_x(largest) - p_x(next)| (the drift between successive crossings; an assumption)
-  collapse 1/nu    the levels R* in LEVELS give p_L(R*) (R_L(p_L) = R*); with y = 1/nu the scaled
+                   consecutive sizes L < L'; the estimate is the largest pair's
+  collapse         the levels R* in LEVELS give p_L(R*) (R_L(p_L) = R*); with y = 1/nu the scaled
                    z = (p_L(R*) - p_c) L^y must not depend on L.  chi2(p_c, y) = sum over levels and L of
                    (z - mean_L z)^2 / var z, var z = L^(2y) var p_L(R*) (bootstrap variance; the levels
                    of one L are correlated, so chi2 is a collapse measure, not chi-square distributed);
-                   (p*, y*) minimise it jointly (nested golden sections); bands: the 0.5 / 99.5
-                   percentiles over BOOT_JOINT = 100 bootstrap replicates (near their extremes);
-                   systematics (assumptions): the larger of the shift when the smallest L is dropped
-                   and the spread between estimators (p*: the crossing estimate; y*: the width slope)
+                   z is linear in p_c, so for each y the minimising p_c is closed form; (p*, y*) by a
+                   golden section in y
+  systematic       ONE rule for every lattice (an assumption, not a bound).  Resolved drift: an
+                   alternative estimate (crossing: the previous pair's; collapse: the fit without the
+                   smallest L) counts only beyond its own noise, max(0, |d| - Z sd(d)) with sd(d) the
+                   bootstrap deviation of the paired difference.  For p_c (both estimators) the
+                   systematic is the larger of the resolved drift and WINDOW_FRACTION = 1/10 of the
+                   critical window (the standard deviation of n*/M at the largest L, measured to ~1%):
+                   corrections to scaling are assumed to move an estimator by at most a tenth of the
+                   window.  For 1/nu: the resolved drift.
   width slope      a second 1/nu estimator: the standard deviation of n*/M scales as L^(-1/nu); minus
-                   the log-slope between the smallest and largest L, with its bootstrap band
-  collapse_test(p_c, y)   "collapses" when p_c and y each lie in the joint collapse's band widened by
-                   its systematic, else "fails" (a printed diagnostic; tests assert it on fixed seeds)
-fss(lattice, dilution, Ls, seeds, sweeps) -> FSSResult.  `contrast(interval, a, b)`: whether the band
-separates two values (printed, never asserted for unresolvable contrasts).
+                   the log-slope between the smallest and largest L, with its bootstrap band (printed)
+  collapse_test(p_c, y), crossing_test(p_c)   inside the band widened by the systematic, or not (printed
+                   diagnostics; the slow tests assert them on two named seed sets)
+Validated resolution (tests/test_percolation_lattice_slow.py; Ls 16 .. 128, 48 seeds x 25 sweeps, seed
+sets 0 .. 47 and 100 .. 147, all four solved lattices): the collapse accepts (exact p_c, 3/4) and
+rejects p_c +- 0.005 and nu = 1; the crossing band accepts the exact p_c and rejects p_c +- 0.01 (it
+does not resolve +- 0.005 on every set).
+fss(lattice, dilution, Ls, seeds, sweeps, boot_seed=20261027) -> FSSResult.  `contrast(interval, a, b)`:
+whether the band separates two values (printed, never asserted for unresolvable contrasts).
 """
 import math
 from dataclasses import dataclass, field
@@ -35,8 +45,10 @@ from .lattice2d import binomial_weights, bonds, check_lattice, check_seeds, chec
 LEVELS = (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8)
 Y_LO, Y_HI = 0.3, 1.5
 GRID = 401
-BOOT = 200
-BOOT_JOINT = 100
+BOOT = 1000
+LEVEL = 0.99
+Z = 2.576
+WINDOW_FRACTION = 0.1
 _GOLD = (math.sqrt(5) - 1) / 2
 
 
@@ -113,39 +125,71 @@ class FSSResult:
     Ls: tuple
     seeds: tuple
     sweeps: int
-    crossings: dict                 # (L, L') -> (estimate, lo, hi) 99% bootstrap
-    p_c: tuple                      # crossing estimate: (estimate, lo, hi, systematic)
-    p_c_collapse: tuple             # joint collapse: (p*, lo, hi, systematic)
-    inv_nu: tuple                   # joint collapse: (y*, lo, hi, systematic)
+    crossings: dict                 # (L, L') -> (estimate, lo, hi) bootstrap percentile band
+    p_c: tuple                      # crossing estimate: (estimate, lo, hi, systematic, stderr)
+    p_c_collapse: tuple             # joint collapse: (p*, lo, hi, systematic, stderr)
+    inv_nu: tuple                   # joint collapse: (y*, lo, hi, systematic, stderr)
     width_slope: tuple              # (estimate, lo, hi)
     levels: dict = field(repr=False, default_factory=dict)   # L -> p_L(R*) per level (full data)
     var0: dict = field(repr=False, default_factory=dict)     # L -> bootstrap variance of p_L(R*)
+    window: float = 0.0             # std of n*/M at the largest L (the critical window)
 
     def chi2(self, p_c, y, Ls=None, levels=None):
         """sum over levels and L of (z - mean_L z)^2 / var z, z = (p_L(R*) - p_c) L^y (var z =
         L^(2y) var p_L(R*), the bootstrap variance); (chi2, dof)."""
         Ls, levels = Ls or self.Ls, levels or self.levels
-        z = np.array([(np.asarray(levels[L], float) - p_c) * L ** y for L in Ls])
-        var = np.array([self.var0[L] * float(L) ** (2 * y) for L in Ls])
-        ok = np.all(np.isfinite(z), 0) & np.all(var > 0, 0)
-        dev = z[:, ok] - z[:, ok].mean(0)
-        return float((dev ** 2 / var[:, ok]).sum()), int(ok.sum() * (len(Ls) - 1))
+        return _chi2(Ls, levels, self.var0, y, p_c)[:2]
 
     def collapse_test(self, p_c, y):
-        """Does (p_c, y = 1/nu) lie in the joint collapse's box: each coordinate inside its 99%
-        bootstrap interval widened by its systematic?  A printed diagnostic in the run path."""
+        """Does (p_c, y = 1/nu) lie in the joint collapse's box: each coordinate inside its bootstrap band
+        widened by its resolved drift?  A printed diagnostic in the run path."""
         inside = lambda t, v: t[1] - t[3] <= v <= t[2] + t[3]
         p, q = self.p_c_collapse, self.inv_nu
         return {"chi2": self.chi2(p_c, y)[0], "chi2_best": self.chi2(p[0], q[0])[0],
                 "p_c box": (p[1] - p[3], p[2] + p[3]), "1/nu box": (q[1] - q[3], q[2] + q[3]),
                 "verdict": "collapses" if inside(p, p_c) and inside(q, y) else "fails"}
 
+    def crossing_test(self, p_c):
+        """Does p_c lie in the crossing band widened by its resolved drift?"""
+        e, lo, hi, s = self.p_c[:4]
+        return "inside" if lo - s <= p_c <= hi + s else "outside"
 
-def _joint(res, levels, Ls, lo, hi, tol=1e-5):
-    """(p*, y*) minimising chi2 (nested golden sections, p in [lo, hi], y in [Y_LO, Y_HI])."""
-    y_of = lambda pc: _golden(lambda y: res.chi2(pc, y, Ls, levels)[0], Y_LO, Y_HI, tol)
-    pb = _golden(lambda pc: res.chi2(pc, y_of(pc), Ls, levels)[0], lo, hi, tol)
-    return pb, y_of(pb)
+
+def _chi2(Ls, levels, var0, y, p_c=None):
+    """(chi2, dof, p): z = (P - p) s_L with s_L = L^y is linear in p, so for a given y the p minimising
+    chi2 is closed form (used when p_c is None)."""
+    P = np.array([np.asarray(levels[L], float) for L in Ls])
+    sc = np.array([float(L) ** y for L in Ls])
+    v = np.array([var0[L] for L in Ls]) * sc[:, None] ** 2
+    ok = np.all(np.isfinite(P), 0) & np.all(v > 0, 0)
+    P, v = P[:, ok], v[:, ok]
+    A = P * sc[:, None]
+    A = A - A.mean(0)
+    B = (sc - sc.mean())[:, None]
+    if p_c is None:
+        p_c = float((A * B / v).sum() / (B * B / v).sum())
+    return float(((A - p_c * B) ** 2 / v).sum()), int(ok.sum() * (len(Ls) - 1)), p_c
+
+
+def _joint(Ls, levels, var0, tol=1e-5):
+    """(p*, y*) minimising chi2: golden section in y, p in closed form."""
+    y = _golden(lambda y: _chi2(Ls, levels, var0, y)[0], Y_LO, Y_HI, tol)
+    return _chi2(Ls, levels, var0, y)[2], y
+
+
+def _band(est, reps, other=None, other_reps=None, floor=0.0):
+    """(est, lo, hi, systematic, stderr): the LEVEL percentile band of the bootstrap replicates; the
+    systematic is max(floor, the resolved drift max(0, |est - other| - Z sd(replicate differences)))."""
+    reps = np.asarray(reps, float)
+    reps = reps[np.isfinite(reps)]
+    lo, hi = np.percentile(reps, [50 * (1 - LEVEL), 50 * (1 + LEVEL)])
+    sysm = 0.0
+    if other is not None:
+        d = np.asarray(other_reps[0], float) - np.asarray(other_reps[1], float)
+        d = d[np.isfinite(d)]
+        sysm = max(0.0, abs(est - other) - Z * float(np.std(d, ddof=1)))
+    sysm = max(sysm, floor)
+    return tuple(float(x) for x in (est, lo, hi, sysm, np.std(reps, ddof=1)))
 
 
 def fss(lattice, dilution, Ls, seeds, sweeps, boot_seed=20261027):
@@ -158,35 +202,40 @@ def fss(lattice, dilution, Ls, seeds, sweeps, boot_seed=20261027):
     curves = {L: _curves(M, per, grid) for L, (M, per) in data.items()}
     rng = np.random.default_rng(boot_seed)
     n = len(seeds)
-    picks = [rng.integers(0, n, n) for _ in range(BOOT)]
+    picks = rng.integers(0, n, (BOOT, n))
+    wts = np.zeros((BOOT, n))
+    np.add.at(wts, (np.repeat(np.arange(BOOT), n), picks.ravel()), 1.0 / n)
     mean = {L: c.mean(0) for L, c in curves.items()}
-    crossings = {}
+    rep = {L: wts @ c for L, c in curves.items()}                # (BOOT, GRID) replicate mean curves
+    crossings, cross_reps = {}, {}
     for L1, L2 in zip(Ls, Ls[1:]):
+        cross_reps[(L1, L2)] = np.array([_cross(grid, rep[L1][b], rep[L2][b]) for b in range(BOOT)])
         est = _cross(grid, mean[L1], mean[L2])
-        bs = [_cross(grid, curves[L1][k].mean(0), curves[L2][k].mean(0)) for k in picks]
-        crossings[(L1, L2)] = tuple(float(x) for x in (est, *np.nanpercentile(bs, [0.5, 99.5])))
-    keys = list(crossings)
-    pc_est = (*crossings[keys[-1]], float(abs(crossings[keys[-1]][0] - crossings[keys[-2]][0])))
+        crossings[(L1, L2)] = tuple(float(x) for x in (est, *np.nanpercentile(cross_reps[(L1, L2)],
+                                                                                [50 * (1 - LEVEL), 50 * (1 + LEVEL)])))
+    k1, k0 = list(crossings)[-1], list(crossings)[-2]
+    M_top, per_top = data[Ls[-1]]
+    window = float(np.std(np.concatenate(list(per_top.values())) / M_top, ddof=1))
+    floor = WINDOW_FRACTION * window
+    pc_est = _band(crossings[k1][0], cross_reps[k1], crossings[k0][0], (cross_reps[k1], cross_reps[k0]), floor)
     levels = {L: [_level(grid, mean[L], r) for r in LEVELS] for L in Ls}
-    boot = {L: np.array([[_level(grid, curves[L][k].mean(0), r) for r in LEVELS] for k in picks]) for L in Ls}
+    boot = {L: np.array([[_level(grid, rep[L][b], r) for r in LEVELS] for b in range(BOOT)]) for L in Ls}
     var0 = {L: np.nanvar(b, axis=0, ddof=1) for L, b in boot.items()}
     res = FSSResult(lattice, dilution, Ls, seeds, sweeps, crossings, pc_est, (), (), (), levels, var0)
-    w = max(pc_est[2] - pc_est[1] + 2 * pc_est[3], 2e-3)
-    lo, hi = pc_est[1] - 3 * w, pc_est[2] + 3 * w
-    p_all, y_all = _joint(res, levels, Ls, lo, hi)
-    p_cut, y_cut = _joint(res, levels, Ls[1:], lo, hi)
-    fits = np.array([_joint(res, {L: boot[L][b] for L in Ls}, Ls, lo, hi, 1e-4) for b in range(BOOT_JOINT)])
+    p_all, y_all = _joint(Ls, levels, var0)
+    p_cut, y_cut = _joint(Ls[1:], levels, var0)
+    fa = np.array([_joint(Ls, {L: boot[L][b] for L in Ls}, var0, 1e-4) for b in range(BOOT)])
+    fc = np.array([_joint(Ls[1:], {L: boot[L][b] for L in Ls}, var0, 1e-4) for b in range(BOOT)])
+    res.p_c_collapse = _band(p_all, fa[:, 0], p_cut, (fa[:, 0], fc[:, 0]), floor)
+    res.window = window
+    res.inv_nu = _band(y_all, fa[:, 1], y_cut, (fa[:, 1], fc[:, 1]))
     widths = {L: np.std(np.concatenate(list(data[L][1].values())) / data[L][0], ddof=1) for L in Ls}
     slope = -math.log(widths[Ls[-1]] / widths[Ls[0]]) / math.log(Ls[-1] / Ls[0])
     bsl = []
     for k in picks:
         wd = [np.std(np.concatenate([data[L][1][seeds[i]] for i in k]) / data[L][0], ddof=1) for L in (Ls[0], Ls[-1])]
         bsl.append(-math.log(wd[1] / wd[0]) / math.log(Ls[-1] / Ls[0]))
-    res.width_slope = tuple(float(x) for x in (slope, *np.percentile(bsl, [0.5, 99.5])))
-    sys_p = max(abs(p_all - p_cut), abs(p_all - pc_est[0]))
-    sys_y = max(abs(y_all - y_cut), abs(y_all - slope))
-    res.p_c_collapse = tuple(float(x) for x in (p_all, *np.percentile(fits[:, 0], [0.5, 99.5]), sys_p))
-    res.inv_nu = tuple(float(x) for x in (y_all, *np.percentile(fits[:, 1], [0.5, 99.5]), sys_y))
+    res.width_slope = tuple(float(x) for x in (slope, *np.percentile(bsl, [50 * (1 - LEVEL), 50 * (1 + LEVEL)])))
     return res
 
 

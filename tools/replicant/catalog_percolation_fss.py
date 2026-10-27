@@ -6,13 +6,12 @@ analysis (same Ls, seeds, sweeps) is run on the solved lattice of the same dilut
 for site, square bond for bond), and whether it recovers the exact p_c and nu = 4/3 is reported in
 meta["fss_validation"] (a printed diagnostic: a correct sampler is never refused; the tests assert it
 on fixed named seeds).  Values: p_c_crossing (crossings), p_c_collapse and inv_nu_collapse (the joint
-collapse), with errors = sqrt((99% half-width / 2.576)^2 + systematic^2) (the systematic an assumption,
-not a bound); inv_nu_width_slope (a second estimator, errors from its bootstrap band).
+collapse), with errors = the bootstrap standard deviation only; the assumed systematic (not a bound) is
+in meta["fss_bands"] and is added outside any t-band (the statistical RefChecks); inv_nu_width_slope (a
+second estimator).
 meta["fss_contrasts"]: whether the bands separate nu = 4/3 from nu = 1 and, on solved lattices, contain
 the exact p_c (printed, not asserted).
 """
-import math
-
 from .catalog import Out, Stability, fstep
 from .percolation import exact2d as X
 from .percolation.fss2d import contrast, fss
@@ -20,6 +19,8 @@ from .percolation.fss2d import contrast, fss
 FSS_CITE = ("percolation/fss2d.py (crossings of R_L(p), a collapse in L^(1/nu), bootstrap over named seeds); "
             "Newman & Ziff, arXiv:cond-mat/0005264v2, Eq. (1)")
 REFERENCE = {"site": ("triangular", "site"), "bond": ("square", "bond")}
+BAND_P, BAND_Y = "p_c (est, lo, hi, systematic, stderr)", "inv_nu (est, lo, hi, systematic, stderr)"
+BAND_PJ = "p_c of the joint collapse (est, lo, hi, systematic, stderr)"
 FSS_META = ("fss_crossings", "fss_bands", "fss_validation", "fss_contrasts")
 _STAT = Stability("not-computed", "sample", FSS_CITE, "finite-size scaling over named seeds: a consistency check "
                   "with a stated band and an assumed systematic; NOT final")
@@ -31,10 +32,9 @@ def _exact_pc(lattice, dilution):
     return None if got is None else float(got[0].mid())
 
 
-def _eff(t):
-    est, lo, hi = t[:3]
-    s = t[3] if len(t) > 3 else 0.0
-    return math.hypot((hi - lo) / 2 / 2.576, s)
+def _se(t):
+    """The bootstrap standard deviation of the estimator (index 4), else the 99% band / (2 x 2.576)."""
+    return t[4] if len(t) > 4 else (t[2] - t[1]) / 2 / 2.576
 
 
 def _summary(r, exact_pc):
@@ -45,6 +45,10 @@ def _summary(r, exact_pc):
         out["exact p_c inside the collapse band (+ systematic)"] = contrast(r.p_c_collapse, exact_pc,
                                                                               exact_pc)["a_inside"]
         out["exact p_c: collapse at (p_c, 3/4)"] = r.collapse_test(exact_pc, nu43)["verdict"]
+        out["exact p_c: crossing"] = r.crossing_test(exact_pc)
+    out["resolution: p_c crossing box half-width"] = (r.p_c[2] - r.p_c[1]) / 2 + r.p_c[3]
+    out["resolution: p_c collapse box half-width"] = (r.p_c_collapse[2] - r.p_c_collapse[1]) / 2 + r.p_c_collapse[3]
+    out["resolution: 1/nu box half-width"] = (r.inv_nu[2] - r.inv_nu[1]) / 2 + r.inv_nu[3]
     return out
 
 
@@ -62,23 +66,23 @@ def fss_step(when, lat_of):
         r = fss(lattice, dilution, Ls, seeds, sweeps)
         vals = {"p_c_crossing": r.p_c[0], "p_c_collapse": r.p_c_collapse[0], "inv_nu_collapse": r.inv_nu[0],
                 "inv_nu_width_slope": r.width_slope[0]}
-        errs = {"p_c_crossing": _eff(r.p_c), "p_c_collapse": _eff(r.p_c_collapse),
-                "inv_nu_collapse": _eff(r.inv_nu), "inv_nu_width_slope": _eff(r.width_slope)}
+        errs = {"p_c_crossing": _se(r.p_c), "p_c_collapse": _se(r.p_c_collapse),
+                "inv_nu_collapse": _se(r.inv_nu), "inv_nu_width_slope": _se(r.width_slope)}
         meta = {"fss_crossings": {f"{a}-{b}": c for (a, b), c in r.crossings.items()},
-                "fss_bands": {"p_c (est, lo, hi, systematic)": r.p_c, "inv_nu (est, lo, hi, systematic)": r.inv_nu,
-                              "width_slope (est, lo, hi)": r.width_slope,
-                              "p_c of the joint collapse (est, lo, hi, systematic)": r.p_c_collapse},
+                "fss_bands": {BAND_P: r.p_c, BAND_Y: r.inv_nu, "width_slope (est, lo, hi)": r.width_slope,
+                              BAND_PJ: r.p_c_collapse, "critical window (std of n*/M at the largest L)": r.window},
                 "fss_validation": validation, "fss_contrasts": _summary(r, exact_pc)}
         return Out({**vals, **meta}, f"FSS Ls = {Ls}: crossing p_c {r.p_c[0]:.5f} [{r.p_c[1]:.5f}, "
                    f"{r.p_c[2]:.5f}] "
                    f"+- {r.p_c[3]:.2g} (syst.); collapse p_c {r.p_c_collapse[0]:.5f}, 1/nu {r.inv_nu[0]:.3f} "
                    f"[{r.inv_nu[1]:.3f}, {r.inv_nu[2]:.3f}] +- {r.inv_nu[3]:.2g}", errors=errs,
                    statistical=tuple(vals),
-                   notes=("finite-size scaling: 99% bootstrap bands over the named seeds plus an assumed "
-                          "systematic (crossings: the drift between the last two; collapse: the shift without "
-                          "the smallest L or the spread to the other estimator); a consistency check, no "
-                          "proven bound",))
+                   notes=("finite-size scaling: 99% bootstrap percentile bands (1000 replicates over the named "
+                          "seeds; errors = the bootstrap standard deviation) plus an assumed systematic: for p_c "
+                          "the larger of a tenth of the critical window at the largest L and the resolved drift "
+                          "(to the previous crossing; to the fit without the smallest L), for 1/nu the resolved "
+                          "drift; a consistency check, no proven bound",))
     return fstep("finite-size-scaling", FSS_CITE, go, when=when, skip="no Ls given")
 
 
-__all__ = ["FSS_FINALITY", "FSS_META", "fss_step"]
+__all__ = ["BAND_P", "BAND_PJ", "BAND_Y", "FSS_FINALITY", "FSS_META", "fss_step"]

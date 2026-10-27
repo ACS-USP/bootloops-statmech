@@ -50,7 +50,8 @@ from .spec import ModelSpec
 class RefCheck:
     """Banked key `file`/`key` is reproduced by running the entry on `route` with
     `params` and reading `extract(values)`.  Statistical keys are compared in a 99%
-    Student-t band on hypot(stderr, tol), stderr = error(errors), df = runs - 1."""
+    Student-t band on hypot(stderr, tol), stderr = error(errors), df = runs - 1, plus
+    systematic(values) when given (an assumed systematic, added outside the t-band)."""
     file: str
     key: str
     extract: Callable[[dict], object]
@@ -60,6 +61,7 @@ class RefCheck:
     slow: bool = False
     error: Callable[[dict], object] | None = None
     runs: int | None = None
+    systematic: Callable[[dict], object] | None = None
 
 
 @dataclass(frozen=True)
@@ -343,11 +345,12 @@ def compare(e: CatalogEntry, ref: RefCheck, values, errors) -> RefOutcome:
     from .cavity._stats import t_quantile
     err = float(ref.error(errors))
     t = t_quantile(0.995, ref.runs - 1)
-    band = t * math.hypot(err, float(want.tol))
+    sysm = float(ref.systematic(values)) if ref.systematic is not None else 0.0
+    band = t * math.hypot(err, float(want.tol)) + sysm
     ok = abs(float(got) - float(want.value)) <= band
     return RefOutcome(ref.file, ref.key, ok, repr(float(got)), want.value, want.tol, True,
-                      f"stderr {err:.3g}, 99% Student-t band {band:.3g} (t = {t:.4g}, "
-                      f"df = {ref.runs - 1})")
+                      f"stderr {err:.3g}, 99% Student-t band {band - sysm:.3g} (t = {t:.4g}, "
+                      f"df = {ref.runs - 1}) + systematic {sysm:.3g}")
 
 
 def check_ref(e: CatalogEntry, ref: RefCheck) -> RefOutcome:

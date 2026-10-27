@@ -719,33 +719,45 @@ triangular bond 2 sin(pi/18) and honeycomb bond 1 - 2 sin(pi/18) (Grimmett & Man
 Thm 1.1, Eqs. (1.1)-(1.3)), with `p_c_cubic_root` (the root of 3p - p^3 - 1 by exact bisection),
 `p_c_dual`, and the star-triangle connection polynomials checked as exact identities (meta
 `identities`); square and honeycomb site have no closed form (the step is skipped). `beta` 5/36, `nu`
-4/3, `gamma` 43/18, `fractal_dimension` 91/48 from the arm exponents of Smirnov & Werner (arXiv:math/0109120)
-with the scaling relations checked exactly: `beta`, `nu`, `gamma` exact-by-literature on triangular site
-(SW Thm 1), not-computed (universality) elsewhere; `fractal_dimension` (hyperscaling) not-computed. `cardy_crossing_h` (`cardy_crossing_v` = 1 - h): Cardy's Eq. (8) for the
-horizontal crossing of a rectangle of width / height `aspect` (Cardy's r = height / width), by arb
-(lambda(2ri), 2F1) and by mpmath (elliptic findroot, incomplete beta); a theorem for triangular site
-(Smirnov, arXiv:0909.4499, Cor. 2, 3), physics-level elsewhere. `crossing_exact`: the exact crossing
-probability of the open `Lx` x `Ly` lattice at `p` by enumerating all 2^M configurations (M <= 20),
-with the planar duality identity (square bond: R_h[W x H](p) + R_h[(H + 1) x (W - 1)](1 - p) = 1,
-Bollobas & Riordan Cor. 4; triangular site: R_h(p) + R_v(1 - p) = 1). Route `sample` (statistical):
-Newman-Ziff sweeps (`percolation/lattice2d.py`, the shared union-find) over named seeds, the canonical
-`crossing_probability_sampled`, `P_inf_sampled` (E|C1|/N), `mean_cluster_size_sampled` (E sum'|C|^2 / N,
-largest excluded) at `p` by NZ Eq. (1); on lattices with M <= 20 every sweep's n* is compared exactly
-with the enumeration (`no-solution:nz-enumeration`). With `Ls` (>= 3 sizes): `p_c_crossing` (crossings
-of R_L and R_2L), `p_c_collapse` and `inv_nu_collapse` (the joint collapse of p_L(R*) - p_c in
-L^(1/nu)) and `inv_nu_width_slope`, 99% bootstrap bands over the seeds plus an assumed systematic (meta
-`fss_bands`); on square / honeycomb
+4/3, `gamma` 43/18, `fractal_dimension` 91/48 from the arm exponents of Smirnov & Werner
+(arXiv:math/0109120) with the scaling relations checked exactly: `beta`, `nu`, `gamma`
+exact-by-literature on triangular site (SW Thm 1), not-computed (universality) elsewhere;
+`fractal_dimension` (hyperscaling) not-computed. `cardy_crossing_h` (`cardy_crossing_v` = 1 - h): Cardy's
+Eq. (8) for the horizontal crossing of a rectangle of width / height `aspect` (Cardy's r = height /
+width), by arb (lambda(2ri), 2F1) and by mpmath (elliptic findroot, incomplete beta); a theorem for
+triangular site (Smirnov, arXiv:0909.4499, Cor. 2, 3), physics-level elsewhere. The width / height of a
+lattice region in every Cardy comparison is `percolation.lattice2d.physical_aspect` (the one stated
+convention: Voronoi cells; triangular W / (H sqrt(3)/2), square bond (W - 1) / H). `crossing_exact`: the
+exact crossing probability of the open `Lx` x `Ly` lattice at `p` by enumerating all 2^M configurations
+(M <= 20), with the planar duality identity (square bond: R_h[W x H](p) + R_h[(H + 1) x (W - 1)](1 - p)
+= 1, Bollobas & Riordan Cor. 4; triangular site: R_h(p) + R_v(1 - p) = 1); labelled exact-by-literature
+by construction (the I3 convention): it is this package's own enumeration, no literature value exists.
+Route `sample` (statistical): Newman-Ziff sweeps (`percolation/lattice2d.py`, the shared union-find) over
+named seeds, the canonical `crossing_probability_sampled`, `P_inf_sampled` (E|C1|/N),
+`mean_cluster_size_sampled` (E sum'|C|^2 / N, largest excluded) at `p` by NZ Eq. (1); on lattices with
+at most 16 elements every sweep's n*, |C1|(n) and S2(n) are compared exactly with the enumeration at
+every n (`no-solution:nz-enumeration`). With `Ls` (>= 3 sizes): `p_c_crossing` (crossings of R_L and
+R_2L), `p_c_collapse` and `inv_nu_collapse` (the joint collapse of p_L(R*) - p_c in L^(1/nu)) and
+`inv_nu_width_slope`; errors are the bootstrap standard deviations (1000 replicates over the seeds), and
+meta `fss_bands` holds the 99% percentile bands and an assumed systematic, one rule for every lattice:
+for p_c the larger of a tenth of the critical window (std of n*/M at the largest L) and the drift to an
+alternative estimate beyond its own bootstrap noise; for 1/nu that resolved drift. On square / honeycomb
 site the same analysis first runs on the solved lattice of the same dilution (meta `fss_validation`).
-A consistency check, no proven bound; square-site p_c is banked numerically (Newman & Ziff 2000
-0.59274621(13); Jacobsen 2015 0.59274605079210(2)), a 1.6e-7 contrast the scaling cannot resolve.
+Validated resolution (Ls 16 .. 128, 48 seeds x 25 sweeps, two seed sets, all four solved lattices): the
+collapse accepts the exact (p_c, 3/4) and rejects p_c +- 0.005 and nu = 1; the crossing estimator
+accepts the exact p_c and rejects p_c +- 0.01 only (+- 0.005 is not resolved on every set). A
+consistency check, no proven bound; square-site p_c is banked numerically (Newman & Ziff 2000
+0.59274621(13); Jacobsen 2015 0.59274605079210(2)), a 1.6e-7 contrast the scaling cannot resolve; the
+slow RefChecks compare `p_c_crossing` within t(df) x stderr plus the systematic.
 Examples: `run percolation_lattice --route exact` (square bond: `p_c` 0.5, `crossing_exact` 0.671875
 on 3 x 3); `run percolation_lattice --route exact --param lattice=triangular --param dilution=bond
---param aspect=2` (`p_c`
-0.347296, `cardy_crossing_h` 0.175647); `run percolation_lattice --route sample --param
-lattice=triangular --param dilution=site` (16 x 16, 8 seeds x 16 sweeps). `percolation.fss2d.fss(lattice,
-dilution, Ls, seeds, sweeps, p_c=None)` -> `FSSResult` (`.collapse_test(p_c, y)`: "collapses" / "fails").
-Planted hooks: `lattice2d._HOOKS["neighbourhood" | "wrap_crossing"]`, `exact2d._HOOKS["star_prob" |
-"exponent"]`, `cardy._HOOKS["invert_aspect"]`, `enumerate2d._HOOKS["dual_shape"]`.
+--param aspect=2` (`p_c` 0.347296, `cardy_crossing_h` 0.175647); `run percolation_lattice --route sample
+--param lattice=triangular --param dilution=site` (16 x 16, 8 seeds x 16 sweeps).
+`percolation.fss2d.fss(lattice, dilution, Ls, seeds, sweeps, boot_seed=20261027)` -> `FSSResult`
+(`.collapse_test(p_c, y)`: "collapses" / "fails"; `.crossing_test(p_c)`: "inside" / "outside").
+Planted hooks: `lattice2d._HOOKS["neighbourhood" | "wrap_crossing" | "site_s2_singletons" | "p_inf_norm"
+| "chi_norm"]`, `exact2d._HOOKS["star_prob" | "exponent"]`, `cardy._HOOKS["invert_aspect"]`,
+`enumerate2d._HOOKS["dual_shape"]`.
 `from replicant.bounds import ...` (E10; needs python-flint and `tools/baller`; SK conventions of
 families/sk.py, P = -beta f; parameters are taken as the exact rationals they denote, an mpf or float its
 exact binary value): `guerra_rs_bound(beta, h, q, digits=40)` -> `Ball`; `guerra_rs_best_bound(beta, h=0,
@@ -940,7 +952,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `precondition:coordination`, `:degree-law`, `:mean-degree`, `:tau`, `:dilution`, `:occupation`, `:s-max`, `:below-threshold`, `:union-find-element`, `:n`, `:named-seeds`, `unsupported:degree-law`, `unsupported:infinite-second-moment` | percolation: Bethe k not an int in 2 .. 1000; a finite law not "k:p,k:p" with int 0 <= k <= 1000, rational p_k >= 0 summing exactly to 1, mean > 0; c not a rational > 0; tau not a number; dilution not bond / site; t outside [0, 1]; s_max outside 1 .. 60; MS (3.20) asked above p_c; a union-find element out of range; N outside 50 .. 2e6 (odd stub count, window sizes <= 1000); seeds not >= 2 distinct ints >= 0; an unknown law; a power law with tau <= 3 (<k^2> = oo; tau > 3 is `unsupported:degree-law`) |
 | `no-solution:sampler-invariant`, `:sampler-degree`, `:sampler-occupation`, `:np-theorem-1`, `:np-theorem-2` | percolation (`sample`): an exact invariant fails (Bethe 2M/N != k; stubs != degree sum; G(N, p) edge count, a repeated pair or self-loop); `diagnostic_refusals(result, alpha)` (tests only; the run path reports p-values in `sampler_checks`); the ER window violates Nachmias-Peres Theorem 1 or 2 beyond its exact 99% interval |
 | `precondition:lattice`, `:lattice-size`, `:exact-size`, `:aspect-ratio`, `:sweeps`, `:fss-sizes` | `percolation_lattice`: a lattice not square / triangular / honeycomb (case-sensitive); Lx, Ly not ints in 1 .. 2048 (exact: 1 .. 64); more than 20 elements to enumerate; width / height outside 1/64 .. 64; sweeps not an int in 1 .. 10^6; Ls not >= 3 increasing ints in 4 .. 2048 (also `:dilution`, `:occupation`, `:named-seeds` as for P1) |
-| `no-solution:star-triangle`, `:scaling-relation`, `:duality-identity`, `:nz-enumeration`, `:route-disagreement`, `:sampler-invariant`, `:certification` | `percolation_lattice`: a star-triangle connection polynomial differs from +-kappa_tri / 0; an exponent breaks a scaling relation; an enumerated crossing polynomial breaks its duality identity; a Newman-Ziff sweep's n* (or bond set) differs from the enumeration's; 2 sin(pi/18) misses the bisected cubic root, or Cardy's two routes differ by more than 1e-25; a sweep with every element occupied is not one crossing cluster of N vertices; Cardy's float route did not solve for the modulus |
+| `no-solution:star-triangle`, `:scaling-relation`, `:duality-identity`, `:nz-enumeration`, `:route-disagreement`, `:sampler-invariant`, `:certification` | `percolation_lattice`: a star-triangle connection polynomial differs from +-kappa_tri / 0; an exponent breaks a scaling relation; an enumerated crossing polynomial breaks its duality identity; a Newman-Ziff sweep's n*, |C1|(n), S2(n) (or bond set) differs from the enumeration's; 2 sin(pi/18) misses the bisected cubic root, or Cardy's two routes differ by more than 1e-25; a sweep with every element occupied is not one crossing cluster of N vertices; Cardy's float route did not solve for the modulus |
 | `unbanked:missing-entry`, `:malformed`, `:no-citation`, `:no-independent-route` | a banked reference value is absent or has no citation / no independent route (a value that fed a fit never certifies it) |
 | `tex-engine:failed`, `tex-engine:unavailable` | `--pdf`: the engine ran and failed, or could not reach its offline resources |
 
@@ -970,7 +982,7 @@ values at the default / banked state points):
 | `ising_honeycomb` honeycomb lattice, certified | exact | `beta_c` 0.658479, `l`, `minus_beta_f` (star-triangle) = `minus_beta_f_duality` = `minus_beta_f_pierre` 0.811676 (beta = 2/5), `torus_minus_beta_f` | `honeycomb_beta_c` (Baxter (6.5.7)), `honeycomb_minus_beta_f_beta0_4` (Pierre et al. Eqs. (19), (20)) | all exact-by-literature (Baxter's maps from the Kac-Ward triangular, Pierre et al.); `torus_minus_beta_f` exact by construction |
 | `percolation_bethe` bond / site percolation on the Bethe lattice, certified | cavity, sample | `p_c` 1/2, `u`, `P_inf` 0.962963 (k = 3, bond p = 3/4; site 13/18), `mean_finite_cluster_size`, `chi_amplitude`, `p_inf_slope_at_p_c`, `P_s1..6`; sample: `P_inf_sampled` etc. | `bethe_pc_k3`, `bethe_site_p_inf_k3_p3_4`, `bethe_site_p_inf_slope_k3` 6, `bethe_mean_cluster_k3_p1_4` 5/2 (Malthe-Sorenssen 2024, Eqs. (3.2), (3.11), (3.15), (3.20)); slow statistical: the sampled `P_inf` | `p_c`, `u`, `P_inf` exact-by-literature (BGW extinction: Abraham & Delmas Cor. 2.5, Lemma 2.6, with the reduction derived here); `mean_finite_cluster_size`, `jacobian` stable (computed f'(u) < 1); amplitudes, `P_s` not-computed; sampled values not-computed (statistical) |
 | `percolation_graph` Erdos-Renyi / configuration model, certified | cavity, sample | ER c = 2: `P_inf` 0.796812, `mean_finite_cluster_size` 1.684567, `molloy_reed_Q`, `p_c`, `P_s` (Borel); finite laws `pk` | `er_giant_c2`, `er_mean_cluster_c2` (NSW Eqs. (37), (38)), `nsw_eq24_site_threshold` 1148/2271 (CNSW Eq. (12)), `nsw_eq24_molloy_reed_Q` 2.246 (Molloy-Reed 1995) | `u`, `P_inf`, `mean_finite_cluster_size` stable (the tree-like fixed point; the finite graph's giant is a theorem for undiluted laws with p_1 > 0 and finite second moment: Janson & Luczak Thm 2.3); `p_c`, amplitudes, `P_s` not-computed; `branching_G1p1`, `molloy_reed_Q` exact-by-literature (definitions); sampled values statistical |
-| `percolation_lattice` 2D lattice percolation (square, triangular, honeycomb; bond / site), certified and sampled | exact, sample | `p_c` (square bond, triangular site 1/2; triangular bond 0.347296; honeycomb bond 0.652704), `p_c_cubic_root`, `p_c_dual`, `beta` 5/36, `nu` 4/3, `gamma` 43/18, `fractal_dimension` 91/48, `cardy_crossing_h` / `_v` (aspect 1: 1/2), `crossing_exact` (3 x 3 square bond at 1/2: 43/64); sample: `crossing_probability_sampled`, `P_inf_sampled`, `mean_cluster_size_sampled`, with `Ls`: `p_c_crossing`, `p_c_collapse`, `inv_nu_collapse`, `inv_nu_width_slope` | `square_bond_pc`, `triangular_site_pc` (Bollobas & Riordan), `triangular_bond_pc`, `honeycomb_bond_pc` (Grimmett & Manolescu Thm 1.1), `percolation_2d_nu`, `_beta`, `_gamma` (Smirnov & Werner Thm 1), `cardy_crossing_square` (Cardy Eq. (8)), `square_bond_self_dual_crossing` (Bollobas & Riordan Cor. 5); slow statistical: `square_site_pc_nz2000`, `square_site_pc_jacobsen2015` | `p_c` and its second routes exact-by-literature; `beta`, `nu`, `gamma` and Cardy exact-by-literature on triangular site, not-computed (universality, physics-level) elsewhere; `fractal_dimension` not-computed; `crossing_exact` exact by construction; sampled and FSS values not-computed (statistical) |
+| `percolation_lattice` 2D lattice percolation (square, triangular, honeycomb; bond / site), certified and sampled | exact, sample | `p_c` (square bond, triangular site 1/2; triangular bond 0.347296; honeycomb bond 0.652704), `p_c_cubic_root`, `p_c_dual`, `beta` 5/36, `nu` 4/3, `gamma` 43/18, `fractal_dimension` 91/48, `cardy_crossing_h` / `_v` (aspect 1: 1/2), `crossing_exact` (3 x 3 square bond at 1/2: 43/64); sample: `crossing_probability_sampled`, `P_inf_sampled`, `mean_cluster_size_sampled`, with `Ls`: `p_c_crossing`, `p_c_collapse`, `inv_nu_collapse`, `inv_nu_width_slope` | `square_bond_pc`, `triangular_site_pc` (Bollobas & Riordan), `triangular_bond_pc`, `honeycomb_bond_pc` (Grimmett & Manolescu Thm 1.1), `percolation_2d_nu`, `_beta`, `_gamma` (Smirnov & Werner Thm 1), `cardy_crossing_square` (Cardy Eq. (8)), `square_bond_self_dual_crossing` (Bollobas & Riordan Cor. 5); slow statistical: `square_site_pc_nz2000`, `square_site_pc_jacobsen2015` | `p_c` and its second routes exact-by-literature; `beta`, `nu`, `gamma` and Cardy exact-by-literature on triangular site, not-computed (universality, physics-level) elsewhere; `fractal_dimension` not-computed; `crossing_exact` exact by construction (this package's enumeration; no literature value); sampled and FSS values not-computed (statistical) |
 | `series_ising2d` 2D Ising (Onsager) free energy, exact series | series | `a4` 1 .. `a20` 8174.2 (v = tanh K); `operator_order` 3, `operator_degree` 8, `elliptic_factor_order` 2; `u_c` 3 - 2 sqrt 2, `v_c` 0.414214, `critical_exponent` 2, `alpha` 0 | `a4`, `a6`, `a8`, `a10` (Finch's table; independently the exact 7 x 7 torus), `v_c` (Kramers-Wannier / Onsager via Duminil-Copin), `alpha` (Onsager via Duminil-Copin, Baxter) | coefficients exact-by-literature (the cited integral, expanded exactly); operator values not-computed (L g = P proved exactly; minimal within bounds only); `u_c`, `v_c`, `alpha` exact-by-literature |
 | `sk_bounds` SK pressure: Guerra's RS and K-step RSB upper bounds, certified | bound | `rs_bound` 1.584786 (beta = 2: min over q of P_RS), `rs_q` 0.530368 and every stationary point; `rsb1_bound` 1.582418 at the package's 1RSB optimiser (`K=2`: `rsb2_bound`); `chain_verdict` | `annealed_pressure_beta_half` (ln 2 + 1/16: Guerra 1992 Thm 3, the annealed value for beta <= 1) | bounds exact-by-literature (Guerra 2003 Thm 3), certified radii; `rs_q` stable iff P_RS''(q*) > 0 certified; the chain verdict is a consistency check (meta), not a theorem |
 | `online_perceptron` online learning of a perceptron teacher (Hebb, perceptron, AdaTron, optimal; output noise) | online | `eps_exponent`, `eps_constant` (alpha = 1e4; noiseless or Hebb), optimal `eps_constant_formula`; at `alpha`: `eps`, `R`, `Q`, `rho` (Hebb: `eps_hebb_closed_form`); optimal with noise: `no_learning_boundary`, `robust_boundary`; with `N`: `eps_sim` | exponents and constants for the four rules (Biehl-Riegler Eqs. (7), (8), (15); 0.88 from VKC 1998 Tables I-II, Kinouchi-Caticha 1992 not fetched); no-learning line 2 lam - 1/2 at lam = 0.3, 0.4 (Copelli et al. p. 5); robust line at lam = 0.2, 0.3, 0.4 READ OFF Copelli et al. Fig. 1a (tol 0.003) | all not-computed (physics-level ODE limit, self-averaging assumed); `eps_sim` statistical |

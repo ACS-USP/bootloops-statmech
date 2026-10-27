@@ -28,7 +28,9 @@ occupied the lattice is one cluster of N vertices that crosses; |C1| never decre
 squared sizes is N^2 at the end.
 _HOOKS (tests): "neighbourhood" None | "diagonal" (planted: (x, y)-(x + 1, y + 1) bonds added to any
 lattice); "wrap_crossing" False | True (planted wrong boundary condition: the crossing direction made
-periodic, bonds (W - 1, y)-(0, y)).
+periodic, bonds (W - 1, y)-(0, y)); planted observables: "site_s2_singletons" False (the N - n
+unoccupied singletons left in the site S2), "p_inf_norm" "M" (P_inf = E|C1|/M), "chi_norm" False (chi
+not divided by N).
 """
 import math
 from dataclasses import dataclass
@@ -41,7 +43,8 @@ from .unionfind import UnionFind
 LATTICES = ("square", "triangular", "honeycomb")
 DILUTIONS = ("bond", "site")
 L_MAX = 2048
-_HOOKS = {"neighbourhood": None, "wrap_crossing": False}
+_HOOKS = {"neighbourhood": None, "wrap_crossing": False, "site_s2_singletons": True, "p_inf_norm": "N",
+          "chi_norm": True}
 
 
 def check_lattice(lattice, dilution):
@@ -82,6 +85,21 @@ def bonds(lattice, W, H):
     if _HOOKS["wrap_crossing"] and W > 2:
         add(x == W - 1, -(W - 1), 0)
     return np.concatenate(us), np.concatenate(vs)
+
+
+def physical_aspect(lattice, dilution, W, H):
+    """Width / height of the W x H region as a continuum rectangle: THE convention of every Cardy
+    comparison in this package (tests, GUIDE).  Each site owns its Voronoi cell: triangular, a hexagon
+    of width 1 in rows sqrt(3)/2 apart, so W / (H sqrt(3)/2); square site W / H; honeycomb (brick
+    wall), columns sqrt(3)/2 and rows 3/2 apart, W / (sqrt(3) H).  Square bond: (W - 1) / H, the
+    convention under which Bollobas & Riordan's self-dual (n + 1) x n bond rectangle (W = n + 2,
+    H = n + 1) has aspect 1.  The region's lattice points span (W - 1/2) x (H - 1) sqrt(3)/2 on the
+    triangular lattice; the O(1/L) ambiguity is the systematic the Cardy tests allow (one spacing)."""
+    if lattice == "triangular":
+        return 2 * W / (math.sqrt(3) * H)
+    if lattice == "honeycomb":
+        return W / (math.sqrt(3) * H)
+    return (W - 1) / H if dilution == "bond" else W / H
 
 
 def _flags(W, H):
@@ -142,7 +160,8 @@ def sweep(lattice, dilution, W, H, rng, full=True, order=None):
                     break
             if full:
                 big = uf.largest
-                largest[n], s2[n] = big, uf.sum_sq - (N - n) - big * big
+                largest[n] = big
+                s2[n] = uf.sum_sq - ((N - n) if _HOOKS["site_s2_singletons"] else 0) - big * big
     out = {"n_star": n_star, "M": M, "N": N, "order": perm}
     if full:
         if n_star is None or largest[M] != N or uf.sum_sq != N * N or \
@@ -206,9 +225,9 @@ def check_sweeps(sweeps):
 
 def sample_lattice(lattice, dilution, p, W, H, seeds, sweeps, cross_check=None):
     """Per named seed, `sweeps` NZ sweeps (numpy default_rng(seed)); the canonical R, P_inf, chi at p
-    per seed; their mean, stderr and 99% Student-t half-width over the seeds.  `cross_check(orders,
-    n_stars, bonds)`, if given, is called once per seed (an exact comparison, e.g. with the
-    enumeration of a small lattice)."""
+    per seed; their mean, stderr and 99% Student-t half-width over the seeds.  `cross_check(runs,
+    bonds)`, if given, is called once per seed with the seed's sweeps (an exact comparison, e.g. with
+    the enumeration of a small lattice)."""
     from scipy.special import stdtrit
     check_lattice(lattice, dilution)
     W, H = check_size(W, H)
@@ -226,10 +245,11 @@ def sample_lattice(lattice, dilution, p, W, H, seeds, sweeps, cross_check=None):
         w = binomial_weights(M, p)
         stars[seed] = [r["n_star"] for r in runs]
         if cross_check is not None:
-            cross_check([r["order"] for r in runs], stars[seed], bonds(lattice, W, H))
+            cross_check(runs, bonds(lattice, W, H))
+        norm_p = N if _HOOKS["p_inf_norm"] == "N" else M
         rows.append({"R": float(w @ crossing_cdf(stars[seed], M)),
-                     "P_inf": float(w @ np.mean([r["largest"] for r in runs], 0)) / N,
-                     "chi": float(w @ np.mean([r["s2"] for r in runs], 0)) / N})
+                     "P_inf": float(w @ np.mean([r["largest"] for r in runs], 0)) / norm_p,
+                     "chi": float(w @ np.mean([r["s2"] for r in runs], 0)) / (N if _HOOKS["chi_norm"] else 1)})
     mean, se, hw = {}, {}, {}
     t = float(stdtrit(len(seeds) - 1, 0.995))
     for k in rows[0]:
@@ -240,4 +260,4 @@ def sample_lattice(lattice, dilution, p, W, H, seeds, sweeps, cross_check=None):
 
 
 __all__ = ["LATTICES", "LatticeSample", "binomial_weights", "bonds", "check_lattice", "check_seeds",
-           "check_size", "check_sweeps", "crossing_cdf", "sample_lattice", "sweep"]
+           "check_size", "check_sweeps", "crossing_cdf", "physical_aspect", "sample_lattice", "sweep"]

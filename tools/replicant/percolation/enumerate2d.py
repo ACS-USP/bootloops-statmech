@@ -25,9 +25,11 @@ M <= M_MAX (else precondition:exact-size).
       else (None, "no planar duality identity for this lattice at finite size")
       _HOOKS["dual_shape"] (tests): the dual rectangle is (H + a) columns x (W + b) rows, (a, b) =
       (1, -1); planted (0, -1)
-  nz_cross_check(lattice, dilution, W, H, orders, n_stars) -> None: for every NZ order, the first n
-      at which the first n elements cross (from the enumeration's table) must equal the sweep's n*;
-      an NZ bond that is not an edge of the embedding, or a different n*, is refused
+  cluster_tables / cluster_means: |C1| and S2 = sum over the other clusters of |C|^2 per configuration,
+      and their exact means at fixed n (the microcanonical P_inf and chi of the sweep, times N)
+  nz_cross_check(lattice, dilution, W, H, runs, bonds) -> None: for every NZ sweep and every n, the
+      configuration of its first n elements must give the enumeration's crossing (so n*), |C1| and S2;
+      an NZ bond that is not an edge of the embedding, or any difference, is refused
       no-solution:nz-enumeration
 """
 import math
@@ -76,9 +78,10 @@ def _ends(keys, direction):
     return lo, hi
 
 
-@lru_cache(maxsize=64)
-def _table(lattice, dilution, W, H, direction):
-    """Boolean array over all 2^M configurations: does it cross?  (bit e of the index = element e.)"""
+@lru_cache(maxsize=16)
+def _labels(lattice, dilution, W, H):
+    """(labels (2^M, V) int16, occupied (2^M, V) bool, M) of every configuration (bit e of the index =
+    element e): label propagation along the open edges until nothing changes."""
     keys, edges = graph(lattice, W, H)
     V = len(keys)
     M = len(edges) if dilution == "bond" else V
@@ -87,8 +90,8 @@ def _table(lattice, dilution, W, H, direction):
                       "(2^M configurations)")
     conf = np.arange(2 ** M, dtype=np.int64)
     bit = lambda e: ((conf >> e) & 1).astype(bool)
-    occ = [bit(i) for i in range(V)] if dilution == "site" else [np.ones(conf.size, bool)] * V
-    opened = [bit(e) if dilution == "bond" else occ[a] & occ[b] for e, (a, b) in enumerate(edges)]
+    occ = np.stack([bit(i) for i in range(V)], 1) if dilution == "site" else np.ones((conf.size, V), bool)
+    opened = [bit(e) if dilution == "bond" else occ[:, a] & occ[:, b] for e, (a, b) in enumerate(edges)]
     lab = np.tile(np.arange(V, dtype=np.int16), (conf.size, 1))
     changed = True
     while changed:
@@ -100,20 +103,54 @@ def _table(lattice, dilution, W, H, direction):
                 changed = True
                 lab[upd, a] = m[upd]
                 lab[upd, b] = m[upd]
-    lo, hi = _ends(keys, direction)
-    out = np.zeros(conf.size, bool)
+    return lab, occ, M
+
+
+@lru_cache(maxsize=64)
+def _table(lattice, dilution, W, H, direction):
+    """Boolean array over all 2^M configurations: does it cross?"""
+    lab, occ, _ = _labels(lattice, dilution, W, H)
+    lo, hi = _ends(graph(lattice, W, H)[0], direction)
+    out = np.zeros(lab.shape[0], bool)
     for i in lo:
         for j in hi:
-            out |= occ[i] & occ[j] & (lab[:, i] == lab[:, j])
+            out |= occ[:, i] & occ[:, j] & (lab[:, i] == lab[:, j])
     return out
+
+
+@lru_cache(maxsize=16)
+def cluster_tables(lattice, dilution, W, H):
+    """(largest, s2) int arrays over all 2^M configurations: |C1| (0 with nothing occupied) and
+    S2 = sum over the other clusters of |C|^2 (occupied vertices only)."""
+    lab, occ, _ = _labels(lattice, dilution, W, H)
+    C, V = lab.shape
+    idx = (lab.astype(np.int64) + V * np.arange(C)[:, None])[occ]
+    counts = np.bincount(idx, minlength=C * V).reshape(C, V)
+    big = counts.max(1)
+    return big, (counts ** 2).sum(1) - big ** 2
+
+
+def cluster_means(lattice, dilution, W, H):
+    """(E[|C1| | n], E[S2 | n]) for n = 0 .. M (exact means over the C(M, n) configurations, floats):
+    the canonical P_inf(p) = sum_n C(M, n) p^n (1 - p)^(M - n) E[|C1| | n] / N, chi likewise with S2."""
+    big, s2 = cluster_tables(lattice, dilution, W, H)
+    M = int(round(math.log2(big.size)))
+    pop = _popcount(big.size, M)
+    n = np.bincount(pop, minlength=M + 1)
+    return np.bincount(pop, big, M + 1) / n, np.bincount(pop, s2, M + 1) / n
+
+
+def _popcount(size, M):
+    pop = np.zeros(size, np.int64)
+    for e in range(M):
+        pop += (np.arange(size) >> e) & 1
+    return pop
 
 
 def crossing_counts(lattice, dilution, W, H, direction="h"):
     t = _table(lattice, dilution, W, H, direction)
     M = int(round(math.log2(t.size)))
-    pop = np.zeros(t.size, np.int64)
-    for e in range(M):
-        pop += (np.arange(t.size) >> e) & 1
+    pop = _popcount(t.size, M)
     return [int(c) for c in np.bincount(pop[t], minlength=M + 1)]
 
 
@@ -161,10 +198,13 @@ def duality_identity(lattice, dilution, W, H):
     return holds, f"{what} = 1 identically (exact polynomials)" if holds else f"{what} = {terms}, not 1"
 
 
-def nz_cross_check(lattice, dilution, W, H, orders, n_stars, nz_bonds=None):
-    """Exact comparison of NZ sweeps with the enumeration: `orders` are the sweeps' element orders,
-    `n_stars` their n*; for bond, `nz_bonds` = the sweep's (u, v) arrays (vertex ids y W + x)."""
+def nz_cross_check(lattice, dilution, W, H, runs, nz_bonds):
+    """Exact comparison of NZ sweeps with the enumeration.  `runs`: the sweeps' dicts (order, n_star and,
+    for full sweeps, largest and s2 over n = 0 .. M); `nz_bonds`: the sweep's (u, v) arrays (vertex ids
+    y W + x).  For every sweep and every n, the configuration of its first n elements must give the
+    enumeration's crossing (n*), |C1| and S2; else no-solution:nz-enumeration."""
     table = _table(lattice, dilution, W, H, "h")
+    big, s2 = cluster_tables(lattice, dilution, W, H)
     keys, edges = graph(lattice, W, H)
     if dilution == "bond":
         index = {frozenset((keys[a][1] * W + keys[a][0], keys[b][1] * W + keys[b][0])): e
@@ -181,18 +221,19 @@ def nz_cross_check(lattice, dilution, W, H, orders, n_stars, nz_bonds=None):
     else:
         pos = {k[1] * W + k[0]: i for i, k in enumerate(keys)}
         elem = [pos[s] for s in range(W * H)]
-    for order, ns in zip(orders, n_stars):
-        mask, first = 0, 0 if table[0] else None
-        for n, k in enumerate(order, 1):
-            if first is not None:
-                break
-            mask |= 1 << elem[int(k)]
-            if table[mask]:
-                first = n
-        if first != ns:
+    for r in runs:
+        masks = np.cumsum([0] + [1 << elem[int(k)] for k in r["order"]])
+        hit = np.nonzero(table[masks])[0]
+        first = int(hit[0]) if hit.size else None
+        if first != r["n_star"]:
             raise Refusal("no-solution:nz-enumeration", f"{lattice} {dilution} {W} x {H}: the sweep's "
-                          f"n* = {ns}, the enumeration's {first}")
+                          f"n* = {r['n_star']}, the enumeration's {first}")
+        for key, tab in (("largest", big), ("s2", s2)):
+            if key in r and not np.array_equal(np.asarray(r[key], float), tab[masks].astype(float)):
+                n = int(np.nonzero(np.asarray(r[key], float) != tab[masks])[0][0])
+                raise Refusal("no-solution:nz-enumeration", f"{lattice} {dilution} {W} x {H}: {key} after "
+                              f"n = {n} elements is {r[key][n]} in the sweep, {tab[masks][n]} enumerated")
 
 
-__all__ = ["M_MAX", "crossing_counts", "crossing_probability", "duality_identity", "graph",
-           "nz_cross_check"]
+__all__ = ["M_MAX", "cluster_means", "cluster_tables", "crossing_counts", "crossing_probability",
+           "duality_identity", "graph", "nz_cross_check"]

@@ -98,8 +98,9 @@ def test_cardy_two_routes_symmetry_and_limits():
 
 
 def _tri_rect(aspect, H):
+    """W x H with lattice2d.physical_aspect (the package's one convention) closest to `aspect`."""
     W = max(2, round(float(aspect) * H * 3 ** 0.5 / 2))
-    return W, H, W / (H * 3 ** 0.5 / 2)
+    return W, H, LT.physical_aspect("triangular", "site", W, H)
 
 
 def test_cardy_rectangle_convention_against_a_small_monte_carlo():
@@ -137,12 +138,9 @@ def test_enumeration_duality_identities_and_planted_dual():
 
 
 def _orders(lattice, dilution, W, H, n, seed):
+    """(full sweeps on named seed `seed`, the sweep's bond arrays)."""
     rng = np.random.default_rng(seed)
-    u, v = LT.bonds(lattice, W, H)
-    M = len(u) if dilution == "bond" else W * H
-    orders = [rng.permutation(M) for _ in range(n)]
-    stars = [LT.sweep(lattice, dilution, W, H, None, order=o)["n_star"] for o in orders]
-    return orders, stars, (u, v)
+    return [LT.sweep(lattice, dilution, W, H, rng) for _ in range(n)], LT.bonds(lattice, W, H)
 
 
 def test_newman_ziff_matches_the_enumeration_exactly_and_planted_lattices_fail():
@@ -152,6 +150,50 @@ def test_newman_ziff_matches_the_enumeration_exactly_and_planted_lattices_fail()
         for lattice, dilution, W, H in SMALL:
             _refused(lambda: _planted(LT._HOOKS, hook, val, lambda: EN.nz_cross_check(
                 lattice, dilution, W, H, *_orders(lattice, dilution, W, H, 40, 3))), "no-solution:nz-enumeration")
+
+
+def test_sweep_cluster_observables_equal_the_enumeration_at_every_n_and_planted_s2_fails():
+    """Exact (no statistics): |C1|(n) and S2(n) of every sweep against the enumerated configuration of
+    its first n elements; the planted site S2 that keeps the N - n unoccupied singletons is refused."""
+    for lattice, dilution, W, H in SMALL:
+        big, s2 = EN.cluster_tables(lattice, dilution, W, H)
+        assert big.max() == W * H and s2[0] == (W * H - 1 if dilution == "bond" else 0)
+    for lattice, dilution, W, H in (("square", "site", 3, 3), ("triangular", "site", 3, 3),
+                                    ("honeycomb", "site", 4, 3)):
+        _refused(lambda: _planted(LT._HOOKS, "site_s2_singletons", False, lambda: EN.nz_cross_check(
+            lattice, dilution, W, H, *_orders(lattice, dilution, W, H, 5, 3))), "no-solution:nz-enumeration")
+
+
+def _exact_canonical(lattice, dilution, W, H, p):
+    big, s2 = EN.cluster_means(lattice, dilution, W, H)
+    w = LT.binomial_weights(len(big) - 1, p)
+    return float(w @ big) / (W * H), float(w @ s2) / (W * H)
+
+
+def test_sampled_p_inf_and_chi_match_the_enumeration_and_planted_normalisations_fail():
+    """Statistical, fixed named seeds: the canonical P_inf = E|C1|/N and chi = E S2/N of the sample
+    route against their exact enumerated values (99% Student-t band); P_inf over M instead of N and chi
+    without the 1/N leave the band."""
+    cases = (("square", "bond", 3, 3, 0.5), ("square", "site", 4, 3, 0.6), ("triangular", "site", 3, 3, 0.5),
+             ("triangular", "bond", 3, 2, 0.35), ("honeycomb", "bond", 4, 3, 0.65), ("honeycomb", "site", 4, 3, 0.7))
+    seeds = tuple(range(8))
+    for lattice, dilution, W, H, p in cases:
+        pinf, chi = _exact_canonical(lattice, dilution, W, H, p)
+        r = LT.sample_lattice(lattice, dilution, p, W, H, seeds, 40)
+        assert abs(r.mean["P_inf"] - pinf) <= r.halfwidth99["P_inf"], (lattice, dilution, r.mean["P_inf"], pinf)
+        assert abs(r.mean["chi"] - chi) <= r.halfwidth99["chi"], (lattice, dilution, r.mean["chi"], chi)
+        assert r.halfwidth99["P_inf"] < 0.05 * pinf
+    for lattice, dilution, W, H, p in (cases[0], cases[4]):
+        pinf, chi = _exact_canonical(lattice, dilution, W, H, p)
+        bad = _planted(LT._HOOKS, "p_inf_norm", "M", lambda: LT.sample_lattice(lattice, dilution, p, W, H, seeds, 40))
+        assert abs(bad.mean["P_inf"] - pinf) > bad.halfwidth99["P_inf"], (lattice, bad.mean["P_inf"], pinf)
+    for lattice, dilution, W, H, p in (cases[1], cases[2]):
+        pinf, chi = _exact_canonical(lattice, dilution, W, H, p)
+        bad = _planted(LT._HOOKS, "chi_norm", False, lambda: LT.sample_lattice(lattice, dilution, p, W, H, seeds, 40))
+        assert abs(bad.mean["chi"] - chi) > bad.halfwidth99["chi"], (lattice, bad.mean["chi"], chi)
+    # the run path: on a small lattice the catalog's sample route cross-checks every sweep exactly
+    _refused(lambda: _planted(LT._HOOKS, "site_s2_singletons", False, lambda: _run(
+        "sample", lattice="square", dilution="site", Lx=3, Ly=3, sweeps=2)), "no-solution:nz-enumeration")
 
 
 def test_sampled_crossing_matches_the_exact_polynomial_and_planted_bc_leaves_the_band():

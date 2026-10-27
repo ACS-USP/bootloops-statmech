@@ -19,7 +19,7 @@ from fractions import Fraction
 
 from .catalog import Out, RefCheck, Stability, entry, fstep, has
 from .catalog_lattice_common import _put
-from .catalog_percolation_fss import FSS_FINALITY, FSS_META, fss_step
+from .catalog_percolation_fss import BAND_P, FSS_FINALITY, FSS_META, fss_step
 from .core import Refusal
 from .lattice.ball import arb_q, ball_of, baller, rational
 from .percolation import cardy as CY
@@ -46,6 +46,7 @@ SMIRNOV = ("Smirnov, 'Critical percolation in the plane', arXiv:0909.4499v1 (PDF
            "Theorem 1, Corollaries 2, 3")
 NZ = ("Newman & Ziff, Phys. Rev. Lett. 85, 4104 (2000), arXiv:cond-mat/0005264v2 (PDF read), the algorithm "
       "(pp. 3-5) and Eq. (1)")
+CHECK_MAX = 16
 ENUM = "exhaustive enumeration of the open Lx x Ly lattice (percolation/enumerate2d.py; derived here)"
 THEOREM = {("square", "bond"): BR_SQ, ("triangular", "site"): BR_TRI, ("triangular", "bond"): GM,
            ("honeycomb", "bond"): GM}
@@ -137,8 +138,8 @@ def _sample(p):
     check_size(W, H)
     cc = None
     elems = len(EN.graph(lattice, W, H)[1]) if dilution == "bond" and W * H <= 64 else W * H
-    if elems <= EN.M_MAX:
-        cc = lambda orders, stars, bonds: EN.nz_cross_check(lattice, dilution, W, H, orders, stars, bonds)
+    if elems <= CHECK_MAX:
+        cc = lambda runs, bonds: EN.nz_cross_check(lattice, dilution, W, H, runs, bonds)
     r = sample_lattice(lattice, dilution, _occ(p), W, H, p.get("seeds", tuple(range(8))), p.get("sweeps", 16),
                        cc)
     ren = {"R": "crossing_probability_sampled", "P_inf": "P_inf_sampled", "chi": "mean_cluster_size_sampled"}
@@ -146,7 +147,8 @@ def _sample(p):
     errs = {ren[k]: x for k, x in r.stderr.items()}
     hw = ", ".join(f"{ren[k]} +- {x:.3g}" for k, x in r.halfwidth99.items())
     meta = {"Lx": W, "Ly": H, "n_seeds": len(r.seeds), "sweeps": r.sweeps,
-            "nz_enumeration_check": "every sweep's n* equals the enumeration's" if cc else "lattice too large"}
+            "nz_enumeration_check": "every sweep's n*, |C1|(n) and S2(n) equal the enumeration's" if cc else
+            f"not run: more than {CHECK_MAX} elements"}
     return Out({**vals, **meta}, f"{len(r.seeds)} x {r.sweeps} NZ sweeps on {lattice} {dilution} {W} x {H}: "
                f"R({r.p:.6g}) = {r.mean['R']:.4g}", errors=errs, statistical=tuple(vals),
                notes=(f"statistical: means over named seeds, stderr in errors; 99% Student-t half-widths: {hw}",))
@@ -181,8 +183,9 @@ FINALITY = {
     **{k: _lit_or_universal(TRI_SITE, f"{SMIRNOV}; {CARDY}", "the scaling limit of the crossing probability, a "
                             "theorem for triangular site (Smirnov Cor. 2, 3)", _CARDY_NO)
        for k in ("cardy_crossing_h", "cardy_crossing_v")},
-    "crossing_exact": Stability("exact-by-literature", "exact", ENUM, "exact by construction: the crossing "
-                                "polynomial of the finite open lattice, evaluated at the rational p"),
+    "crossing_exact": Stability("exact-by-literature", "exact", ENUM, "exact by construction (the I3 "
+                                "convention): this package's own exhaustive enumeration of the finite open "
+                                "lattice, evaluated at the rational p; no literature value exists"),
     **{k: STAT for k in ("crossing_probability_sampled", "P_inf_sampled", "mean_cluster_size_sampled")},
     **FSS_FINALITY}
 META = ("lattice", "dilution", "identities", "scaling_relations", "aspect", "cardy_routes", "exact_lattice",
@@ -197,7 +200,8 @@ def _echo(p):
 def _rc(key, extract, params=None, route="exact", statistical=False):
     if statistical:
         return RefCheck("percolation_lattice", key, extract, statistical=True, route="sample", slow=True,
-                        params=params, error=lambda e, k=extract.key: e[k], runs=len(params["seeds"]))
+                        params=params, error=lambda e, k=extract.key: e[k], runs=len(params["seeds"]),
+                        systematic=lambda v: v["fss_bands"][BAND_P][3])
     return RefCheck("percolation_lattice", key, extract, route=route, params=params or {})
 
 
