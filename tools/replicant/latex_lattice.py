@@ -10,6 +10,7 @@ import mpmath as mp
 import sympy as sp
 
 from .latex_lattice_obs import ising1d_blocks, ising2d_blocks
+from .latex_lattice_xi import ising2d_xi_blocks
 from .tex import Check, cited, sym, text
 
 K, H, B, X, KK = sp.symbols("K H B x k", real=True)
@@ -57,6 +58,7 @@ def ising2d(route):
               r"Z = e^{2NK}\,\mathrm{Tr}\,T^{L_x},\quad T_{s s'} = x^{u(s) + |s \oplus s'|}",
               _DC + ", Frame 2"),
         *ising2d_blocks(),
+        *ising2d_xi_blocks(),
     ]
 
 

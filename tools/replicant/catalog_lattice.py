@@ -7,7 +7,7 @@ ball (radius plus the rounding of the midpoint).  The routes are declared rigor 
 (CatalogEntry.rigor); compose refuses a certified run with a value lacking its radius.
 Run parameters:
   ising2d (exact)     beta (rational, or "beta_c", the default), L (torus side, default 4; 2 .. 6),
-                      Ly (default L)
+                      Ly (default L), n (diagonal distance at beta_c, default 1)
   ising1d (exact)     beta (rational > 0, default 1), h (rational, default 0), N (ring, default 8)
   bethe_ising (cavity) k (coordination >= 2, default 3), beta (default 1), h (default 0), branch
 """
@@ -24,6 +24,7 @@ from .lattice.coupling import coupling
 from .lattice.transfer import ising1d_ring_balls
 from .spec import ModelSpec
 from . import catalog_lattice_obs as OBS
+from . import catalog_lattice_xi as XI
 
 DC = "Duminil-Copin, arXiv:2208.00864 (2022)"
 ONSAGER = f"Onsager, Phys. Rev. 65, 117 (1944) (not fetched), as printed by {DC}, Eq. (3.6)"
@@ -125,12 +126,13 @@ def ising2d():
              fstep("ising2d-yang-magnetization", YANG, _yang, when=_above,
                    skip="beta <= beta_c: m* = 0 (paramagnet)"),
              fstep("ising2d-yang-exponent", YANG, _slope),
-             fstep("ising2d-kaufman-vs-transfer-matrix", KAUF, _torus)] + OBS.STEPS_2D
+             fstep("ising2d-kaufman-vs-transfer-matrix", KAUF, _torus)] + OBS.STEPS_2D + \
+        XI.STEPS_2D
     refs = [RefCheck("lattice", "onsager_critical_minus_beta_f", lambda v: v["minus_beta_f"],
                      route="exact"),
             RefCheck("lattice", "beta_c_square", lambda v: v["beta_c"], route="exact"),
             RefCheck("lattice", "yang_exponent", lambda v: v["yang_exponent_loglog"], route="exact")
-            ] + OBS.REFS_2D
+            ] + OBS.REFS_2D + XI.REFS_2D
     lit = lambda cite, note: Stability("exact-by-literature", "exact", cite, note)
     fin = {"beta_c": lit(KW, "self-dual point"),
            "minus_beta_f": lit(ONSAGER, "Onsager's free energy, certified ball"),
@@ -142,16 +144,17 @@ def ising2d():
            "torus_minus_beta_f_tm": Stability("exact-by-literature", "exact", TM, "exact by "
                                               "construction: the transfer-matrix trace in exact "
                                               "integers (equal to Kaufman's polynomial)"),
-           **OBS.FIN_2D}
+           **OBS.FIN_2D, **XI.FIN_2D}
     spec = ModelSpec("ising2d", "ising", "none", constraint="square lattice, exact solution")
     return entry("ising2d", spec, f"{ONSAGER}; {YANG}; {KAUF}", {"exact": steps}, refs,
                  {"exact": CAVEAT_2D}, "2D Ising model (square lattice, zero field): Onsager's free "
-                 "energy, energy and specific heat, Yang's magnetization, Kaufman's torus versus the "
+                 "energy, energy and specific heat, Yang's magnetization, correlation length, critical "
+                 "correlations, Kaufman's torus versus the "
                  "transfer matrix, certified",
                  default_route="exact", finality=fin,
                  meta=("beta", "slope_points", "torus_size", "torus_coefficients",
-                       "kaufman_max_radius", "kaufman_prec_bits") + OBS.META_2D,
-                 parameters={"exact": ("beta", "L", "Ly")}, rigor={"exact": "certified"})
+                       "kaufman_max_radius", "kaufman_prec_bits") + OBS.META_2D + XI.META_2D,
+                 parameters={"exact": ("beta", "L", "Ly", "n")}, rigor={"exact": "certified"})
 
 
 # ---- ising1d -----------------------------------------------------------------------------------

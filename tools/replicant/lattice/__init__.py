@@ -12,8 +12,13 @@
                 ring and its explicit N -> oo limit
   onsager_thermo.py 2D energy and specific heat (Onsager 1944), the log divergence's amplitude
   torus_thermo.py   finite-torus energy and specific heat (Kaufman's Z, the exact polynomial)
+  correlation2d.py  2D correlation length above / below T_c, Onsager's strip spectrum, the nu and
+                eta consistency checks
+  strip_tm.py   the strip transfer matrix built and diagonalised directly (numpy, symmetry sectors)
+  critical2d.py critical correlations: nearest neighbour, diagonal (product, Toeplitz, asymptote)
 """
-from . import bethe, kaufman, observables1d, onsager, onsager_thermo, torus_thermo, transfer
+from . import bethe, correlation2d, critical2d, kaufman, observables1d, onsager, onsager_thermo, \
+    strip_tm, torus_thermo, transfer
 from .ball import DIGITS, Ball, certify
 from .bethe import BetheFixedPoint, BetheResult, bethe_critical_beta, bethe_ising_fixed_points, \
     bethe_ising_free_energy
@@ -25,8 +30,8 @@ from .transfer import ising1d_free_energy, ising_transfer_matrix_free_energy, to
 
 __all__ = ["BETA_C", "Ball", "BetheFixedPoint", "BetheResult", "DIGITS", "Recovery", "XPoint",
            "bethe", "bethe_critical_beta", "bethe_ising_fixed_points", "bethe_ising_free_energy",
-           "beta_of_x", "certify", "critical_beta", "ising1d_free_energy",
+           "beta_of_x", "correlation2d", "critical2d", "certify", "critical_beta", "ising1d_free_energy",
            "ising_transfer_matrix_free_energy", "kaufman", "kaufman_free_energy",
            "kaufman_partition_function", "kaufman_polynomial", "observables1d", "onsager",
-           "onsager_free_energy", "onsager_thermo", "torus_thermo",
+           "onsager_free_energy", "onsager_thermo", "strip_tm", "torus_thermo",
            "torus_partition_polynomial", "transfer", "yang_magnetization"]
