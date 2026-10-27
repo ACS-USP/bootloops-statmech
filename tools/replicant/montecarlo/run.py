@@ -4,7 +4,8 @@
       "E" (energy, the state before the sweep), "abs_m", "m2", "m2_improved" (SW: sum |C|^2 / N^2, the
       Fortuin-Kasteleyn estimator <m^2> = <sum |C|^2> / N^2, Salas & Sokal 1997 Eq. (3.9)), "cluster"
       (SW: number of clusters; Wolff: the flipped cluster's size).  Wolff is measured after every
-      cluster flip, sweeps x flips flips with flips = max(1, round(N / mean size over the burn-in)), and
+      cluster flip, sweeps x flips flips with flips = max(1, round(N / mean size)) from a pilot chain
+      (wolff_flips_per_sweep; simulate fixes it once per run from seeds[0], so every seed shares it), and
       its tau_int (per flip) is converted to sweeps by "tau_scale" = <|C|> / N over the run (the time unit
       of LPS Eq. (27): one sweep = N flipped sites)
   simulate(algorithm, q, L, beta, sweeps, burn_in, seeds) -> MCRun
@@ -64,15 +65,28 @@ def _n_sat(s, u, v):
     return sum(1 for a, b in zip(u, v) if s[a] == s[b])
 
 
-def _wolff_chain(q, L, p, total, burn_in, rng):
+PILOT = 0x5EED
+
+
+def wolff_flips_per_sweep(q, L, p, burn_in, seed):
+    """The Wolff sweep unit, max(1, round(N / mean cluster size)) over 4 max(burn_in, 1) cluster flips of a pilot
+    chain with its own generator default_rng([seed, PILOT]) from iid colours: deterministic given (q, L, beta,
+    burn_in, seed); simulate fixes it ONCE per run from seeds[0], so every seed has the same unit and length."""
+    N = L * L
+    nb = neighbours(L)
+    rng = np.random.default_rng([int(seed), PILOT])
+    s = rng.integers(q, size=N).tolist()
+    sizes = [wolff_step(s, q, p, nb, rng)[0] for _ in range(max(burn_in, 1) * 4)]
+    return max(1, round(N / (sum(sizes) / len(sizes))))
+
+
+def _wolff_chain(q, L, p, total, flips, rng):
     """Measured after every cluster flip; n_sat and the colour counts are tracked through each flip and
-    checked against the final spins (an exact invariant).  Returns (rows per flip, flips per sweep)."""
+    checked against the final spins (an exact invariant).  Returns rows per flip (total x flips of them)."""
     N = L * L
     nb = neighbours(L)
     u, v = bond_lists(L)
     s = rng.integers(q, size=N).tolist()
-    sizes = [wolff_step(s, q, p, nb, rng)[0] for _ in range(max(burn_in, 1) * 4)]
-    flips = max(1, round(N / (sum(sizes) / len(sizes))))
     n = total * flips
     out = np.empty((n, 5))
     n_sat, counts = _n_sat(s, u, v), [s.count(c) for c in range(q)]
@@ -85,14 +99,13 @@ def _wolff_chain(q, L, p, total, burn_in, rng):
         counts[b] += size
     if n_sat != _n_sat(s, u, v) or counts != [s.count(c) for c in range(q)]:
         raise Refusal("no-solution:sampler-invariant", "Wolff: tracked n_sat or colour counts != the final spins'")
-    return out, flips
+    return out
 
 
-def chain_series(algorithm, q, L, beta, sweeps, burn_in, seed):
+def chain_series(algorithm, q, L, beta, sweeps, burn_in, seed, flips=None):
     N = L * L
     b = float(beta_value(q, beta))
     rng = np.random.default_rng(seed)
-    flips = None
     if algorithm == "metropolis":
         if q != 2:
             raise Refusal("precondition:algorithm", "metropolis is the Ising (q = 2) single-spin flip")
@@ -103,9 +116,11 @@ def chain_series(algorithm, q, L, beta, sweeps, burn_in, seed):
                 "flips": None, "tau_scale": 1.0}
     p = bond_probability(q, beta)
     if algorithm == "swendsen_wang":
-        out = _sw_chain(q, L, p, burn_in + sweeps, rng)
+        out, flips = _sw_chain(q, L, p, burn_in + sweeps, rng), None
     elif algorithm == "wolff":
-        out, flips = _wolff_chain(q, L, p, burn_in + sweeps, burn_in, rng)
+        if flips is None:
+            flips = wolff_flips_per_sweep(q, L, p, burn_in, seed)
+        out = _wolff_chain(q, L, p, burn_in + sweeps, flips, rng)
     else:
         raise Refusal("precondition:algorithm", f"algorithm = {algorithm!r}: one of {', '.join(ALGORITHMS)}")
     out = out[burn_in * (flips or 1):]
@@ -133,7 +148,7 @@ class MCRun:
     equilibration: ST.Equilibration
     status: str
     per_seed: dict = field(default_factory=dict)
-    flips: tuple = ()
+    flips: int | None = None   # Wolff: cluster flips per sweep, one value for the whole run
 
 
 def _int(name, x, lo, hi):
@@ -171,7 +186,9 @@ def simulate(algorithm, q, L, beta, sweeps, burn_in, seeds):
                    "tau_scale": 1.0}
                   for k in range(len(seeds))]
     else:
-        chains = (chain_series(algorithm, q, L, beta, sweeps, burn_in, sd) for sd in seeds)
+        unit = (wolff_flips_per_sweep(q, L, bond_probability(q, beta), burn_in, seeds[0])
+                if algorithm == "wolff" else None)               # one sweep unit for every seed of the run
+        chains = (chain_series(algorithm, q, L, beta, sweeps, burn_in, sd, unit) for sd in seeds)
     for c in chains:
         e = c["E"] / N
         per["e"].append(e.mean())
@@ -186,6 +203,8 @@ def simulate(algorithm, q, L, beta, sweeps, burn_in, seeds):
             rel = rel and ti.reliable
         traces.append(e)
         flips.append(c["flips"])
+    if len(set(flips)) != 1 or len({len(x) for x in traces}) != 1:
+        raise Refusal("no-solution:sampler-invariant", f"chains of one run differ in sweep unit or length: {flips}")
     keys = [k for k in per if per[k]]
     bands = {k: ST.band(per[k]) for k in keys}
     eq = ST.equilibration(np.array(traces))
@@ -194,7 +213,7 @@ def simulate(algorithm, q, L, beta, sweeps, burn_in, seeds):
                  {k: bands[k].stderr for k in keys}, bands, {k: float(np.mean(v)) for k, v in taus.items()},
                  {k: float(np.std(v, ddof=1) / np.sqrt(len(v))) for k, v in taus.items()}, rel, eq, status,
                  {k: tuple(per[k]) for k in keys} | {f"tau_{k}": tuple(v) for k, v in taus.items()},
-                 tuple(flips))
+                 flips[0])
 
 
-__all__ = ["ALGORITHMS", "MCRun", "chain_series", "simulate"]
+__all__ = ["ALGORITHMS", "MCRun", "chain_series", "simulate", "wolff_flips_per_sweep"]

@@ -206,6 +206,23 @@ def test_fk_at_q1_reproduces_p2_crossing_polynomial():
     assert wrapped[0] is False
 
 
+def test_wolff_sweep_unit_is_fixed_once_per_run():
+    """Fix round 2 (re-review N1): the unit was estimated per seed, so seeds of one run could get 1 or 2 flips per
+    sweep and the traces were ragged (a ValueError).  On these seeds the per-seed pilot estimates differ; the run
+    uses seeds[0]'s for all of them, every chain has sweeps x unit rows, and a ragged set of runs is refused."""
+    from replicant.montecarlo import run as RN
+    from replicant.montecarlo import stats as ST
+    seeds, p = (0, 1, 2, 3), FK.bond_probability(2, "beta_c")
+    units = [RN.wolff_flips_per_sweep(2, 4, p, 2, s) for s in seeds]
+    assert len(set(units)) > 1, units                     # the case that used to crash
+    r = RN.simulate("wolff", 2, 4, "beta_c", 16, 2, seeds)
+    assert r.flips == units[0]
+    one = RN.chain_series("wolff", 2, 4, "beta_c", 16, 2, seeds[2], r.flips)
+    assert len(one["E"]) == 16 * r.flips and one["flips"] == r.flips
+    _refused(lambda: ST.equilibration([np.zeros(8), np.zeros(9)]), "precondition:ragged-runs")
+    _refused(lambda: ST.power_fit([4, 8, 16], [(1, 2, 3), (1, 2)]), "precondition:ragged-runs")
+
+
 # ---- the catalog entry -------------------------------------------------------------------------------------
 def _run(**p):
     e = catalog()["cluster_mc"]

@@ -41,6 +41,8 @@ per run; their difference s_hi - s_lo in a Student-t band.  A pure power law has
 ln L has s_hi < s_lo.  `separable_from_zero` = the z band excludes 0; `separable_from_log` = the
 difference band contains 0 AND excludes the log model's predicted difference (computed from the
 per-run log fit tau = a + b ln L at the same L).  When either is False the caller prints, never asserts.
+Runs of different lengths given to equilibration or power_fit are refused precondition:ragged-runs (never a
+numpy ValueError).
 """
 import math
 from dataclasses import dataclass
@@ -197,8 +199,15 @@ def band(values, conf=0.99):
     return Band(mean, se, t * se, n - 1, conf, t)
 
 
+def _matrix(rows, what):
+    rows = list(rows)
+    if len({np.size(r) for r in rows}) > 1:
+        raise Refusal("precondition:ragged-runs", f"{what}: runs of different lengths {[np.size(r) for r in rows]}")
+    return np.asarray(rows, dtype=float)
+
+
 def equilibration(traces, conf=0.99):
-    tr = np.asarray(traces, dtype=float)
+    tr = _matrix(traces, "equilibration traces")
     if tr.ndim != 2 or tr.shape[0] < 2 or tr.shape[1] < 4:
         raise Refusal("precondition:windows", f"traces of shape {tr.shape}: need (runs >= 2, T >= 4)")
     h = tr.shape[1] // 2
@@ -252,7 +261,7 @@ def _slope(x, y):
 
 def power_fit(Ls, taus, conf=0.99):
     Ls = np.asarray(Ls, float)
-    T = np.asarray(taus, float)
+    T = _matrix(taus, "power_fit taus")
     if Ls.ndim != 1 or Ls.size < 3 or T.ndim != 2 or T.shape[1] != Ls.size or T.shape[0] < 2 \
             or (T <= 0).any() or (np.diff(Ls) <= 0).any():
         raise Refusal("precondition:fit-sizes", "need >= 3 increasing L and (runs >= 2, len(L)) taus > 0")

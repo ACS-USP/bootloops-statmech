@@ -81,6 +81,9 @@ def _mc(p):
              f"equilibration: {r.equilibration.text}",
              f"specific_heat_sampled is each chain's own variance, biased low by about 2 tau_int(e) / n = {bias:.2%} "
              "(not in errors; <= 2% when mc_status is equilibrated, since then n >= 100 tau)")
+    if g["algorithm"] == "wolff":
+        notes += (f"Wolff sweep = {r.flips} cluster flips for every seed, fixed once per run by a pilot chain on seed "
+                  f"{r.seeds[0]} (montecarlo/run.wolff_flips_per_sweep); tau_int converted to sweeps by <|C|> / N",)
     return Out({**vals, **meta}, note, errors=errs, statistical=tuple(vals), notes=notes)
 
 
