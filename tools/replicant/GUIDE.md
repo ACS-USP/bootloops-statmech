@@ -587,8 +587,11 @@ J = 1, K = beta J, H = beta h; per-site values).  1D (Baxter, Exactly Solved Mod
 -> `Ball`; the ring: `ring_observables(N, a, b, r=1)` (exact Fractions at rational a = e^K, b = e^H;
 `RingObs(Z, m, chi_over_beta, corr, corr_next)`), `ring_brute(N, a, b, r)` (N <= 12, enumeration),
 `ring_check(N, beta, h, r=1)` -> `RingCheck(N, r, rho, observables)` with per observable
-`Observable(ring, closed, correction, bound, identity, within_bound)` and `.ok` (the ring equals the
-closed form plus the exact finite-N correction, and |ring - closed| <= the explicit N -> oo bound).
+`Observable(ring, closed, correction, bound, identity, within_bound, limit_tested)` and `.ok` (the ring
+equals the closed form plus the exact finite-N correction, and |ring - closed| <= the explicit N -> oo
+bound); `.limit_untested` names the legs whose bound is infinite or not below the value (small N or
+rho near 1: beta = 3, N = 8 leaves chi and xi untested), reported in the catalog's
+`ring_limit_untested` and step note, since the limit check is informative only when rho^N is small.
 2D (Onsager, Phys. Rev. 65, 117 (1944)): `onsager_thermo.onsager_energy(beta)` (Eq. (116); `BETA_C`:
 -sqrt 2, Eq. (121)), `onsager_specific_heat(beta)` (Eq. (117); `BETA_C` refused
 `precondition:off-critical`: c diverges), `specific_heat_amplitude()` (A = (2/pi) ln^2(1 + sqrt 2),
@@ -596,7 +599,9 @@ Eq. (120)), `specific_heat_log_slope(d1, d2)` (-> A, a consistency check), `onsa
 `onsager_specific_heat_integral` (derivatives of the single integral, acb.integral),
 `series_energy_specific_heat(beta, order=200)` (E8's series, mpf, not certified);
 `torus_thermo.torus_thermo_kaufman(Lx, Ly, beta)`, `torus_thermo_polynomial(Lx, Ly, beta)` -> (u_L, c_L)
-balls (K-derivatives by arb_series of Kaufman's Z, sides <= 512, and of the exact integer polynomial).
+balls (K-derivatives by arb_series of Kaufman's Z, sides <= 512, and of the exact integer polynomial),
+`torus_thermo_moments(Lx, Ly, beta)` (<E>/N and K^2 Var(E)/N over the integer coefficients, no
+derivative extraction: the catalog step refuses `no-solution:torus-disagreement` when it differs).
 Planted-error hooks: `observables1d._HOOKS["magnetization" | "susceptibility" | "correlation" |
 "correlation_length"]`, `onsager_thermo._HOOKS["amplitude_coefficient"]`,
 `torus_thermo._HOOKS["derivative_order"]`. Example: `onsager_thermo.specific_heat_amplitude().render(30)`

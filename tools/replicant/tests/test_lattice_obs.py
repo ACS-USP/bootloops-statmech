@@ -133,6 +133,40 @@ def test_ising1d_planted_closed_forms_fail_the_ring():
     assert O.ring_check(8, 1, "1/2", 1).ok                   # restored
 
 
+def test_ising1d_limit_leg_reported_untested_at_small_N():
+    """beta = 3, h = 0, N = 8: rho^N = 0.96, so the N -> oo bounds of chi (2.3e3) and xi (inf) are not
+    below the values: those legs are reported not tested (the identity legs still check).  At
+    N = 1000, beta = 3 (rho^N = 7e-3) the xi interval still reaches rho = 1 (not tested); at beta = 2
+    (rho^N = 1e-16) every leg is tested."""
+    from replicant.catalog import catalog
+    from replicant.compose import compose
+    from replicant.lattice import observables1d as O
+    c = O.ring_check(8, 3, 0, 1)
+    assert c.ok and set(c.limit_untested) == {"susceptibility", "correlation_length"}, c.limit_untested
+    assert not c.observables["correlation_length"].bound.arb.is_finite()
+    assert O.ring_check(1000, 3, 0, 1).limit_untested == ("correlation_length",)
+    assert O.ring_check(1000, 2, 0, 1).limit_untested == ()
+    e = catalog()["ising1d"]
+    res = compose(e.spec, "exact").run(beta=3, N=8)
+    assert res.values["ring_limit_untested"] == ["susceptibility", "correlation_length"]
+    assert res.values["ring_limit_bounds"]["correlation_length"] == "inf (not tested)"
+    note = next(t.summary for t in res.trace.entries if t.step == "ising1d-observables")
+    assert "informative only when rho^N is small" in note and "not tested for" in note, note
+    assert _refusal(lambda: compose(e.spec, "exact").run(N=8, r=7)).reason == "precondition:distance"
+
+
+@slow
+def test_slow_ising1d_susceptibility_is_the_field_derivative_symbolically():
+    """chi = beta dm/dH of Baxter Eq. (2.1.18), mechanically (sympy): beta dm/dH - chi = 0."""
+    import sympy as sp
+    K, H, b = sp.symbols("K H beta", positive=True)
+    D = sp.exp(2 * K) * sp.sinh(H) ** 2 + sp.exp(-2 * K)
+    m = sp.exp(K) * sp.sinh(H) / sp.sqrt(D)
+    chi = b * sp.exp(-K) * sp.cosh(H) / D ** sp.Rational(3, 2)     # as in observables1d._chi
+    assert sp.simplify(sp.together((b * sp.diff(m, H) - chi).rewrite(sp.exp))) == 0
+    assert sp.simplify(sp.together((b * sp.diff(m, H) - 2 * chi).rewrite(sp.exp))) != 0
+
+
 # ---- 2D: Onsager's energy and specific heat ------------------------------------------------------
 def test_onsager_energy_and_specific_heat_two_certified_routes():
     from flint import ctx
@@ -190,8 +224,21 @@ def test_torus_derivatives_polynomial_kaufman_and_bulk_sequence():
     for beta in ("0.3", "0.6"):
         g = gaps(beta)                   # finite-size sequence: each gap below the previous^1.5
         assert all(b < a ** 1.5 for a, b in zip(g, g[1:])) and g[-1] < mp.mpf("1e-30"), (beta, g)
-    # planted: the wrong derivative order (c_L from the first K-derivative) breaks the sequence
-    _planted(T, "derivative_order", 1, lambda: _assert_far(gaps("0.3")))
+    for L, beta in ((3, "0.3"), (4, "beta_c"), (4, "0.6")):   # moments: no derivative extraction
+        pu, pc = T.torus_thermo_polynomial(L, L, beta)
+        mu, mc = T.torus_thermo_moments(L, L, beta)
+        assert pu.overlaps(mu) and pc.overlaps(mc), (L, beta)
+    # planted: the wrong derivative order (c_L from the first K-derivative) breaks the sequence,
+    # and the catalog step refuses (the energy-variance route disagrees with the derivatives)
+    from replicant.catalog import catalog
+    from replicant.compose import compose
+    e = catalog()["ising2d"]
+
+    def planted():
+        _assert_far(gaps("0.3"))
+        r = _refusal(lambda: compose(e.spec, "exact").run(beta="0.6"))
+        assert r.reason == "no-solution:torus-disagreement" and "moments" in r.detail, r
+    _planted(T, "derivative_order", 1, planted)
 
 
 def _assert_far(g):
@@ -258,8 +305,7 @@ def test_catalog_observables_certified_and_printed_enclosures():
 
 
 # ---- slow tier ---------------------------------------------------------------------------------
-@slow
-def test_slow_ising1d_rings_up_to_1000():
+def test_ising1d_rings_up_to_1000():
     from replicant.lattice import observables1d as O
     for N, beta, h, r in ((1000, 3, 0, 5), (1000, "1/2", "2", 3), (500, 2, "-1/4", 10), (64, 1, "1/2", 30)):
         c = O.ring_check(N, beta, h, r)

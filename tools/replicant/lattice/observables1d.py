@@ -231,6 +231,8 @@ class Observable:
     bound: Ball          # an upper bound of |ring - closed|
     identity: bool       # ring overlaps closed + correction
     within_bound: bool   # |ring - closed| <= bound (ball comparison not refuted)
+    limit_tested: bool = True   # False when the bound is infinite or >= |closed| (and nonzero):
+                                # within_bound then says nothing (small N, rho near 1)
 
 
 @dataclass(frozen=True)
@@ -243,6 +245,19 @@ class RingCheck:
     @property
     def ok(self):
         return all(o.identity and o.within_bound for o in self.observables.values())
+
+    @property
+    def limit_untested(self):
+        """Observables whose N -> oo leg is uninformative at this N (see Observable.limit_tested)."""
+        return tuple(k for k, o in self.observables.items() if not o.limit_tested)
+
+
+def _tested(bound, closed):
+    """The limit leg tests something iff the bound is finite and below |closed| (a zero bound,
+    e.g. m at h = 0, is an exact statement and counts as tested)."""
+    if not bound.is_finite():
+        return False
+    return bool(bound == 0) or bool(bound < closed.abs_lower())
 
 
 def _log_lambda_series(K, H):
@@ -298,13 +313,16 @@ def ring_check(N, beta, h, r=1, J=1, prec=None) -> RingCheck:
         for name in ("magnetization", "susceptibility", "correlation"):
             c, b = corr[name]
             diff = rings[name] - closed[name]
+            bu = arb(b.abs_upper())
             out[name] = Observable(ball_of(rings[name]), ball_of(closed[name]), ball_of(c),
-                                   ball_of(arb(b.abs_upper())), bool(diff.overlaps(c)),
-                                   not bool(diff.abs_lower() > b.abs_upper()))
+                                   ball_of(bu), bool(diff.overlaps(c)),
+                                   not bool(diff.abs_lower() > b.abs_upper()),
+                                   _tested(bu, closed[name]))
         cxi = _HOOKS["correlation_length"](k, x)
+        bxi = arb(xi_lim.rad())
         out["correlation_length"] = Observable(
-            ball_of(xi_ring), ball_of(cxi), ball_of(xi_ring - xi_corr),
-            ball_of(arb(xi_lim.rad())), bool(xi_corr.overlaps(cxi)), bool(xi_lim.overlaps(cxi)))
+            ball_of(xi_ring), ball_of(cxi), ball_of(xi_ring - xi_corr), ball_of(bxi),
+            bool(xi_corr.overlaps(cxi)), bool(xi_lim.overlaps(cxi)), _tested(bxi, cxi))
         return RingCheck(N, r, ball_of(rho), out)
 
 

@@ -45,7 +45,10 @@ def _int(p, name, default, lo, hi):
 def _obs1d(p):
     beta, h = p.get("beta", 1), p.get("h", 0)
     N = _int(p, "N", 8, 2, 1000)
-    r = _int(p, "r", 1, 0, max(N - 2, 0))
+    r = p.get("r", 1)
+    if isinstance(r, bool) or not isinstance(r, int) or not 0 <= r <= max(N - 2, 0):
+        raise Refusal("precondition:distance", f"r = {r!r}: need an int in 0 .. {max(N - 2, 0)} "
+                      f"(the ring has N = {N} sites)")
     chk = O1.ring_check(N, beta, h, r)
     if not chk.ok:
         bad = [k for k, o in chk.observables.items() if not (o.identity and o.within_bound)]
@@ -61,12 +64,17 @@ def _obs1d(p):
                 ring_susceptibility=ob["susceptibility"].ring,
                 ring_correlation=ob["correlation"].ring,
                 ring_correlation_length=ob["correlation_length"].ring)
-    bounds = {k: o.bound.render(3) if o.bound.arb.is_finite() else "inf" for k, o in ob.items()}
+    bounds = {k: (o.bound.render(3) if o.bound.arb.is_finite() else "inf")
+              + ("" if o.limit_tested else " (not tested)") for k, o in ob.items()}
+    untested = chk.limit_untested
     return Out({**v, "correlation_r": r, "ring_limit_bounds": bounds,
-                "ring_rho": chk.rho.value_and_error(20)[0]},
+                "ring_limit_untested": list(untested), "ring_rho": chk.rho.value_and_error(20)[0]},
                f"closed forms (Baxter Ch. 2); ring N = {N}: ring = closed + exact finite-N "
                f"correction, |ring - closed| <= the N -> oo bound (rho^N = "
-               f"{(chk.rho.arb ** N).str(3, radius=False)})", errors=e)
+               f"{(chk.rho.arb ** N).str(3, radius=False)}; the limit check is informative only when "
+               "rho^N is small: "
+               + (f"not tested for {', '.join(untested)}, whose bound is infinite or not below the "
+                  "value's size)" if untested else "every leg tested)"), errors=e)
 
 
 def _ring_note(what):
@@ -94,7 +102,7 @@ FIN_1D = {
     "ring_correlation": _ring_note("<s_0 s_r> - m_N^2"),
     "ring_correlation_length": _ring_note("-1/ln[G_N(r + 1)/G_N(r)]"),
 }
-META_1D = ("correlation_r", "ring_limit_bounds", "ring_rho")
+META_1D = ("correlation_r", "ring_limit_bounds", "ring_limit_untested", "ring_rho")
 
 
 # ---- ising2d ---------------------------------------------------------------------------------
@@ -125,13 +133,20 @@ def _torus_thermo(p):
     beta = _b2(p)
     ku, kc = TT.torus_thermo_kaufman(L, Ly, beta)
     pu, pc = TT.torus_thermo_polynomial(L, Ly, beta)
+    mu, mc = TT.torus_thermo_moments(L, Ly, beta)
     if not (ku.overlaps(pu) and kc.overlaps(pc)):
         raise Refusal("no-solution:torus-disagreement", f"{L} x {Ly}: Kaufman's energy / specific "
                       "heat differ from the exact polynomial's")
+    # Kaufman and the polynomial share the derivative extraction (torus_thermo._thermo); the
+    # energy moments over the integer coefficients do not
+    if not (pu.overlaps(mu) and pc.overlaps(mc)):
+        raise Refusal("no-solution:torus-disagreement", f"{L} x {Ly}: the K-derivatives of ln Z differ "
+                      "from the energy moments <E>/N, K^2 Var(E)/N of the integer polynomial")
     v, e = _put(torus_energy=ku, torus_specific_heat=kc, torus_energy_tm=pu,
                 torus_specific_heat_tm=pc)
     return Out(v, f"{L} x {Ly} torus: K-derivatives of Kaufman's Z and of the exact polynomial "
-               "agree (finite torus, not the bulk)", errors=e)
+               "agree, and equal the energy moments <E>/N, K^2 Var(E)/N of the integer "
+               "coefficients (finite torus, not the bulk)", errors=e)
 
 
 STEPS_2D = [fstep("ising2d-onsager-thermodynamics", f"{ONS44}, Eqs. (114)-(121)", _thermo2d),

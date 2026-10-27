@@ -13,6 +13,8 @@ finite-width crystal; for the torus this is a consistency check of the amplitude
 
   torus_thermo_polynomial(Lx, Ly, beta) -> (Ball u_L, Ball c_L)
   torus_thermo_kaufman(Lx, Ly, beta) -> (Ball u_L, Ball c_L)      (beta rational or BETA_C)
+  torus_thermo_moments(Lx, Ly, beta) -> (Ball u_L, Ball c_L)      <E>/N and K^2 Var(E)/N over the
+      integer coefficients: no derivative extraction, so it checks _thermo (and its hook)
 _HOOKS["derivative_order"] (2): the order whose Taylor coefficient makes c_L (planted error: 1).
 """
 from math import factorial
@@ -100,9 +102,28 @@ def torus_thermo_polynomial(Lx, Ly, beta, prec=320):
     return _run(beta, lambda K: _lnz_polynomial(cs, K), Lx * Ly, prec)
 
 
+def torus_thermo_moments(Lx, Ly, beta, prec=320):
+    """(u_L, c_L) as energy moments over the integer coefficients, with no K-derivative and no
+    shared code with _thermo: weight w_j = c_j x^j of the configurations with j unsatisfied bonds,
+    energy E_j = -(2N - j) + j = 2j - 2N (J = 1), u_L = <E>/N, c_L = K^2 <(E - <E>)^2>/N."""
+    Lx, Ly = _side("Lx", Lx, MAX_LX), _side("Ly", Ly, MAX_LY)
+    cs = torus_partition_polynomial(Lx, Ly)
+    N = Lx * Ly
+    c = coupling(beta)
+    with baller().hygiene.ctx_guard(prec=prec):
+        K0 = c.arb()
+        x = (-2 * K0).exp()
+        w = [cj * x ** j for j, cj in enumerate(cs) if cj]
+        E = [2 * j - 2 * N for j, cj in enumerate(cs) if cj]
+        Z = sum(w[1:], w[0])
+        mean = sum((wi * e for wi, e in zip(w, E)), 0 * x) / Z
+        var = sum((wi * (e - mean) * (e - mean) for wi, e in zip(w, E)), 0 * x) / Z
+        return ball_of(mean / N), ball_of(K0 * K0 * var / N)
+
+
 def torus_thermo_kaufman(Lx, Ly, beta, prec=None):
     M, N = _side("Lx", Lx, MAX_TORUS), _side("Ly", Ly, MAX_TORUS)
     return _run(beta, lambda K: _lnz_kaufman(M, N, K), M * N, prec or 256 + 2 * M)
 
 
-__all__ = ["torus_thermo_kaufman", "torus_thermo_polynomial"]
+__all__ = ["torus_thermo_kaufman", "torus_thermo_moments", "torus_thermo_polynomial"]
