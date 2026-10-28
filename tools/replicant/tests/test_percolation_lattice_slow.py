@@ -163,3 +163,14 @@ def test_self_dual_square_rectangle_is_crossed_with_probability_one_half():
     bad, hwb = _planted(LT._HOOKS, "wrap_crossing", True, lambda: _mc_crossing("square", "bond", 65, 64, seeds, 25))
     assert abs(bad - 0.5) > hwb, (bad, hwb)
 
+
+
+@slow
+def test_slow_fss_unresolved_crossing_square_bond():
+    """Final review I-2 at the full 1000 bootstrap replicates: square site (its triangular-site
+    validation had crashed) and square bond (it had printed p_c_crossing = nan with stderr 0); no
+    validation run for bond (closed-form threshold)."""
+    from test_percolation_lattice import check_fss_undetermined
+    check_fss_undetermined("site")
+    r = check_fss_undetermined("bond")
+    assert r.values["fss_validation"] == "not needed: closed-form threshold"

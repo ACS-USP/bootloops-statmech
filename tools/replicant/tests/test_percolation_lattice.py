@@ -262,3 +262,35 @@ def test_fss_crossing_level_and_contrast_on_synthetic_curves():
     assert c["a_inside"] and c["b_inside"] and not c["resolves"]
     assert F.contrast((0.75, 0.7, 0.8), 0.75, 1.0)["resolves"]
     _refused(lambda: F.fss("square", "bond", (8, 4, 16), (0, 1), 2), "precondition:fss-sizes")
+
+
+def test_fss_unresolved_crossing_is_labelled_undetermined_not_nan():
+    """Final review I-2: Ls = 4, 8, 16 with 2 seeds x 2 sweeps leaves the largest pair's crossing
+    unresolved (no sign change inside the transition window in most resamples).  Square site, whose
+    triangular-site validation run had crashed in np.percentile of an empty array: p_c_crossing is
+    omitted, fss_status and a note say undetermined:crossing, the other FSS values are kept.  Default
+    tier at BOOT = 200 bootstrap replicates (restored); the slow test runs the full 1000 on square
+    site and on square bond (which had printed nan with stderr 0).  _band never takes a percentile of
+    an empty array; under 90% finite replicates it is all NaN."""
+    import math
+    assert all(math.isnan(x) for x in F._band(math.nan, [math.nan] * 5))
+    assert all(math.isnan(x) for x in F._band(0.5, [0.5] * 8 + [math.nan] * 2))     # 80% < 90%
+    assert F._band(0.5, [0.4, 0.5, 0.6] * 10)[0] == 0.5
+    saved = F.BOOT
+    F.BOOT = 200
+    try:
+        check_fss_undetermined("site")
+    finally:
+        F.BOOT = saved
+        assert F.BOOT == 1000
+
+
+def check_fss_undetermined(dil):
+    import math
+    r = _run("sample", Ls=(4, 8, 16), seeds=(0, 1), sweeps=2, dilution=dil)
+    st = r.values["fss_status"]
+    assert "p_c_crossing" not in r.values and "p_c_crossing" not in r.errors, dil
+    assert st["p_c_crossing"].startswith("undetermined:crossing") and st["p_c_collapse"] == "determined"
+    assert math.isfinite(r.values["p_c_collapse"]) and r.errors["p_c_collapse"] > 0
+    assert any("p_c_crossing undetermined" in n for n in r.notes), r.notes
+    return r

@@ -31,10 +31,16 @@ Validated resolution (tests/test_percolation_lattice_slow.py; Ls 16 .. 128, 48 s
 sets 0 .. 47 and 100 .. 147, all four solved lattices): the collapse accepts (exact p_c, 3/4) and
 rejects p_c +- 0.005 and nu = 1; the crossing band accepts the exact p_c and rejects p_c +- 0.01 (it
 does not resolve +- 0.005 on every set).
+Undetermined: when the largest pair's crossing is not finite, or fewer than MIN_FINITE = 90% of its
+bootstrap replicates are (no sign change of R_L - R_L' inside the transition window: too few seeds or
+sweeps), its band is all NaN and FSSResult.undetermined["p_c_crossing"] says why (undetermined:crossing);
+likewise a collapse whose fit is not finite (undetermined:collapse) and a width slope with too few
+resamples of nonzero width (undetermined:width).
 fss(lattice, dilution, Ls, seeds, sweeps, boot_seed=20261027) -> FSSResult.  `contrast(interval, a, b)`:
 whether the band separates two values (printed, never asserted for unresolvable contrasts).
 """
 import math
+import warnings
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -49,6 +55,7 @@ BOOT = 1000
 LEVEL = 0.99
 Z = 2.576
 WINDOW_FRACTION = 0.1
+MIN_FINITE = 0.9         # an estimate needs >= 90% finite bootstrap replicates, else undetermined
 _GOLD = (math.sqrt(5) - 1) / 2
 
 
@@ -133,6 +140,7 @@ class FSSResult:
     levels: dict = field(repr=False, default_factory=dict)   # L -> p_L(R*) per level (full data)
     var0: dict = field(repr=False, default_factory=dict)     # L -> bootstrap variance of p_L(R*)
     window: float = 0.0             # std of n*/M at the largest L (the critical window)
+    undetermined: dict = field(default_factory=dict)        # value -> "undetermined:crossing: why"
 
     def chi2(self, p_c, y, Ls=None, levels=None):
         """sum over levels and L of (z - mean_L z)^2 / var z, z = (p_L(R*) - p_c) L^y (var z =
@@ -177,17 +185,32 @@ def _joint(Ls, levels, var0, tol=1e-5):
     return _chi2(Ls, levels, var0, y)[2], y
 
 
+def _resolved(est, reps, what="no sign change of R_L - R_L' inside the transition window"):
+    """None if the estimate is finite and at least MIN_FINITE of its bootstrap replicates are, else why
+    not (the crossing or level is not inside the transition window of the curves)."""
+    reps = np.asarray(reps, float)
+    frac = float(np.isfinite(reps).mean()) if reps.size else 0.0
+    if math.isfinite(est) and frac >= MIN_FINITE:
+        return None
+    return (f"estimate {est:.5g}, {100 * frac:.0f}% of the {reps.size} bootstrap replicates finite (need a "
+            f"finite estimate and >= {100 * MIN_FINITE:.0f}%): {what}; more seeds or sweeps")
+
+
 def _band(est, reps, other=None, other_reps=None, floor=0.0):
     """(est, lo, hi, systematic, stderr): the LEVEL percentile band of the bootstrap replicates; the
-    systematic is max(floor, the resolved drift max(0, |est - other| - Z sd(replicate differences)))."""
+    systematic is max(floor, the resolved drift max(0, |est - other| - Z sd(replicate differences))).
+    An unresolved estimate (_resolved) is all NaN: no band is taken of too few replicates."""
     reps = np.asarray(reps, float)
+    if _resolved(est, reps) is not None:
+        return (math.nan,) * 5
     reps = reps[np.isfinite(reps)]
     lo, hi = np.percentile(reps, [50 * (1 - LEVEL), 50 * (1 + LEVEL)])
     sysm = 0.0
     if other is not None:
         d = np.asarray(other_reps[0], float) - np.asarray(other_reps[1], float)
         d = d[np.isfinite(d)]
-        sysm = max(0.0, abs(est - other) - Z * float(np.std(d, ddof=1)))
+        if math.isfinite(other) and d.size >= 2:      # else no resolved drift can be measured
+            sysm = max(0.0, abs(est - other) - Z * float(np.std(d, ddof=1)))
     sysm = max(sysm, floor)
     return tuple(float(x) for x in (est, lo, hi, sysm, np.std(reps, ddof=1)))
 
@@ -211,17 +234,22 @@ def fss(lattice, dilution, Ls, seeds, sweeps, boot_seed=20261027):
     for L1, L2 in zip(Ls, Ls[1:]):
         cross_reps[(L1, L2)] = np.array([_cross(grid, rep[L1][b], rep[L2][b]) for b in range(BOOT)])
         est = _cross(grid, mean[L1], mean[L2])
-        crossings[(L1, L2)] = tuple(float(x) for x in (est, *np.nanpercentile(cross_reps[(L1, L2)],
-                                                                                [50 * (1 - LEVEL), 50 * (1 + LEVEL)])))
+        fin = cross_reps[(L1, L2)][np.isfinite(cross_reps[(L1, L2)])]
+        crossings[(L1, L2)] = tuple(float(x) for x in (est, *(np.percentile(fin, [50 * (1 - LEVEL), 50 * (
+            1 + LEVEL)]) if fin.size else (math.nan, math.nan))))
     k1, k0 = list(crossings)[-1], list(crossings)[-2]
     M_top, per_top = data[Ls[-1]]
     window = float(np.std(np.concatenate(list(per_top.values())) / M_top, ddof=1))
     floor = WINDOW_FRACTION * window
     pc_est = _band(crossings[k1][0], cross_reps[k1], crossings[k0][0], (cross_reps[k1], cross_reps[k0]), floor)
+    status = {"p_c_crossing": _resolved(crossings[k1][0], cross_reps[k1])}
     levels = {L: [_level(grid, mean[L], r) for r in LEVELS] for L in Ls}
     boot = {L: np.array([[_level(grid, rep[L][b], r) for r in LEVELS] for b in range(BOOT)]) for L in Ls}
-    var0 = {L: np.nanvar(b, axis=0, ddof=1) for L, b in boot.items()}
+    with warnings.catch_warnings():         # a level never reached by a replicate is all NaN
+        warnings.simplefilter("ignore", RuntimeWarning)
+        var0 = {L: np.nanvar(b, axis=0, ddof=1) for L, b in boot.items()}
     res = FSSResult(lattice, dilution, Ls, seeds, sweeps, crossings, pc_est, (), (), (), levels, var0)
+    res.undetermined = {k: f"undetermined:crossing: {why}" for k, why in status.items() if why}
     p_all, y_all = _joint(Ls, levels, var0)
     p_cut, y_cut = _joint(Ls[1:], levels, var0)
     fa = np.array([_joint(Ls, {L: boot[L][b] for L in Ls}, var0, 1e-4) for b in range(BOOT)])
@@ -229,13 +257,26 @@ def fss(lattice, dilution, Ls, seeds, sweeps, boot_seed=20261027):
     res.p_c_collapse = _band(p_all, fa[:, 0], p_cut, (fa[:, 0], fc[:, 0]), floor)
     res.window = window
     res.inv_nu = _band(y_all, fa[:, 1], y_cut, (fa[:, 1], fc[:, 1]))
+    no_levels = "no level R* inside every size's curve"
+    for k, est, reps in (("p_c_collapse", p_all, fa[:, 0]), ("inv_nu_collapse", y_all, fa[:, 1])):
+        why = _resolved(est, reps, no_levels)
+        if why:
+            res.undetermined[k] = f"undetermined:collapse: {why}"
     widths = {L: np.std(np.concatenate(list(data[L][1].values())) / data[L][0], ddof=1) for L in Ls}
-    slope = -math.log(widths[Ls[-1]] / widths[Ls[0]]) / math.log(Ls[-1] / Ls[0])
+    lslope = lambda w0, w1: -math.log(w1 / w0) / math.log(Ls[-1] / Ls[0]) if w0 > 0 and w1 > 0 else math.nan
+    slope = lslope(widths[Ls[0]], widths[Ls[-1]])
     bsl = []
-    for k in picks:
+    for k in picks:          # a resample of identical sweeps has width 0: no slope (NaN replicate)
         wd = [np.std(np.concatenate([data[L][1][seeds[i]] for i in k]) / data[L][0], ddof=1) for L in (Ls[0], Ls[-1])]
-        bsl.append(-math.log(wd[1] / wd[0]) / math.log(Ls[-1] / Ls[0]))
-    res.width_slope = tuple(float(x) for x in (slope, *np.percentile(bsl, [50 * (1 - LEVEL), 50 * (1 + LEVEL)])))
+        bsl.append(lslope(*wd))
+    bsl = np.array(bsl)
+    why = _resolved(slope, bsl, "a zero width of n*/M in the resamples")
+    if why:
+        res.undetermined["inv_nu_width_slope"] = f"undetermined:width: {why}"
+        res.width_slope = (math.nan,) * 3
+    else:
+        fin = bsl[np.isfinite(bsl)]
+        res.width_slope = tuple(float(x) for x in (slope, *np.percentile(fin, [50 * (1 - LEVEL), 50 * (1 + LEVEL)])))
     return res
 
 
