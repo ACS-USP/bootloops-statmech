@@ -13,7 +13,7 @@ large-deviation rate s_rho(eps), the Legendre transform of
     spherical   (q - 1 - log((1 + q)/2)) / 2,  q = sqrt(1+4 lam^2 rho^2)  -log(1-eps^2/rho^2)/2    (C3), (C4)
     binary      log cosh(lam)   (rho = 1, x in {-1,+1}^N, xi in {-1,+1}^N)  I(eps)                  DERIVED HERE
 
-`binary` is NOT in the paper (its Conclusions only say that binary patterns "should" be treatable): it is
+`binary` is NOT in the paper (its Introduction and Conclusions only expect that binary patterns can be treated): it is
 the paper's recipe (A16) applied to xi_i = +-1, E exp(lam x_i xi_i) = cosh(lam), and its rate function is
 I(eps) = ((1+eps) log(1+eps) + (1-eps) log(1-eps))/2, the function printed in Demircigil et al.
 (arXiv:1702.01929, Thm 1.3).  It needs rho = 1 (Ising x has |x|^2 = N) and its levels are bounded,

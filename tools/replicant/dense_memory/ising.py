@@ -17,10 +17,11 @@ PUBLISHED (rigorous, lam = 1):
 
 DERIVED HERE (not in either paper), from the REM noise of rem_noise.py with the binary ensemble:
   Mechanism.  alpha = log(2)/2 is the BIRTHDAY threshold: two of the e^{alpha N} patterns differ in at most
-  one site with probability ~ M^2 N / 2^N.  A pair at distance 1 cancels exactly in one coordinate of the decision sum, and that coordinate is then decided by
-  the remaining noise (a tie broken at random); below the threshold the noise never matters.  expected_close_pairs gives the
-  exact finite-N count.  Observed over every sampled instance (tests, sim.ising_flip_trial, N = 16 and 20): NO pair within
-  Hamming distance 1 implies that every pattern is a fixed point; with such a pair some pattern usually (not always) is not.
+  one site with probability ~ M^2 N / 2^N.  A pair at distance 1 cancels exactly in one coordinate of the decision
+  sum, and that coordinate is then decided by the remaining noise (a tie broken at random); below the threshold the
+  noise never matters.  expected_close_pairs gives the exact finite-N count.  Observed over every sampled instance
+  (tests, sim.ising_flip_trial, N = 16 and 20): NO pair within Hamming distance 1 implies that every pattern is a
+  fixed point; with such a pair some pattern usually (not always) is not.
   Typical pattern at a typical site.  The decision sum at site i is sum_mu xi_i^mu xi_i^1 exp(lam m_mu^(i)):
   the signal exp(lam (N-1)) against a sum of terms with INDEPENDENT FAIR SIGNS (xi_i^mu is independent of the
   overlap with the other sites), whose size is the square root of sum_mu exp(2 lam m_mu), that is the REM noise

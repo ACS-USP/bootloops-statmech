@@ -23,7 +23,7 @@ From the repository root:
 
 ```
 python3 tools/replicant/selftest.py                        # default battery, about 30 s
-cd tools && python3 -m replicant list                      # the 36 catalog entries
+cd tools && python3 -m replicant list                      # the 38 catalog entries
 python3 -m replicant run perceptron --param alpha=1.5 --out /tmp/result.json --latex /tmp/p.tex
 ```
 
@@ -77,6 +77,14 @@ sample`), and `--pdf` (with `--latex`) to compile the derivation.
   `ridge_rs.py`: the RS saddle point of the linear student, a cited closed form solved here;
   `ridge_sim.py`: SVD fits over named seeds, extrapolated in 1/n); catalog entry `ridge` (replica)
   (`catalog_learning.py`, `latex_learning.py`).
+- `dense_memory/` (D1): dense associative memories with P = e^(alpha N) patterns and exponential interaction (Lucibello &
+  Mezard 2024; Demircigil et al. 2017), at zero temperature: the pattern ensembles' zeta and rate function (`ensembles.py`:
+  Gaussian, spherical, and binary derived here), the REM noise by four routes (`rem_noise.py`), the retrieval thresholds, basins,
+  all-patterns bound and Ramsauer bound (`thresholds.py`), the Ising entry's fixed-point exponent and single-flip thresholds
+  (`ising.py`), independent finite-N checks (`sim.py`: exact-law sampler, the paper's gradient descent, single-flip dynamics,
+  Gray-code enumeration) and the InfoNCE dictionary (`infonce.py`, `MAPPING_INFONCE.md`); `derive_dense_memory.py` (the
+  label-replica derivation, reusing `families/rem.py`); catalog entries `dense_memory` and `dense_memory_ising`
+  (`catalog_dense_memory.py`, `latex_dense_memory.py`).
 - `series/` (E8): the exact high-temperature series of the 2D Ising free energy from the Onsager
   integral (`ising2d.py`, with the independent L x L torus route), holonomic recognition through
   `tools/annihilator` (`recognize.py`), exact local exponents (`local.py`), the elliptic operator
@@ -158,7 +166,7 @@ sample`), and `--pdf` (with `--latex`) to compile the derivation.
   population annealing (`population.py`) with an SK Metropolis sweep (`sk_metropolis.py`); entries `cluster_mc`,
   `wang_landau_mc`, `histogram_reweighting_mc`, `population_annealing_mc` (`catalog_mc*.py`, `latex_mc*.py`).
 - `catalog*.py`, `compose.py` (+ `compose_result.py`: `Result` and the finality rule), `cli.py`,
-  `__main__.py`: the 36-entry catalog (`catalog_ts.py` holds the teacher-student entry,
+  `__main__.py`: the 38-entry catalog (`catalog_ts.py` holds the teacher-student entry,
   `catalog_pspin.py` the two p-spin entries; LaTeX in `latex_pspin.py`), the composer,
   the command line.
 - `latex*.py`, `tex*.py`, `derive_tex.py`: the LaTeX derivation writer.
@@ -166,14 +174,13 @@ sample`), and `--pdf` (with `--latex`) to compile the derivation.
 
 ## Test tiers
 
-- Default: `python3 tools/replicant/selftest.py` (662 tests, about 30 s; measured 30.2 s cold on a clean
-  export after the final fix wave). Also `python3 run_selftests.py replicant` from the repository root, with the venv activated (it runs
+- Default: `python3 tools/replicant/selftest.py` (696 tests, about 30 s; the 662-test baseline took 28 s CPU on a quiet machine; under a load average of 200 it took 45 s against 54 s with the D1 tests). Also `python3 run_selftests.py replicant` from the repository root, with the venv activated (it runs
   the `python3` on PATH; without python-flint the certified lattice, bounds and percolation tests and the Monte
   Carlo exact targets fail, by design).
-- Full: `python3 tools/replicant/selftest.py --full` adds the 206 `@slow` tests (full RSB,
+- Full: `python3 tools/replicant/selftest.py --full` adds the 208 `@slow` tests (full RSB,
   population dynamics at reference sizes, the K-SAT and LDPC crossings, Monte Carlo and enumeration
   held-out routes, solver-based checks, the online simulations at N = 1000, the lattice, percolation and
-  Monte Carlo checks at reference sizes); about 35 minutes on a laptop (measured 34 min 39 s with 859 tests before the final fix wave, now 868 tests).
+  Monte Carlo checks at reference sizes); about 35 minutes on a laptop (measured 34 min 39 s with 859 tests before the final fix wave, now 904 tests: the dense-memory task adds 34 default and 2 slow).
 - The held-out tests are `tests/test_heldout*.py` (helpers `tests/heldout_common.py`, `tests/heldout_mc.py`).
 - `@slow` is a plain function attribute honoured by `selftest.py` only. pytest ignores the
   marker and would run every test, slow ones included.

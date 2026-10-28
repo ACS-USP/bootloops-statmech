@@ -212,7 +212,8 @@ def test_limits_hard_max_small_lambda_and_small_alpha():
 def test_gaussian_noise_at_alpha_log2_is_the_rem_free_energy_both_phases():
     for lv, s in (("0.9", "1"), ("1.3", "0.5"), ("4", "2")):
         rho = mp.sqrt(mp.mpf(s))
-        assert abs(RN.phi("gaussian", mp.log(2), lv, rho) + rem_free_energy(mp.mpf(lv), N_scale=mp.mpf(s))) < mp.mpf("1e-25")
+        got = RN.phi("gaussian", mp.log(2), lv, rho)
+        assert abs(got + rem_free_energy(mp.mpf(lv), N_scale=mp.mpf(s))) < mp.mpf("1e-25")
 
 
 def test_sampler_reproduces_the_exact_finite_N_rem_quadrature_of_the_rem_family():
@@ -295,7 +296,7 @@ def test_gray_code_enumeration_gives_the_exact_overlap_law_and_zeta_of_the_binar
         hist, Z = SIM.enumerate_overlap_law(N)
         assert hist == {N - 2 * k: math.comb(N, k) for k in range(N + 1)}
         for lam in (0.3, 1.0, 2.0):
-            assert abs(Z(lam) / (2 * math.cosh(lam)) ** N - 1) < 1e-12                  # sum_x e^{lam x.xi} = (2 cosh)^N
+            assert abs(Z(lam) / (2 * math.cosh(lam)) ** N - 1) < 1e-12          # sum_x e^{lam x.xi} = (2 cosh)^N
             assert abs(math.log(Z(lam) / 2**N) / N - float(EN.zeta("binary", lam))) < 1e-12
     _refuses(lambda: SIM.enumerate_overlap_law(30), "precondition:size")
 
@@ -317,7 +318,7 @@ def test_dhluv_exponent_from_the_exact_binomial_tail():
 def test_binary_thresholds_order_and_limits():
     for l in ("0.5", "1", "3"):
         assert IS.alpha_1_energy(l) < IS.alpha_1_flip(l) < mp.log(2)
-    assert IS.fixed_point_exponent(0) < IS.alpha_1_flip(1)                    # log(2)/2 against the typical-pattern value
+    assert IS.fixed_point_exponent(0) < IS.alpha_1_flip(1)          # log(2)/2 against the typical-pattern value
     assert abs(IS.alpha_1_flip(40) - mp.log(2)) < mp.mpf("1e-20")
     # alpha >= log 2: eps* is the edge, lam* infinite, never condensed, no retrieval at any lam
     assert RN.eps_star("binary", "0.8") == 1 and RN.condensation_lambda("binary", "0.8") == mp.inf
@@ -463,11 +464,16 @@ def test_slow_sampler_at_large_N_and_gradient_descent_sharpens():
 
 
 @slow
-def test_slow_birthday_equivalence_at_n20_and_the_landscape_has_no_spurious_minima_at_n14():
+def test_slow_birthday_implication_at_n20_and_the_landscape_has_no_spurious_minima_at_n14():
+    paired = []
     for P in (200, 800, 1600):
         for seed in range(20):
             t = SIM.ising_flip_trial(20, P, 1.0, seed)
-            assert bool(t.stable.all()) == (t.n_close_pairs == 0), (P, seed)
+            if t.n_close_pairs == 0:
+                assert t.stable.all(), (P, seed)                  # no pair within distance 1 => all fixed points
+            else:
+                paired.append(bool(t.stable.all()))
+    assert len(paired) > 20 and np.mean(paired) < 0.2, np.mean(paired)   # the converse, observed: usually fails
     # Gray-code enumeration of the whole 2^14 landscape: every single-flip local minimum of E_lam is a pattern
     # (an observation at this size, recorded; neither paper claims it)
     from replicant.numerics.enumeration import gray_states

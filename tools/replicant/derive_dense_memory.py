@@ -67,21 +67,27 @@ def _zero(expr):
 
 
 # ---- 1: signal and noise -------------------------------------------------------------------
+@lru_cache(maxsize=None)
+def _signal_vs_noise():
+    for a, b in ((sp.Integer(1), sp.Rational(1, 2)), (sp.Rational(1, 3), sp.Rational(3, 4))):
+        lim = sp.limit(sp.log(sp.exp(N * a) + sp.exp(N * b)) / N, N, sp.oo)
+        _check(lim == max(a, b), "signal-vs-noise", f"(1/N) log(e^(N {a}) + e^(N {b})) -> {lim}")
+    return True
+
+
 def _split(fixed):
     def apply(st):
         ens = fixed or st["params"].get("ensemble", "spherical")
         EN.check_ensemble(ens, st["params"].get("rho", 1))
-        for a, b in ((sp.Integer(1), sp.Rational(1, 2)), (sp.Rational(1, 3), sp.Rational(3, 4))):
-            lim = sp.limit(sp.log(sp.exp(N * a) + sp.exp(N * b)) / N, N, sp.oo)
-            _check(lim == max(a, b), "signal-vs-noise",
-                   f"(1/N) log(e^(N {a}) + e^(N {b})) -> {lim}")
+        _signal_vs_noise()
         return st.with_(dm_ens=ens, dm_split="E(x) = -(1/lam) log(e^(lam x.xi^1) + e^(lam N Phi)) + "
                         "|x|^2/2 ~ -max(x.xi^1, N phi) + |x|^2/2")
     return apply
 
 
 # ---- 2: replicate --------------------------------------------------------------------------
-def _replicate(st):
+@lru_cache(maxsize=None)
+def _replica_identity():
     Zs = sp.Symbol("Z", positive=True)
     lim = sp.limit((Zs**n - 1) / n, n, 0)
     _check(lim == sp.log(Zs), "replica-identity", f"lim (Z^n - 1)/n = {lim}, not ln Z")
@@ -90,6 +96,11 @@ def _replicate(st):
         tuples = sum(sp.Mul(*(w[k] for k in tup)) for tup in itertools.product(range(K), repeat=nn))
         _check(sp.expand(sum(w)**nn - tuples) == 0, "tuple-expansion",
                f"(sum_mu w_mu)^{nn} != the sum over {nn}-tuples of labels")
+    return True
+
+
+def _replicate(st):
+    _replica_identity()
     return st.with_(dm_replicate="Z^n = sum over n-tuples (mu_1..mu_n) of exp(lam N sum_a eps_{mu_a})")
 
 
@@ -102,7 +113,8 @@ def _zeta_symbolic(ens):
         # eps = rho z/sqrt(N): E exp(t N eps) = E exp(t rho sqrt(N) z) = exp(N t^2 rho^2/2)
         mgf = sp.simplify(sp.integrate(sp.exp(t * rho * sp.sqrt(N) * z - z**2 / 2), (z, -sp.oo, sp.oo))
                           / sp.sqrt(2 * sp.pi))
-        return sp.simplify(sp.expand_log(sp.log(mgf), force=True) / N), "sympy.integrate (Gaussian moment generating function)"
+        zeta_g = sp.simplify(sp.expand_log(sp.log(mgf), force=True) / N)
+        return zeta_g, "sympy.integrate (Gaussian moment generating function)"
     if ens == "spherical":
         e = sp.Symbol("e", real=True)
         s = -sp.log(1 - e**2 / rho**2) / 2                                       # (C4)
@@ -128,6 +140,15 @@ def _average(st):
 
 
 # ---- 4: 1RSB over labels -------------------------------------------------------------------
+@lru_cache(maxsize=None)
+def _falling_factorial():
+    X = sp.Symbol("x", positive=True)                        # x = e^{-alpha N}
+    for g in (2, 3, 4, 5):
+        ser = sp.series(sp.log(sp.Mul(*(1 - j * X for j in range(g)))), X, 0, 2).removeO()
+        _check(_zero(ser + sp.Rational(g * (g - 1), 2) * X), "falling-factorial", f"g = {g}: {ser}")
+    return True
+
+
 def _blocks(st):
     k = _PLANT.get("blocks", 0)
     groups = n / (m + k)
@@ -140,17 +161,25 @@ def _blocks(st):
         got = groups.subs({n: nn, m: mm})
         _check(got == sp.Rational(nn, mm), "block-count",
                f"n = {nn}, m = {mm}: the ansatz has {got} groups, the tuple has {nn // mm}")
-    X = sp.Symbol("x", positive=True)                        # x = e^{-alpha N}
-    for g in (2, 3, 4, 5):
-        ser = sp.series(sp.log(sp.Mul(*(1 - j * X for j in range(g)))), X, 0, 2).removeO()
-        _check(_zero(ser + sp.Rational(g * (g - 1), 2) * X), "falling-factorial", f"g = {g}: {ser}")
+    _falling_factorial()
     phi_n = groups * (alpha + ZETA(lam * m))                 # per N: (n/m) alpha + sum_mu zeta
     return st.with_(dm_phin=phi_n)
 
 
 # ---- 5: n -> 0 -----------------------------------------------------------------------------
-def _limit(st):
+@lru_cache(maxsize=None)
+def _gaussian_is_rem(conc):
+    """The Gaussian Phi(m) at alpha = log 2 equals families/rem.py rem_1rsb_functional (beta -> lam, s -> rho^2)."""
     from .families.rem import rem_1rsb_functional
+    b, ss = sp.symbols("beta s", positive=True)
+    fam = rem_1rsb_functional().subs({b: lam, ss: rho**2})
+    _check(_zero(conc.subs(alpha, sp.log(2)) - fam), "rem-functional",
+           f"Gaussian Phi(m) at alpha = log 2: {sp.simplify(conc.subs(alpha, sp.log(2)))}; "
+           f"rem_1rsb_functional = {fam}")
+    return True
+
+
+def _limit(st):
     ens = st["dm_ens"]
     phi_m = n_to_zero(st["dm_phin"], n)
     _check(_zero(phi_m - (alpha + ZETA(lam * m)) / m), "functional", f"Phi(m) = {phi_m}")
@@ -158,18 +187,17 @@ def _limit(st):
     conc = phi_m.replace(ZETA, sp.Lambda(t, zs.subs(rho, rho)))
     reused = None
     if ens == "gaussian":
-        b, ss = sp.symbols("beta s", positive=True)
-        fam = rem_1rsb_functional().subs({b: lam, ss: rho**2})
-        _check(_zero(conc.subs(alpha, sp.log(2)) - fam), "rem-functional",
-               f"Gaussian Phi(m) at alpha = log 2: {sp.simplify(conc.subs(alpha, sp.log(2)))}; "
-               f"rem_1rsb_functional = {fam}")
-        reused = "families/rem.py rem_1rsb_functional at alpha = log 2 (beta -> lam, N_scale -> rho^2; the alpha-dependence is the label entropy, linear)"
+        _gaussian_is_rem(conc)
+        reused = ("families/rem.py rem_1rsb_functional at alpha = log 2 (beta -> lam, N_scale -> rho^2; the "
+                  "alpha-dependence is the label entropy, linear)")
     return st.with_(dm_Phim=phi_m, dm_Phim_ens=sp.simplify(conc), dm_reused=reused)
 
 
 # ---- 6: extremise --------------------------------------------------------------------------
-def _extremize(st):
-    ens = st["dm_ens"]
+@lru_cache(maxsize=None)
+def _convexity_identity():
+    """For a generic zeta: stationarity of Phi(m) = (alpha + zeta(lam m))/m is (A25), and at it
+    d2Phi/dm2 = lam^2 zeta''(lam m)/m."""
     u = sp.Symbol("u", positive=True)                      # u = lam m
     g = sp.Function("g")                                   # a generic zeta
     Phi_u = lam * (alpha + g(u)) / u                       # Phi(m) = (alpha + zeta(lam m))/m
@@ -179,11 +207,22 @@ def _extremize(st):
     d2 = sp.simplify(sp.diff(Phi_u, u, 2).subs(alpha, u * sp.diff(g(u), u) - g(u)).doit())
     _check(_zero(d2 - lam * sp.diff(g(u), (u, 2)) / u), "convexity",
            f"d2Phi/du2 at (A25) = {d2}, expected lam zeta''(u)/u (so d2Phi/dm2 = lam^2 zeta''(lam m)/m > 0)")
-    zs = st["dm_zeta"]
-    zpp_ens = sp.simplify(sp.diff(zs, t, 2))
+    return d2
+
+
+@lru_cache(maxsize=None)
+def _zeta_convex(ens):
+    zpp_ens = sp.simplify(sp.diff(_zeta_symbolic(ens)[0], t, 2))
     for tv in (sp.Rational(1, 10), sp.Integer(1), sp.Integer(5)):
         v = zpp_ens.subs({t: tv, rho: sp.Rational(3, 4) if ens != "binary" else 1})
         _check(v.is_positive is True or sp.N(v) > 0, "zeta-convex", f"zeta''({tv}) = {v}")
+    return True
+
+
+def _extremize(st):
+    ens = st["dm_ens"]
+    _convexity_identity()
+    _zeta_convex(ens)
     p = st["params"]
     num = None
     if p.get("alpha") is not None and p.get("lam") is not None:
@@ -193,7 +232,7 @@ def _extremize(st):
         _check(abs(got - want_phi) < mp.mpf("1e-25"), "minimised-functional",
                f"min_m Phi = {mp.nstr(got, 20)}, closed form {mp.nstr(want_phi, 20)}")
         num = dict(phi=got, m=mstar, closed=want_phi)
-    return st.with_(dm_ext=dict(stationarity=stat, d2=d2, num=num))
+    return st.with_(dm_ext=dict(d2=_convexity_identity(), num=num))
 
 
 # ---- 7: reduction to the REM ---------------------------------------------------------------
@@ -229,7 +268,8 @@ def label_replica_steps(ensemble=None):
         Step("dm-1rsb-labels", has("dm_zeta"), _blocks, f"{LEVEL_A}; {LM}, App. A 4 (1RSB ansatz)",
              lambda st: "n/m groups of m replicas on one label: (n/m)(alpha + zeta(lam m))"),
         Step("dm-replica-limit", has("params", "dm_phin"), _limit, f"{LEVEL_A}; {LM}, Eq. (A24)",
-             lambda st: "Phi(m) = (alpha + zeta(lam m))/m" + (f"; reused {st['dm_reused']}" if st["dm_reused"] else "")),
+             lambda st: "Phi(m) = (alpha + zeta(lam m))/m"
+             + (f"; reused {st['dm_reused']}" if st["dm_reused"] else "")),
         Step("dm-extremize", has("params", "dm_Phim"), _extremize, f"{LEVEL_A}; {LM}, Eqs. (A25)-(A27)",
              lambda st: "a minimum over 0 < m <= 1: m* = min(1, lam*/lam)" + (
                  f"; at the state point phi = {mp.nstr(st['dm_ext']['num']['phi'], 12)}, m* = "

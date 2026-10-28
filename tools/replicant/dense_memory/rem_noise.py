@@ -24,6 +24,7 @@ AUXILIARY REM (the paper stresses that its energies and temperature "have nothin
 the memory itself is analysed at zero temperature through E(x).
 """
 from dataclasses import dataclass
+from functools import lru_cache
 
 import mpmath as mp
 
@@ -33,7 +34,7 @@ from .ensembles import _prec, binary_rate, check_ensemble, dzeta, num, rate, zet
 
 # planted-error hook for the tests: {"lam_star": factor} scales the closed condensation threshold
 _PLANT = {}
-_ITER = 160
+_ITER = 110                      # 2^-110 ~ 1e-33: enough for 30 digits
 
 
 def _bisect(f, lo, hi, *, what):
@@ -62,6 +63,12 @@ def _lam(lam):
     return num(lam, "lambda", positive=True)
 
 
+@lru_cache(maxsize=4096)
+def _binary_eps_star(a):
+    """The root of I(eps) = alpha on (0, 1): no closed form, so cached (a nested bisection otherwise)."""
+    return _bisect(lambda e: binary_rate(e) - a, mp.mpf(0), mp.mpf(1), what="binary eps*")
+
+
 def eps_star(ens, alpha, rho=1):
     """eps*(alpha, rho): the largest of the e^{alpha N} levels, the root of s_rho(eps) = alpha above the
     typical value 0 (App. A 3 step 3); the support edge (rho, or 1 for binary) when the rate function is
@@ -74,7 +81,7 @@ def eps_star(ens, alpha, rho=1):
             return r * mp.sqrt(1 - mp.exp(-2 * a))         # -log(1 - eps^2/rho^2)/2 = alpha
         if a >= mp.log(2):
             return mp.mpf(1)
-        return _bisect(lambda e: binary_rate(e) - a, mp.mpf(0), mp.mpf(1), what="binary eps*")
+        return _binary_eps_star(a)
 
 
 def condensation_lambda(ens, alpha, rho=1, method="closed"):

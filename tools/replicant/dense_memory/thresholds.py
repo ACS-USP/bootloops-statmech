@@ -162,8 +162,10 @@ def cos_theta_c(ens, alpha, lam, rho=1, r_xi=1):
 
 
 def cos_theta_nearest(ens, alpha, rho=1):
-    """c_max(alpha) rho: the cosine to the nearest of the e^{alpha N} other patterns (the continuous
-    Gilbert-Varshamov distance, App. B), lim_{lam->inf} cos theta_c = eps*(alpha, rho)/rho * rho."""
+    """eps*(alpha, rho) = rho c_max(alpha): the overlap x.xi/N with the nearest of the e^{alpha N} other patterns
+    (the continuous Gilbert-Varshamov distance, App. B).  Note cos_theta_c (the criterion rho cos(theta) = phi)
+    tends to eps*/rho = c_max as lam -> inf; the paper's Sec. IV prints 'lim cos theta_c = rho c_max', which agrees
+    only at rho = 1 (the case banked and tested here)."""
     with _prec():
         return eps_star(ens, alpha, rho)
 

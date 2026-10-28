@@ -86,10 +86,16 @@ def _interaction(p):
     if kind != "exp":
         raise Refusal("unsupported:interaction",
                       f"interaction = {kind!r}: only the exponential F(x) = exp(lam x) has an exponential number of "
-                      "retrievable patterns here.  A polynomial F(x) = x^p stores O(N^(p-1)) patterns "
-                      "(Krotov-Hopfield; quoted by Demircigil et al., Thm 1.1-1.2), so P = e^(alpha N) lies outside "
-                      "its regime, and its thermodynamics is the p-spin glass: see the catalog entries `pspin` and "
+                      "retrievable patterns here.  A polynomial F(x) = x^p stores of order N^(p-1) patterns "
+                      "(Krotov-Hopfield's claim, quoted as Thm 1.1 by Demircigil et al. and proved by them only for a "
+                      "related tensor dynamics, Thm 1.2), so P = e^(alpha N) lies outside its "
+                      "regime, and its thermodynamics is the p-spin glass: see the catalog entries `pspin` and "
                       "`ising_pspin`")
+
+
+def _check_interaction(p):
+    _interaction(p)
+    return Out({}, "exponential interaction F(x) = exp(lam x)")
 
 
 def _state(ens_fixed=None):
@@ -172,7 +178,8 @@ def _lambda_one(p):
 
 def _basin(p):
     c = TH.cos_theta_c(p.get("ensemble", "spherical"), p["alpha"], p["lam"], p.get("rho", 1))
-    return Out({"cos_theta_c": c}, f"cos(theta_c) = phi/rho = {mp.nstr(c, 10)}" + (" >= 1: no one-step basin" if c >= 1 else ""))
+    tail = " >= 1: no one-step basin" if c >= 1 else ""
+    return Out({"cos_theta_c": c}, f"cos(theta_c) = phi/rho = {mp.nstr(c, 10)}{tail}")
 
 
 def _few(p):
@@ -228,8 +235,9 @@ def _ising_fixed(p):
     v = IS.fixed_point_exponent(p.get("radius", 0))
     return Out({"alpha_fixed_points": v},
                f"I(1 - 2 radius)/2 = {mp.nstr(v, 14)} (Thm 1.3; radius 0: log(2)/2, Remark 1.4): the exponent below "
-               "which all patterns are fixed points, proved for lam = 1; it is the birthday threshold of pattern pairs "
-               "within Hamming distance 1")
+               "which all patterns are fixed points, proved for lam = 1 (a sufficient condition: "
+               "the theorem says nothing above it).  Derived here, not in the paper: this exponent is the birthday "
+               "threshold of pattern pairs within Hamming distance 1")
 
 
 def _ising_pairs(p):
@@ -245,9 +253,10 @@ def _ising_flip_mc(p):
         raise Refusal("precondition:size", f"N = {N!r}: need an int >= 20")
     seeds = _checks.seeds(p.get("seeds", _SEEDS))
     v = np.array(SIM.sign_noise_mc(float(p["alpha"]), float(p["lam"]), N, seeds))
-    return Out({"phi_flip_mc": float(np.median(v))}, f"median over seeds {list(seeds)} of (1/(lam N)) log|sign-random "
-               f"sum| = {np.median(v):.6g}; the formula phi(alpha, 2 lam) = {mp.nstr(RN.phi('binary', p['alpha'], 2 * mp.mpf(p['lam'])), 8)}",
-               statistical=("phi_flip_mc",))
+    formula = RN.phi("binary", p["alpha"], 2 * mp.mpf(p["lam"]))
+    return Out({"phi_flip_mc": float(np.median(v))},
+               f"median over seeds {list(seeds)} of (1/(lam N)) log|sign-random sum| = {np.median(v):.6g}; "
+               f"the formula phi(alpha, 2 lam) = {mp.nstr(formula, 8)}", statistical=("phi_flip_mc",))
 
 
 def _ising_phi_flip(p):
@@ -256,17 +265,20 @@ def _ising_phi_flip(p):
 
 
 # ---- finality -------------------------------------------------------------------------------
-def _lm(eqs, note=""):
-    """Stability of a value the paper establishes: `eqs` maps the ensemble to the equation citations."""
+def _lm(eqs, note="", rem=True):
+    """Stability of a value the paper establishes: `eqs` maps the ensemble to the equation citations; `rem`
+    appends the non-rigorous-REM caveat (not for a value that is another paper's theorem)."""
     def f(v):
         e = eqs.get(v.get("ensemble"), eqs.get("*", ""))
-        return Stability("exact-by-literature", "rem-labels", f"{LM}, {e}", (note + "; " if note else "") + _NON_RIGOROUS)
+        return Stability("exact-by-literature", "rem-labels", f"{LM}, {e}",
+                         (note + "; " if note else "") + (_NON_RIGOROUS if rem else ""))
     return f
 
 
 def _derived(note):
     return Stability("not-computed", "rem-labels", "",
-                     f"derived in this package, not published ({note}); cross-checked by sampling or enumeration; NOT final")
+                     f"derived in this package, not published ({note}); cross-checked by sampling or enumeration; "
+                     "NOT final")
 
 
 _PHI = {"gaussian": "Eq. (5), (D5)", "spherical": "Eq. (A17), the line above (C5)"}
@@ -279,11 +291,14 @@ def _dm_finality():
         "phi": _lm(_PHI, "the noise phi_(alpha,rho)(lam); the energy is E ~ -max(x.xi^1, N phi) + |x|^2/2, Eq. (6)"),
         "m_star": _lm({"gaussian": "Eqs. (A25)-(A27)", "spherical": "Eqs. (A25)-(A27)"},
                       "Parisi parameter of the 1RSB solution over pattern labels, m* = min(1, lam*/lam); the second "
-                      "derivative of the 1RSB functional is lam^2 zeta''/m > 0 (a minimum), derived in step dm-extremize"),
+                      "derivative of the 1RSB functional is lam^2 zeta''/m > 0 (a minimum), derived in step "
+                      "dm-extremize"),
         "lam_star": _lm(_LAMS, "the REM condensation (freezing) line"),
-        "eps_star": _lm({"*": "App. A 3 step 3, App. B (Gilbert-Varshamov); Eqs. (C5), (D6)"},
+        "eps_star": _lm({"*": "App. A 3 step 3, App. B (B4)-(B7) (Gilbert-Varshamov); the displays above (C5) "
+                              "and in (D5)"},
                         "eps*(alpha, rho): the largest overlap among e^(alpha N) patterns"),
-        "alpha_1": _lm(_ALPHA1, "single-pattern retrieval threshold: the largest load at which a typical stored pattern "
+        "alpha_1": _lm(_ALPHA1, "single-pattern retrieval threshold: the largest load at which a typical stored "
+                       "pattern "
                        "is retrieved"),
         "alpha_c_lb": _lm({"gaussian": "Eq. (10) with (D8)-(D13): a LOWER BOUND on the all-patterns capacity "
                            "(the paper's simulations sit near it, Fig. 8; whether it equals alpha_c is open)",
@@ -293,8 +308,9 @@ def _dm_finality():
         "lambda_1": _lm({"*": "Eq. (7) inverted"}, "the smallest lam retrieving at load alpha"),
         "alpha_tilde_1": _lm({"*": "Sec. VI"}, "scaled dot product: alpha~_1 = alpha~_c = lam~"),
         "alpha_c_ramsauer_lb": _lm({"*": "App. E, Eq. (E7)"},
-                                   "the thermodynamic limit of Theorem 3 of Ramsauer et al. (their ref. [8], NOT read "
-                                   "here) for SPHERICAL patterns, as restated by the paper"),
+                                   "the thermodynamic limit, computed by Lucibello & Mezard, of Theorem 3 of Ramsauer "
+                                   "et al. (their ref. [8], NOT read here): a rigorous finite-N lower bound for "
+                                   "SPHERICAL patterns that they call weaker than alpha_1 (Sec. V)", rem=False),
         "cos_theta_c": _lm({"gaussian": "Sec. IV, App. D 3", "spherical": "Sec. IV, App. C 3"},
                            "the one-step retrieval boundary rho cos(theta) = phi, exact from Eq. (6) for a start "
                            "independent of the other patterns; the paper calls theta_c a LOWER BOUND on the basin of "
@@ -336,14 +352,15 @@ def _ising_finality():
         "phi_mc": Stability("not-computed", "finite-N", "dense_memory/sim.py",
                             "statistical: the quenched noise at finite N from the exact overlap law; NOT final"),
         "phi_flip_mc": Stability("not-computed", "finite-N", "dense_memory/sim.py",
-                                 "statistical: median of (1/(lam N)) log |sign-random sum| over named seeds; NOT final"),
+                                 "statistical: median of (1/(lam N)) log |sign-random sum| over named seeds; "
+                                 "NOT final"),
     }
 
 
 # ---- the entries ------------------------------------------------------------------------------
 def dense_memory():
     deriv = label_replica_steps()
-    steps = [fstep("dm-interaction", f"{LM}, Eqs. (1)-(2); refuses a polynomial interaction", lambda p: _interaction(p) or Out({}, "exponential interaction F(x) = exp(lam x)")),
+    steps = [fstep("dm-interaction", f"{LM}, Eqs. (1)-(2); refuses a polynomial interaction", _check_interaction),
              fstep("dm-state-point", f"{LM}, Sec. II", _state()),
              *deriv,
              fstep("dm-condensation", f"{LM}, App. A 3, Eqs. (C5), (D6)", _condensation, when=_have("alpha"),
@@ -374,7 +391,7 @@ def dense_memory():
 
 
 def dense_memory_ising():
-    steps = [fstep("dmi-interaction", f"{DHLUV}, Eq. (1); refuses a polynomial interaction", lambda p: _interaction(p) or Out({}, "exponential interaction F(x) = exp(lam x)")),
+    steps = [fstep("dmi-interaction", f"{DHLUV}, Eq. (1); refuses a polynomial interaction", _check_interaction),
              fstep("dmi-state-point", f"{DHLUV}; derived here", _state("binary")),
              *label_replica_steps("binary"),
              fstep("dmi-condensation", "derived here from Lucibello & Mezard (A17), zeta = log cosh", _condensation_b,
