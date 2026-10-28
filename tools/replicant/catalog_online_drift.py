@@ -188,7 +188,8 @@ def online_drift():
            "eps_inf_kc93": kc, "eps_sim": sim}
     meta = ("rule", "drift", "D", "eta", "noise", "R0", "Q0", "alpha", "bound_gap", "closed_form_gap",
             "eps_exponent_derived", "eps_sim_halfwidth99", "N", "seeds", "sim_status")
-    steps = [*steps, nothing_computed(fin, "give alpha (the learning curve) or a drift D > 0 (the stationary state and the small-drift law)")]
+    hint = "give alpha (the learning curve) or a drift D > 0 (the stationary state and the small-drift law)"
+    steps = [*steps, nothing_computed(fin, hint)]
     spec = ModelSpec("online_drift", "spherical", "gaussian", constraint="online", prior="teacher")
     return entry("online_drift", spec, f"{VKC}; {KC93}; {BS}", {"online": steps}, refs, {"online": CAVEAT},
                  "online learning of a perceptron teacher that drifts (randomly or deterministically, VKC 1998, "

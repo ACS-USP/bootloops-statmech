@@ -85,7 +85,8 @@ def fss_step(when, lat_of):
                    f"+- {r.p_c[3]:.2g} (syst.); collapse p_c {r.p_c_collapse[0]:.5f}, 1/nu {r.inv_nu[0]:.3f} "
                    f"[{r.inv_nu[1]:.3f}, {r.inv_nu[2]:.3f}] +- {r.inv_nu[3]:.2g}" + und, errors=errs,
                    statistical=tuple(vals),
-                   notes=tuple(f"{k} undetermined (value omitted): {why}" for k, why in r.undetermined.items()) + ("finite-size scaling: 99% bootstrap percentile bands (1000 replicates over the named "
+                   notes=tuple(f"{k} undetermined (value omitted): {why}" for k, why in r.undetermined.items())
+                   + ("finite-size scaling: 99% bootstrap percentile bands (1000 replicates over the named "
                           "seeds; errors = the bootstrap standard deviation) plus an assumed systematic: for p_c "
                           "the larger of a tenth of the critical window at the largest L and the resolved drift "
                           "(to the previous crossing; to the fit without the smallest L), for 1/nu the resolved "

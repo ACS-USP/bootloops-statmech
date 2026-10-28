@@ -212,7 +212,8 @@ def online_linear():
            "rho_offline_optimal_ridge": rid, "eg_pinv_ridge": rid, "eg_sim": sim, "rho_sim": sim}
     meta = ("rule", "constraint", "eta", "M", "R0", "Q0", "alpha", "alpha_big", "closed_form_gap",
             "ridge_gamma", "eg_sim_halfwidth99", "N", "seeds")
-    steps = [*steps, nothing_computed(fin, "give alpha (the learning curve), or rule = optimal without alpha (the asymptote and the crossing)")]
+    hint = "give alpha (the learning curve), or rule = optimal without alpha (the asymptote and the crossing)"
+    steps = [*steps, nothing_computed(fin, hint)]
     spec = ModelSpec("online_linear", "spherical", "gaussian", constraint="online", prior="teacher")
     return entry("online_linear", spec, f"{KC95}; {SST}; {HMRT}", {"online": steps}, refs,
                  {"online": CAVEAT}, "online learning of a linear teacher by a linear perceptron with "

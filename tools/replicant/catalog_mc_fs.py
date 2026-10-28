@@ -13,9 +13,9 @@ so for L > 8 the default beta and betas are moved towards beta_c by 8/L (beta_c 
 default_betas); L <= 8 keeps the printed defaults.  Ruling (final review I-3, as M5 for wang_landau_mc): an implicit
 default still outside the window (or default betas whose windows do not chain) labels the step's values undetermined
 (single_status / multi_status, the reason in single_undetermined / multi_undetermined; the multiple-histogram values
-are omitted when the windows do not chain); an explicit beta / betas outside is refused as before.  Run m of named seed s at betas[m] is the
-chain of seed s + SEED_STRIDE (m + 1), so the multiple-histogram runs are independent of each other and of the
-single-histogram run (seed s itself).
+are omitted when the windows do not chain); an explicit beta / betas outside is refused as before.  Run m of named
+seed s at betas[m] is the chain of seed s + SEED_STRIDE (m + 1), so the multiple-histogram runs are independent of
+each other and of the single-histogram run (seed s itself).
 """
 from fractions import Fraction
 from functools import lru_cache
