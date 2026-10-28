@@ -170,7 +170,7 @@ def test_selftest_summary_line_states_the_full_tier_cost():
     from replicant.selftest import summary_line
     line = summary_line(235, 0, 68)
     assert line.startswith("replicant selftest: 235 passed, 0 failed, 68 skipped "), line
-    assert "--full" in line and "18 minutes" in line, line
+    assert "--full" in line and "35 minutes" in line, line
 
 
 @slow

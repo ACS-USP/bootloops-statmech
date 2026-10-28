@@ -49,3 +49,31 @@ These are the same as E9:
 - **Triangular and honeycomb lattices:** critical points and free energies (Houtappel/Wannier, Baxter).
 - **Independent routes:** exact transfer matrices on small periodic lattices of each geometry, and the star–triangle (triangular ↔ honeycomb) and duality relations checked as exact identities.
 - **Planted errors:** a wrong lattice weight, and a wrong duality map.
+
+## As built
+
+From the ledger (`.superpowers/sdd/2026-10-26-ising-exact/progress.md`, not committed) and the task reports;
+commits 8ff6aec .. 2091a08; documented in the online plan's task O7.
+
+- **Built.** I1: the 1D magnetization, susceptibility, connected correlation and correlation length, certified,
+  against exact finite rings with the N -> oo bound; Onsager's 2D energy and specific heat (Eqs. (116), (117),
+  the log amplitude of (120)) against Kaufman-torus derivatives, integer moments and the E8 series. I2: the 2D
+  correlation length above and below T_c from Onsager's strip spectrum, the strip -> bulk sequence and a direct
+  strip matrix, nu / eta consistency checks, the critical nearest-neighbour and diagonal correlations (Perk &
+  Au-Yang, Deift-Its-Krasovsky). I3: three new entries `ising2d_anisotropic`, `ising_triangular`,
+  `ising_honeycomb` (route `exact`, certified) rather than parameters of `ising2d`, which stays unchanged.
+- **Deviations.** Houtappel 1950, Wannier 1950, McCoy-Wu and Wu-McCoy-Tracy-Barouch were not fetched: the
+  triangular free energy comes from Athanasopoulos & Ueltschi's Kac-Ward integral, the honeycomb from Baxter's
+  star-triangle and duality maps and Pierre, Bernu & Messio, xi_0+ from Dohm. Two errors in the controller's I2
+  dispatch were corrected from the sources (the critical strip gap is pi eta = pi/4, Cardy Eq. (19); 1/xi =
+  2(K* - K) above T_c, 4(K - K*) below). Below T_c `correlation_length` is `not-computed` (its identification with
+  Onsager's two-particle gap is derived here), `two_particle_gap` exact-by-literature. The 1D chi(h) is
+  exact-by-literature "derivative taken here". The direct strip matrix is double precision, not certified. The
+  I2 fix restored `ising2d` at large beta (a strip overflow guard had refused beta > ~33); the I3 fixes added a
+  high-temperature torus identity that catches a wrong lattice weight and reports the signed torus under a gauge
+  that does not close on odd tori.
+- **Rulings that changed scope.** L-R1: per-topic files (`catalog_lattice_<x>.py`, `latex_lattice_<x>.py`,
+  `lattice/<x>.py`), guarded files <= 380 lines. L-R2: <= 1 s default-tier growth for the plan. Measured at O7
+  by the default-selftest growth between 99acf67 and 2091a08 (three cold runs each): +1.6 s, above the ruling;
+  the task reports' direct accounting gave about 0.25 + 0.28 + 0.35 s, the new test functions alone cost 0.7 s
+  in-suite, the rest is the growth of the shared catalog-RefCheck and LaTeX tests with three new entries.

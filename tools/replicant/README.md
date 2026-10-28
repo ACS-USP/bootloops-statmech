@@ -5,9 +5,12 @@ recorded steps. Each step names its preconditions and its citation; a missing pr
 is a named refusal (`precondition:<name>`, `missing-step:<hook>`, ...), never a silent
 fallback; every run returns a trace, a per-value finality label (`stable`, `unstable`,
 `not-computed`, `exact-by-literature`) and a comparison with banked, cited reference values.
-Results are physics-level (the n -> 0 continuation and the RS/RSB ansaetze are not proved), except
-the four entries certified in ball arithmetic (`ising2d`, `ising1d`, `bethe_ising`, `sk_bounds`);
-population-dynamics, AMP and Monte Carlo results are statistical. Full documentation: [GUIDE.md](GUIDE.md).
+Results are physics-level (the n -> 0 continuation and the RS/RSB ansaetze are not proved; the
+online-learning ODEs assume the N -> oo limit), except what is certified in ball arithmetic (the lattice
+entries `ising2d`, `ising1d`, `bethe_ising`, `ising2d_anisotropic`, `ising_triangular`, `ising_honeycomb`,
+the bound entry `sk_bounds`, and the `cavity` / `exact` routes of the percolation entries);
+population-dynamics, AMP, finite-N simulation, the percolation `sample` route and the Monte Carlo entries
+are statistical. Full documentation: [GUIDE.md](GUIDE.md).
 
 Requirements: Python 3 with `sympy`, `mpmath`, `numpy`, `scipy` and `python-flint` (the certified
 entries go through `tools/baller`). Run the battery from the project venv (INSTALL.md: `.venv`, which
@@ -19,8 +22,8 @@ has python-flint): without python-flint the lattice and bounds tests fail loudly
 From the repository root:
 
 ```
-python3 tools/replicant/selftest.py                        # default battery, about 22 s
-cd tools && python3 -m replicant list                      # the 19 catalog entries
+python3 tools/replicant/selftest.py                        # default battery, about 29 s
+cd tools && python3 -m replicant list                      # the 36 catalog entries
 python3 -m replicant run perceptron --param alpha=1.5 --out /tmp/result.json --latex /tmp/p.tex
 ```
 
@@ -29,8 +32,14 @@ python3 -m replicant run perceptron --param alpha=1.5 --out /tmp/result.json --l
 `--route amp` for `sk`, `teacher_student` and `spiked_wigner` (state evolution, and finite-N AMP / GAMP with
 `--param N=...`), `--route cavity` for the entries that have a cavity route (required for `viana_bray`, `xorsat`,
 `ksat`, `ldpc_bec`, `sbm` and `bethe_ising`, which are cavity-only: `python3 -m replicant run viana_bray --route
-cavity`, `python3 -m replicant run xorsat --route cavity`), `--route exact` for `ising2d` and `ising1d`, `--route
-series` for `series_ising2d`, `--route bound` for `sk_bounds`, and `--pdf` (with `--latex`) to compile the derivation.
+cavity`, `python3 -m replicant run xorsat --route cavity`; the percolation entries `percolation_bethe`,
+`percolation_graph`, `percolation_kcore` and `percolation_bootstrap` also default to `cavity`), `--route exact` for
+`ising2d`, `ising1d`, `ising2d_anisotropic`, `ising_triangular`, `ising_honeycomb` and `percolation_lattice`, `--route
+series` for `series_ising2d`, `--route bound` for `sk_bounds`, `--route online` for the online-learning entries
+(`online_perceptron`, `online_linear`, `online_drift`, `online_tcm`, `online_scm`: `python3 -m replicant run online_scm
+--route online`), `--route sample` for the sampled percolation routes and the Monte Carlo entries (`cluster_mc`,
+`wang_landau_mc`, `histogram_reweighting_mc`, `population_annealing_mc`: `python3 -m replicant run cluster_mc --route
+sample`), and `--pdf` (with `--latex`) to compile the derivation.
 
 ## Layout
 
@@ -121,8 +130,35 @@ series` for `series_ising2d`, `--route bound` for `sk_bounds`, and `--pdf` (with
   `optimal_ml_flow.py` (integration through det H = 0, VC97's initial overlaps), `simulate_optimal_ml.py`
   (finite-N runs of the algorithm); `rule=optimal` of `online_scm` (`catalog_online_scm_opt.py`,
   `latex_online_scm_opt.py`).
+- `lattice/` (I1-I3, beside E9's files): exact 1D observables and finite rings (`observables1d.py`), Onsager's 2D
+  energy and specific heat (`onsager_thermo.py`), the torus u, c by Kaufman derivatives and integer moments
+  (`torus_thermo.py`), the 2D correlation length from Onsager's strip spectrum (`correlation2d.py`) with the direct
+  strip matrix (`strip_tm.py`), the critical diagonal correlations (`critical2d.py`), the anisotropic square lattice
+  (`anisotropic.py`), the triangular and honeycomb lattices (`tri_honey.py`) and their exact tori (`geom_tori.py`),
+  the exact coupling K = beta J (`coupling.py`); entries `ising2d_anisotropic`, `ising_triangular`,
+  `ising_honeycomb` (`catalog_lattice_obs.py`, `catalog_lattice_xi.py`, `catalog_lattice_aniso.py`,
+  `catalog_lattice_geom.py`, `catalog_lattice_common.py`, `latex_lattice_obs.py`, `latex_lattice_xi.py`,
+  `latex_lattice_geom.py`).
+- `percolation/` (P1-P3): the shared union-find (`unionfind.py`), degree laws and generating functions (`laws.py`),
+  the certified cavity fixed points (`cavity.py`), cluster-size distributions (`clusters.py`), independent closed
+  forms (`closed_forms.py`), finite-graph samplers (`sampling.py`) and the ER critical window (`window.py`); 2D
+  lattices: exact thresholds and exponents (`exact2d.py`), Cardy's formula (`cardy.py`), exact crossing polynomials by
+  enumeration (`enumerate2d.py`), Newman-Ziff sweeps (`lattice2d.py`) and finite-size scaling (`fss2d.py`); k-cores
+  and bootstrap percolation: the certified core equation (`kcore.py`, `kcore_audit.py`), the birth point
+  (`kcore_threshold.py`), DGM's form in mpmath (`kcore_dgm.py`), exact peeling and spreading (`kcore_sample.py`);
+  entries `percolation_bethe`, `percolation_graph`, `percolation_lattice`, `percolation_kcore`,
+  `percolation_bootstrap` (`catalog_percolation*.py`, `latex_percolation*.py`).
+- `montecarlo/` (M1-M3): Fortuin-Kasteleyn bond probabilities and critical points (`fk.py`), Swendsen-Wang and Wolff
+  on the shared union-find (`cluster.py`) and a csgraph SW for large L (`cluster_fast.py`), checkerboard Metropolis
+  (`metropolis.py`), exact small-torus distributions and the stationarity / ergodicity chi^2 (`exact_small.py`,
+  `balance.py`), FK at q = 1 against P2's crossing polynomial (`fk_percolation.py`), runs over named seeds (`run.py`),
+  the shared statistics module (`stats.py`: tau_int, binning, jackknife, Student-t bands, the equilibration
+  diagnostic, chi^2, z fits); the exact g(E) (`dos_exact.py`), the flat-histogram walk (`flat_walk.py`), Wang-Landau
+  (`wang_landau.py`), multicanonical reweighting (`multicanonical.py`), Ferrenberg-Swendsen (`reweight.py`);
+  population annealing (`population.py`) with an SK Metropolis sweep (`sk_metropolis.py`); entries `cluster_mc`,
+  `wang_landau_mc`, `histogram_reweighting_mc`, `population_annealing_mc` (`catalog_mc*.py`, `latex_mc*.py`).
 - `catalog*.py`, `compose.py` (+ `compose_result.py`: `Result` and the finality rule), `cli.py`,
-  `__main__.py`: the 24-entry catalog (`catalog_ts.py` holds the teacher-student entry,
+  `__main__.py`: the 36-entry catalog (`catalog_ts.py` holds the teacher-student entry,
   `catalog_pspin.py` the two p-spin entries; LaTeX in `latex_pspin.py`), the composer,
   the command line.
 - `latex*.py`, `tex*.py`, `derive_tex.py`: the LaTeX derivation writer.
@@ -130,12 +166,14 @@ series` for `series_ising2d`, `--route bound` for `sk_bounds`, and `--pdf` (with
 
 ## Test tiers
 
-- Default: `python3 tools/replicant/selftest.py` (425 tests, about 22 s; measured 21.4 s). Also
-  `python3 run_selftests.py replicant` from the repository root, with the venv activated (it runs
-  the `python3` on PATH; without python-flint the lattice and bounds tests fail, 31 of them).
-- Full: `python3 tools/replicant/selftest.py --full` adds the 132 `@slow` tests (full RSB,
+- Default: `python3 tools/replicant/selftest.py` (655 tests, about 29 s; measured 28.3-28.9 s cold on a clean
+  export). Also `python3 run_selftests.py replicant` from the repository root, with the venv activated (it runs
+  the `python3` on PATH; without python-flint the certified lattice, bounds and percolation tests and the Monte
+  Carlo exact targets fail, by design).
+- Full: `python3 tools/replicant/selftest.py --full` adds the 204 `@slow` tests (full RSB,
   population dynamics at reference sizes, the K-SAT and LDPC crossings, Monte Carlo and enumeration
-  held-out routes, solver-based checks); about 18 minutes on a laptop (measured 18 min 11 s, 557 tests).
+  held-out routes, solver-based checks, the online simulations at N = 1000, the lattice, percolation and
+  Monte Carlo checks at reference sizes); about 35 minutes on a laptop (measured 34 min 39 s, 859 tests).
 - The held-out tests are `tests/test_heldout*.py` (helpers `tests/heldout_common.py`, `tests/heldout_mc.py`).
 - `@slow` is a plain function attribute honoured by `selftest.py` only. pytest ignores the
   marker and would run every test, slow ones included.

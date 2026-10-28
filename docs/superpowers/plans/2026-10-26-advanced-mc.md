@@ -48,3 +48,32 @@ Each method is validated against exact results the package already has.
 - **Population annealing (Hukushima–Iba, Machta):** a free-energy estimate from the weight normalisations, checked against exact ln Z for the 2D Ising tori and the E11 enumeration of SK and ±J at small N.
 - **Families and diagnostics:** report the family-size diagnostics (ρ_t, the effective number of families), and label a run undetermined when its diagnostics fail.
 - **Planted controls:** a wrong reweighting factor and a missing resampling step.
+
+## As built
+
+From the ledger (`.superpowers/sdd/2026-10-26-advanced-mc/progress.md`, not committed) and the task reports;
+commits c23c6d1 .. dea3fe5; documented in the online plan's task O7.
+
+- **Built.** A new package `tools/replicant/montecarlo/` (not `numerics/`, ruling A-R1) with entries `cluster_mc`
+  (M1: Swendsen-Wang, Wolff and a checkerboard Metropolis baseline for the Ising / q-state Potts torus),
+  `wang_landau_mc` and `histogram_reweighting_mc` (M2: Wang-Landau with the 1/t refinement against the exact torus
+  g(E), multicanonical reweighting, Ferrenberg-Swendsen single / multiple histogram) and
+  `population_annealing_mc` (M3: the 2D Ising torus and one SK / +-J matrix at small N), all route `sample`,
+  statistical, and one shared statistics module (ruling A-R4).
+- **Deviations.** The dynamic exponents are printed, not asserted, for SW and Wolff (SW cannot be separated from a
+  logarithm at L <= 64; Wolff's 0.382 +- 0.066 over L = 8 .. 32 excludes LPS's quench-scaling 0.30(2)); the
+  Metropolis z band is compared with Nightingale-Blote's heat-bath value under an assumed universality of local
+  dynamics. <|m|> has no Kaufman torus form (ruling A-R6): exact only by enumeration on small tori. The FK tie to
+  P2 is the q = 1 crossing polynomial (ruling A-R7). WL is checked against the exact g(E) up to L = 16 (ruling
+  A-R3; L = 13 .. 16 by the same certified interpolation, slow only); the energy-range discovery rules are this
+  package's; at L = 8 the 1/t error slope does not reproduce BP's -0.488(8) (the discovery transient, printed).
+  Swendsen-Wang 1987, Wolff 1989, the Ferrenberg-Swendsen PRLs and Hukushima-Iba 2003 were not fetched (cited
+  through Salas-Sokal and Liu-Polkovnikov-Sandvik, Kumar et al. 1992, Machta and Wang-Machta-Katzgraber).
+  M3 added the nominal-R normalisation (WMK's actual-R~ form biases e^{ln Z~}, measured) for Machta's weighted
+  average.
+- **Rulings that changed scope.** A-R2: a csgraph SW for L >= 16, checked trajectory-for-trajectory against the
+  union-find SW; an undetermined run never feeds an asserted band (M1), except named estimator-property tests
+  (M3 ruling); the default chi^2 states its measured power; the run path labels an out-of-window default beta
+  undetermined and refuses only an explicitly requested one (M2). A-R5: <= 1 s default-tier growth for the plan;
+  measured at O7 by the default-selftest growth between 6e4f9ca and HEAD (three or more cold runs each): +0.5 s
+  (the new test functions alone 0.7 s in-suite; cold isolated 1.3 s, imports included).

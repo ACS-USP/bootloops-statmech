@@ -101,7 +101,60 @@ All notable changes to BootLoops are recorded here. The format follows
   annealed entropy and capacity of the Ising perceptron; what they do not resolve (1RSB against
   Parisi, RS against 1RSB at beta = 2) is printed, not asserted.
 
+- `replicant` (online learning, O1-O6): the N -> oo order-parameter ODEs of online learning in alpha = examples / N
+  (`online/`, new route `online`), each checked against finite-N simulation over named seeds that shares no code with
+  the ODE, closed forms and an independent quadrature, with planted ODE terms that must fall outside the band. Entries
+  `online_perceptron` (Hebb, perceptron, AdaTron and the variationally optimal rule of Kinouchi-Caticha, output
+  noise: Biehl-Riegler 1994, Copelli et al. 1997), `online_linear` (online versus offline, Kinouchi-Caticha 1995),
+  `online_drift` (random and deterministic drift, Vicente-Kinouchi-Caticha 1998, Kinouchi-Caticha 1993),
+  `online_tcm` (tree committee machine and its noisy-perceptron equivalence, Copelli-Caticha 1995), `online_scm`
+  (soft committee machines, plateaus and their escape, critical learning rates: Saad-Solla read through their 1996 /
+  1997 restatements, Biehl-Schwarze 1995, Biehl-Riegler-Woehler 1996; `rule=optimal`: Vicente-Caticha 1997's
+  functional optimisation). Every ODE value is `not-computed` (no concentration theorem fetched); "optimal" names its
+  class; a plateau not left inside the window is `undetermined`. Not fetched: Kinouchi-Caticha 1992 (0.88 read from
+  two secondary prints), Saad-Solla's PRL / PRE, Biehl-Schwarze 1992 / 1993; Copelli-Kinouchi-Caticha 1996 abstract
+  only. Default tier +4.0 s (ruling: <= 4 s).
+- `replicant` (exact Ising, I1-I3): certified 1D magnetization, susceptibility, connected correlation and
+  correlation length checked against exact finite rings with the N -> oo bound; Onsager's 2D energy and specific heat
+  (the log amplitude (2/pi) ln^2(1 + sqrt 2)) against Kaufman-torus derivatives and the E8 series; the 2D correlation
+  length above and below T_c from Onsager's strip spectrum (below T_c `not-computed`: the two-particle gap's
+  identification with xi is derived here), nu / eta consistency checks, the critical nearest-neighbour and diagonal
+  correlations (Perk-Au-Yang, Deift-Its-Krasovsky); new entries `ising2d_anisotropic`, `ising_triangular` and
+  `ising_honeycomb` (route `exact`, certified: Athanasopoulos-Ueltschi's Kac-Ward integral, Baxter's maps, Pierre et
+  al.; the triangular antiferromagnet's ground-state entropy), with star-triangle and four-sector duality identities on
+  exact tori and a high-temperature torus identity. `ising2d` and `ising1d` keep their earlier values. Default tier
+  +1.6 s (ruling: <= 1 s; the task reports' own direct accounting gave about 0.9 s, see Changed).
+- `replicant` (percolation, P1-P3): new package `percolation/` with a shared union-find and entries
+  `percolation_bethe`, `percolation_graph` (certified cavity fixed points of the generating-function equations, P_inf,
+  mean cluster size, Molloy-Reed, cluster-size distributions; route `sample`: finite graphs over named seeds, the ER
+  critical window in the slow tier), `percolation_lattice` (square, triangular, honeycomb; certified thresholds 1/2,
+  2 sin(pi/18), 1 - 2 sin(pi/18), the Smirnov-Werner exponents, Cardy's formula by two routes, exact crossing
+  polynomials; Newman-Ziff sweeps and finite-size scaling validated on the solved lattices), `percolation_kcore` and
+  `percolation_bootstrap` (certified k-core and bootstrap fixed points and birth points of Dorogovtsev-Goltsev-Mendes
+  and Janson, against csp/xorsat.py's 2-core and Balogh-Pittel's closed forms; exact peeling and spreading). The
+  sample route never refuses a correct sampler. Default tier +1.1 s (ruling: <= 1 s).
+- `replicant` (advanced Monte Carlo, M1-M3): new package `montecarlo/` and entries `cluster_mc` (Swendsen-Wang,
+  Wolff and a Metropolis baseline for the Ising / q-state Potts torus; stationarity chi^2 of stated power; z fits
+  printed against the literature), `wang_landau_mc` (Wang-Landau with the 1/t refinement against the exact torus
+  g(E), multicanonical reweighting), `histogram_reweighting_mc` (Ferrenberg-Swendsen single and multiple histogram as
+  printed by Kumar et al. 1992, with a stated overlap window and refusals outside it) and `population_annealing_mc`
+  (Hukushima-Iba as described by Machta and Wang-Machta-Katzgraber; free energy against Kaufman and exact enumeration,
+  family diagnostics, the finite-R bias and its corrections), all route `sample`, statistical, unequilibrated runs
+  labelled `undetermined`; a shared statistics module (tau_int, binning, jackknife, Student-t bands, equilibration
+  diagnostic, chi^2). Default tier +0.5 s (ruling: <= 1 s).
 ### Changed
+- `replicant` (documentation and cleanup, O7): GUIDE (catalog, refusal table, routes, finality notes, hazards,
+  every worked example re-run literally on a clean export), README, REFERENCES (every source of the four plans
+  classified primary / secondary / abstract only) and the online spec's and three plans' as-built sections updated;
+  `catalog_percolation_kcore.py` split (the `percolation_bootstrap` entry moved to `catalog_percolation_bootstrap.py`,
+  outputs unchanged); no number or behaviour changed. Time standard, measured cold on clean `git archive` exports:
+  default tier 655 tests, 28.3-28.9 s (425 tests, 20.3-21.1 s at the last push, 9f97a28: +7.8 s for the four plans,
+  of which about 0.6 s is the REM level-(a) derivation committed between them); full tier (`--full`) 859 tests,
+  34 min 39 s. Per-plan default-tier growth by default-selftest differences at the plan boundaries (the rulings'
+  method; three cold runs each, run-to-run noise about +-0.5 s): online +4.0 s, Ising +1.6 s, percolation +1.1 s,
+  Monte Carlo +0.5 s; the new test functions alone (in-suite) cost 2.7, 0.7, 0.5 and 0.7 s, the rest is the growth of
+  the shared catalog-RefCheck and LaTeX tests with each new entry. Cold isolated, each plan's own test modules take
+  3.6, 1.3, 1.3 and 1.3 s (including about 0.45 s of imports each).
 - `replicant`: finality labels that became computed: the derived RS stability of the perceptrons and
   Hopfield (E1), the p-spin 1RSB values (E4). `tests/test_heldout.py` split by model
   (`test_heldout_sk.py`, `test_heldout_perceptron.py`, `test_heldout_mc.py`, helpers in

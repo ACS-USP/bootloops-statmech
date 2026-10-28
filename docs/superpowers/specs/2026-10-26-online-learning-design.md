@@ -99,3 +99,46 @@ Order:
 5. Soft committee: 9, 10, 12, 13.
 6. Functional optimisation in multilayer networks: 7.
 7. Docs.
+
+## As built
+
+Deviations of the implementation from the text above, taken from the build ledger
+(`.superpowers/sdd/2026-10-26-online-learning/progress.md`, not committed), the task reports and the code.
+Commits 490d90f (this design and its plan) .. 99acf67 (O6 fix round), then the documentation and cleanup task
+O7, which also documents the Ising, percolation and advanced Monte Carlo plans built in between.
+
+- **Shape.** One engine package `online/` and the route `online`, as designed, but split by model family rather
+  than one generic teacher/student engine: the perceptron flow (`odes.py`, `fields.py`, `optimal.py`) is
+  extended by composition for drift (`drift.py`), while the linear perceptron (`linear.py`), the tree committee
+  machine (`tcm.py`, `tcm_flow.py`), the soft committee machine (`scm.py`, `scm_flow.py`, `plateau.py`) and
+  VC97's optimal algorithm (`optimal_multilayer.py`, `optimal_ml_flow.py`) have their own flows; each has its own
+  finite-N simulator that shares no code with the ODE. Ruling O-R1 put each entry in its own
+  `catalog_online_<x>.py` / `latex_online_<x>.py`. The five entries are as designed; VC97 (paper 7) is
+  `rule=optimal` of `online_scm`, not a sixth entry.
+- **Composer.** NOT built for online models: a spec that is not a catalog entry is refused
+  (`missing-step:family:<f>`) on the `online` route. Nearby models are reached through the engine's API instead
+  (a callable rule F(h, b, Q), a learning-rate schedule, output noise, drift, a mismatched K and M in the soft
+  committee machine), which the GUIDE documents.
+- **Labels.** No concentration theorem was fetched (Goldt et al. was not), so every ODE value is `not-computed`;
+  simulation values are statistical. "Optimal" names its class on every value (`OPTIMALITY_CLASS`). A plateau not
+  left inside the window, an escape seeded below round-off (O5 fix) and VC97's K = M = 2 curve past min eig Sigma
+  = 1e-3 (alpha ~ 17, O6) are `undetermined`.
+- **Papers (goal: all 14 reproduced or reported).** Not fetched: paper 1 (Kinouchi-Caticha 1992; its 0.88 is
+  banked from two secondary prints, the derived constant is 0.8834), papers 9 and 10 (Saad-Solla's PRL and PRE;
+  read through their NIPS 8 and MANNA restatements by the same authors), paper 14 (Biehl-Schwarze 1992 / 1993:
+  nothing banked, their weight-decay Hebb not implemented; the drift models as VKC 1998 and KC 1993 restate them).
+  Paper 5 (Copelli-Kinouchi-Caticha 1996) was read from its abstract only; the noisy-perceptron mapping is derived
+  here and checked between two independent routes. Read from preprints: papers 2-4, 6, 11-13; from arXiv: 7, 8.
+  Source misprints recorded, not banked: Copelli et al. 1997 Eq. (8) (gives 1.325 for the 0.88 of the same group),
+  KC93 Eq. (22) (a sign), VKC 1998 Table II (a determinant formula); VKC 1998 p. 15's perceptron exponents 5, 8 are
+  UNCLAIMED (the ODE and the O3 reviewer give 3, 4).
+- **Not implemented.** Seung-Sompolinsky-Tishby's offline saddle point (the offline linear values come from a
+  derived zero-energy geometry and the ridge route), an optimal eta schedule (KC95 prints none; the greedy eta
+  is derived here, not banked), BRW's eta_d / eta_s and parity details, BS95's eta_d; the non-goals stay out.
+- **Checks.** As designed (closed forms, finite-N bands with planted ODE terms, independent quadrature); the
+  default simulation bands use a few hundred inputs, the reference sizes (N = 1000) are in the slow tier.
+- **Time standard.** Ruling O-R3: online default-tier growth <= 4 s, O7 adds no default tests beyond doc checks.
+  Measured by the default-selftest growth at the plan boundaries (three cold runs each on clean exports):
+  20.8 s at 9f97a28 -> 25.4 s at 99acf67, of which about 0.6 s is the foreign REM commit 157cff0, so +4.0 s for
+  O1-O6 (the new test functions alone 2.7 s in-suite; cold isolated, the online test modules 3.6 s). The whole
+  default tier is now 655 tests, 28.3-28.9 s; the full tier 859 tests, 34 min 39 s (cold, clean export of 40fc924).
