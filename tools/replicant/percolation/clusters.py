@@ -95,11 +95,17 @@ class ClusterDistribution:
     lagrange: tuple
 
 
+def check_s_max(s_max):
+    """The one s_max rule (cavity and sample routes; their finality declarations stop at S_MAX)."""
+    if isinstance(s_max, bool) or not isinstance(s_max, int) or not 1 <= s_max <= S_MAX:
+        raise Refusal("precondition:s-max", f"s_max = {s_max!r}: need an int in 1 .. {S_MAX}")
+    return s_max
+
+
 def cluster_distribution(law, dilution, s_max, s_occupied=None):
     L = parse_law(law)
     _, t = occupation(dilution)
-    if isinstance(s_max, bool) or not isinstance(s_max, int) or not 1 <= s_max <= S_MAX:
-        raise Refusal("precondition:s-max", f"s_max = {s_max!r}: need an int in 1 .. {S_MAX}")
+    check_s_max(s_max)
     with baller().hygiene.ctx_guard(prec=_PREC):
         ser, lag = _series(L, t, s_max), _lagrange(L, t, s_max)
         for s, (a, b) in enumerate(zip(ser, lag), 1):
@@ -114,4 +120,4 @@ def cluster_distribution(law, dilution, s_max, s_occupied=None):
         return ClusterDistribution(s_max, tuple(ball_of(x) for x in ser), tuple(ball_of(x) for x in lag))
 
 
-__all__ = ["ClusterDistribution", "S_MAX", "cluster_distribution"]
+__all__ = ["ClusterDistribution", "S_MAX", "check_s_max", "cluster_distribution"]

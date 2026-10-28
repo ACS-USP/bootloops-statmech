@@ -6,6 +6,7 @@ seeds (default 0 .. 7), s_max (default 3).  The comparison with the certified ca
 tests' (tests/test_percolation_sample.py) and the slow statistical bank checks'.
 """
 from .catalog import Out, Stability, fstep
+from .percolation.clusters import S_MAX, check_s_max
 from .percolation.sampling import sample_percolation
 
 SEEDS = tuple(range(8))
@@ -22,7 +23,7 @@ KEYS = ("P_inf", "mean_finite", "mean_degree")
 def sample_step(name, law_of, cite):
     def go(p):
         law, dil = law_of(p)
-        s_max = p.get("s_max", 3)
+        s_max = check_s_max(p.get("s_max", 3))
         r = sample_percolation(law, dil, p.get("N", 2000), p.get("seeds", SEEDS), s_max)
         keys = [k for k in r.mean]
         ren = {"P_inf": "P_inf_sampled", "mean_finite": "mean_finite_cluster_size_sampled",
@@ -40,7 +41,7 @@ def sample_step(name, law_of, cite):
     return fstep(name, cite, go)
 
 
-def sample_finality(s_max_max=60):
+def sample_finality(s_max_max=S_MAX):          # the cap of the s_max check (percolation/clusters.py)
     fin = {k: STAT for k in ("P_inf_sampled", "mean_finite_cluster_size_sampled", "mean_degree_sampled")}
     fin.update({f"P_s{s}_sampled": STAT for s in range(1, s_max_max + 1)})
     return fin

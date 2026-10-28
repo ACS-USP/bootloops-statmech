@@ -13,7 +13,8 @@ Route sample (statistical):
 Run parameters: model (ising2d | sk_gaussian | sk_pm_one), L (4; even, 4 .. 64), N (12; 2 .. 64), disorder (0: the
 coupling matrix is sample 0 of numerics/finite_size's couplings(N, 1, disorder)), beta (beta_c for ising2d, 3/2 for
 SK), population (R, 1000), temperatures (20, evenly spaced in beta from 0), sweeps (Metropolis sweeps per
-temperature, 2), seeds (0 .. 7).
+temperature, 2; 1 .. 10^4: sweeps = 0 would be resampling only), seeds (0 .. 7).  L for an SK model, or N /
+disorder for ising2d, is refused precondition:known-parameter (not read by that model).
 """
 from functools import lru_cache
 
@@ -57,6 +58,10 @@ def _p(p):
     g = {k: p.get(k, d) for k, d in DEFAULTS.items()}
     if g["model"] not in MODELS:
         raise Refusal("precondition:model", f"model = {g['model']!r}: one of {', '.join(MODELS)}")
+    unused = sorted(k for k in (("N", "disorder") if g["model"] == "ising2d" else ("L",)) if k in p)
+    if unused:                      # every accepted parameter is read or refused
+        raise Refusal("precondition:known-parameter", f"{', '.join(unused)}: not a parameter of model = "
+                      f"{g['model']} (ising2d reads L; the SK models read N and disorder)")
     if g["model"] == "ising2d":
         if isinstance(g["L"], bool) or not isinstance(g["L"], (int, np.integer)) or g["L"] % 2 or not 4 <= g["L"] <= 64:
             raise Refusal("precondition:checkerboard", f"L = {g['L']!r}: the checkerboard Metropolis sweep needs an "

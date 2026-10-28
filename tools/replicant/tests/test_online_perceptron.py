@@ -268,6 +268,21 @@ def test_unreached_asymptote_is_labelled_and_the_curve_kept():
     assert 0 < res.values["eps"] < 0.5
 
 
+def test_runs_without_a_physical_value_say_so():
+    """Final review m-3: parameter combinations where every value step is skipped end with a run-level note
+    (catalog_online.nothing_computed) instead of returning only the echoed parameters; a run that computes a
+    value gets no such note."""
+    cat = catalog()
+    for name, p in (("online_linear", {"rule": "standard", "eta": "greedy"}), ("online_drift", {"D": "0"}),
+                    ("online_drift", {"rule": "hebb"}), ("online_scm", {"teacher": "graded"}),
+                    ("online_perceptron", {"rule": "perceptron", "noise": "0.1"})):
+        res = compose(cat[name].spec, "online").run(**p)
+        assert not set(res.values) & set(cat[name].finality), (name, p)
+        assert any(n.startswith("NO PHYSICAL VALUE") for n in res.notes), (name, p, res.notes)
+    res = compose(cat["online_perceptron"].spec, "online").run(rule="perceptron", alpha="2")
+    assert not any(n.startswith("NO PHYSICAL VALUE") for n in res.notes)
+
+
 def test_guide_is_true():
     """The GUIDE's online rows: every refusal reason it lists is raised by the code, and the worked
     example's perceptron numbers are what the CLI prints."""

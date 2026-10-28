@@ -280,9 +280,11 @@ def summary(run):
 
 
 def check_params(R, temperatures, sweeps, seeds):
+    """The run path's parameters; sweeps >= 1 (sweeps = 0 is pure resampling with no Metropolis move: the
+    population never equilibrates at the new temperature; anneal itself accepts it, the tests use it)."""
     from ..percolation.lattice2d import check_seeds
     for name, v, lo, hi in (("population", R, 2, 10 ** 6), ("temperatures", temperatures, 1, 10 ** 5),
-                            ("sweeps", sweeps, 0, 10 ** 4)):
+                            ("sweeps", sweeps, 1, 10 ** 4)):
         if isinstance(v, bool) or not isinstance(v, (int, np.integer)) or not lo <= v <= hi:
             raise Refusal(f"precondition:{name}", f"{name} = {v!r}: need an int in {lo} .. {hi}")
     return int(R), int(temperatures), int(sweeps), check_seeds(seeds)

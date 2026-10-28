@@ -71,6 +71,23 @@ def test_check_ref_can_fail():
     assert not check_ref(rem, wrong).ok          # paramagnet at beta = 1: not the ground energy
 
 
+def test_statistical_detail_names_a_systematic_only_when_there_is_one():
+    """Final review m-11: a statistical RefCheck without a systematic prints no '+ systematic 0' (compare on
+    synthetic values: the banked value with a stderr; P2's FSS RefChecks keep their systematic text)."""
+    from replicant.catalog import compare
+    from replicant.catalog_percolation_fss import BAND_P
+    from replicant.refdata import load
+    e = catalog()["percolation_graph"]
+    ref = next(r for r in e.refs if r.statistical)
+    want = float(load(ref.file)[ref.key].value)
+    out = compare(e, ref, {"P_inf_sampled": want}, {"P_inf_sampled": 1e-3})
+    assert out.ok and out.statistical and "systematic" not in out.detail, out.detail
+    lat = catalog()["percolation_lattice"]
+    pc = next(r for r in lat.refs if r.statistical)
+    v = {"p_c_crossing": float(load(pc.file)[pc.key].value), "fss_bands": {BAND_P: (0, 0, 0, 0.002, 0)}}
+    assert "+ systematic 0.002" in compare(lat, pc, v, {"p_c_crossing": 1e-3}).detail
+
+
 @slow
 def test_catalog_entry_reproduces_its_slow_and_statistical_numbers():
     for name, e in catalog().items():

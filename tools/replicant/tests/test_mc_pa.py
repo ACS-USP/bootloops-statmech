@@ -266,7 +266,11 @@ def test_entry_labels_finality_and_refusals():
                         ({"model": "sk_gaussian", "beta": "beta_c"}, "precondition:beta"), ({"beta": "0"},
                         "precondition:beta"), ({"population": 1}, "precondition:population"),
                         ({"temperatures": 0}, "precondition:temperatures"), ({"sweeps": -1}, "precondition:sweeps"),
-                        ({"seeds": (0,)}, "precondition:named-seeds"), ({"q": 3}, "precondition:known-parameter")):
+                        ({"seeds": (0,)}, "precondition:named-seeds"), ({"q": 3}, "precondition:known-parameter"),
+                        ({"sweeps": 0}, "precondition:sweeps"),                    # final review m-6
+                        ({"model": "sk_gaussian", "L": 7}, "precondition:known-parameter"),        # m-2: not read
+                        ({"model": "ising2d", "N": 99}, "precondition:known-parameter"),
+                        ({"disorder": 3}, "precondition:known-parameter")):
         _refused(lambda: _run(**{**CHEAP, **bad}), reason)
 
 

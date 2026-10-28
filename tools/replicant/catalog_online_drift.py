@@ -23,7 +23,7 @@ Run parameters:
 import math
 
 from .catalog import Out, RefCheck, Stability, entry, fstep, has
-from .catalog_online import _num, sim_band
+from .catalog_online import _num, nothing_computed, sim_band
 from .core import Refusal
 from .csp import _checks
 from .online import drift as DR
@@ -188,6 +188,7 @@ def online_drift():
            "eps_inf_kc93": kc, "eps_sim": sim}
     meta = ("rule", "drift", "D", "eta", "noise", "R0", "Q0", "alpha", "bound_gap", "closed_form_gap",
             "eps_exponent_derived", "eps_sim_halfwidth99", "N", "seeds", "sim_status")
+    steps = [*steps, nothing_computed(fin, "give alpha (the learning curve) or a drift D > 0 (the stationary state and the small-drift law)")]
     spec = ModelSpec("online_drift", "spherical", "gaussian", constraint="online", prior="teacher")
     return entry("online_drift", spec, f"{VKC}; {KC93}; {BS}", {"online": steps}, refs, {"online": CAVEAT},
                  "online learning of a perceptron teacher that drifts (randomly or deterministically, VKC 1998, "

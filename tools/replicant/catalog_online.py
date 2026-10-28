@@ -180,6 +180,21 @@ def _finite(p):
                       "no code shared with the ODEs); it differs from the N -> oo ODE by O(1/N)",))
 
 
+def nothing_computed(physical, hint):
+    """A last Step: when no key of `physical` (the entry's physical values) was computed, a run-level note
+    says so and how to ask for a value, instead of returning only the echoed parameters (final review m-3)."""
+    from .core import Step
+    keys = frozenset(physical)
+
+    def apply(s):
+        if keys & set(s["values"]):
+            return s.with_(step_note="a physical value was computed")
+        why = f"NO PHYSICAL VALUE at these parameters: every value step was skipped (reasons in the trace); {hint}"
+        return s.with_(notes=s["notes"] + (why,), step_note=why)
+    return Step("online-no-value-check", lambda s: [] if "params" in s else ["params"], apply,
+                "this package (run-level check)", lambda s: s["step_note"])
+
+
 def online_perceptron():
     steps = [fstep("online-state-point", f"{BR}, Eqs. (1)-(3); {CEKBSRC}, Eq. (7)", _state),
              fstep("online-asymptote", f"{BR}, Eqs. (7), (8), (15); {VKC}, Tables I-II; {KC92}", _asymptote,
@@ -226,6 +241,7 @@ def online_perceptron():
     meta = ("rule", "eta", "noise", "noise_estimate", "R0", "Q0", "alpha", "alpha_big",
             "eps_exponent_derived", "asymptote_status", "hebb_closed_form_gap", "robust_boundary_error",
             "eps_sim_halfwidth99", "N", "seeds", "sim_status")
+    steps.append(nothing_computed(fin, "give alpha (the learning curve), or noise = 0 / rule = hebb (the asymptote)"))
     spec = ModelSpec("online_perceptron", "spherical", "gaussian", constraint="online", prior="teacher")
     return entry("online_perceptron", spec, f"{BR}; {VKC}; {KC92}; {CEKBSRC}", {"online": steps}, refs,
                  {"online": CAVEAT}, "online perceptron learning of a perceptron teacher: Hebb, "
@@ -243,4 +259,4 @@ def online_entries():
     return [online_perceptron(), online_linear(), online_drift(), online_tcm(), online_scm()]
 
 
-__all__ = ["online_entries", "online_perceptron", "sim_band"]
+__all__ = ["nothing_computed", "online_entries", "online_perceptron", "sim_band"]

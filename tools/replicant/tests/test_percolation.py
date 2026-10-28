@@ -228,6 +228,13 @@ def test_cluster_distribution_three_routes_and_the_sum_rule():
     _refused(lambda: cluster_distribution(("bethe", 3), ("bond", F(3, 4)), 10, percolation_giant(
         ("bethe", 3), ("bond", F(99, 100))).S_occupied), "no-solution:sum-rule")
     _refused(lambda: cluster_distribution(("bethe", 3), ("bond", F(3, 4)), 61), "precondition:s-max")
+    # final review m-8: one cap (clusters.S_MAX) for the cavity check, the sample check and both finality maps
+    from replicant.catalog import catalog
+    from replicant.compose import compose
+    from replicant.percolation.clusters import S_MAX
+    e = catalog()["percolation_graph"]
+    assert {f"P_s{S_MAX}", f"P_s{S_MAX}_sampled"} <= set(e.finality) and f"P_s{S_MAX + 1}" not in e.finality
+    _refused(lambda: compose(e.spec, "sample").run(s_max=S_MAX + 1, N=200), "precondition:s-max")
 
 
 # ---- planted errors ------------------------------------------------------------------------------

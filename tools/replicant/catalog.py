@@ -357,7 +357,7 @@ def compare(e: CatalogEntry, ref: RefCheck, values, errors) -> RefOutcome:
     ok = abs(float(got) - float(want.value)) <= band
     return RefOutcome(ref.file, ref.key, ok, repr(float(got)), want.value, want.tol, True,
                       f"stderr {err:.3g}, 99% Student-t band {band - sysm:.3g} (t = {t:.4g}, "
-                      f"df = {ref.runs - 1}) + systematic {sysm:.3g}")
+                      f"df = {ref.runs - 1})" + (f" + systematic {sysm:.3g}" if ref.systematic is not None else ""))
 
 
 def check_ref(e: CatalogEntry, ref: RefCheck) -> RefOutcome:

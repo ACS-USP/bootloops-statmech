@@ -27,7 +27,7 @@ from .core import Refusal
 from .lattice.ball import arb_q, ball_of, baller
 from .percolation import closed_forms as CF
 from .percolation.cavity import percolation_giant
-from .percolation.clusters import cluster_distribution
+from .percolation.clusters import S_MAX, cluster_distribution
 from .percolation.laws import occupation, parse_law
 from .spec import ModelSpec
 
@@ -222,7 +222,7 @@ def _finality(cite, graph):
                               "mean_finite_cluster_size_closed_form")},
            **{f"P_s{s}": Stability("not-computed", "cavity", f"{NSW}: Eqs. (26)-(28)", "certified "
                                    "coefficient of H0 (Lagrange inversion, " + DERIVED.split(" (")[0] +
-                                   "; = NSW's series iteration); tree-like limit") for s in range(1, 61)}}
+                                   "; = NSW's series iteration); tree-like limit") for s in range(1, S_MAX + 1)}}
     if not graph:
         fin.update({k: _bethe_theorem(cite) for k in ("u", "P_inf", "P_inf_closed_form")})
     if graph:

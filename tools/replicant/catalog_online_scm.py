@@ -27,7 +27,7 @@ import math
 import numpy as np
 
 from .catalog import Out, RefCheck, Stability, entry, fstep, has
-from .catalog_online import _num
+from .catalog_online import _num, nothing_computed
 from . import catalog_online_scm_opt as OPT
 from .core import Refusal
 from .csp import _checks
@@ -277,6 +277,7 @@ def online_scm():
     meta = ("K", "M", "eta", "teacher", "init", "alpha", "plateau_status", "plateau_branch", "plateau_rtol_spread",
             "plateau_runaway",
             "eps_sim_halfwidth99", "N", "seeds") + OPT.META
+    steps = [*steps, nothing_computed(fin, "give alpha (the learning curve), or the isotropic teacher (the symmetric points and asymptotics)")]
     spec = ModelSpec("online_scm", "spherical", "gaussian", constraint="online", prior="teacher")
     return entry("online_scm", spec, f"{SS}; {BS}; {BRW}", {"online": steps}, refs, {"online": CAVEAT},
                  "online gradient descent in the soft committee machine (Saad-Solla ODEs, erf units): symmetric "
