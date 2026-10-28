@@ -31,7 +31,8 @@ ROUTES = {"rem": {"replica"}, "sk": {"replica", "cavity", "amp"}, "pspin": {"rep
           "hopfield": {"replica", "cavity"}, "viana_bray": {"cavity"},
           "percolation_bethe": {"cavity", "sample"}, "percolation_graph": {"cavity", "sample"},
           "percolation_lattice": {"exact", "sample"}, "percolation_kcore": {"cavity", "sample"},
-          "percolation_bootstrap": {"cavity", "sample"}, "cluster_mc": {"sample"}}
+          "percolation_bootstrap": {"cavity", "sample"}, "cluster_mc": {"sample"},
+          "wang_landau_mc": {"sample"}, "histogram_reweighting_mc": {"sample"}}
 
 
 def _bank_keys():

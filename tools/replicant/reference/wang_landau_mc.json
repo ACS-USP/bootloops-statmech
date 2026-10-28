@@ -1,0 +1,8 @@
+{
+  "bp_one_over_t_eps_slope_l8": {
+    "value": "-0.488",
+    "tol": "0.008",
+    "cite": "slope of log <eps(t)> against log t for the 1/t algorithm, 2D Ising model, L = 8, whole energy range, 88 independent samples: Belardinelli & Pereyra, 'Fast algorithm to calculate density of states', Phys. Rev. E 75, 046701 (2007), arXiv:cond-mat/0701672 (PDF read), Fig. 3 caption: slopes 0.518 +- 0.015 (Delta H'), -0.482 +- 0.015 (<H''>), -0.486 +- 0.008 (<h(t)>), -0.488 +- 0.008 (<eps(t)>) 'for large t'; eps(E, t) of their Eq. (2) (ln g normalised at the ground state); their text: the errors go as ~ sqrt(F(t)) = t^{-1/2}. tol = their quoted error",
+    "independent_route": "replicant's 1/t schedule (montecarlo/wang_landau.py) on the 8 x 8 torus: <eps> of each walker against the exact g(E) (montecarlo/dos_exact.py, Kaufman's integer polynomial) at MC times 500 .. 32000, the log-log slope per seed (between snapshots) in a 99% Student-t band over 8 named seeds x 8 walkers; the slope over 8000 .. 32000 printed next to this value in tests/test_mc_flat_slow.py (test_error_saturation_and_its_slope); asserted only that the 1/t slope band lies below the saturation rule (-1/4); the original schedule's slopes are printed"
+  }
+}
