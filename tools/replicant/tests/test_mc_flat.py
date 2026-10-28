@@ -318,6 +318,38 @@ def test_entries_labels_finality_and_refusals():
         _refused(lambda: _run(name, **{**cheap, **bad}), reason)
 
 
+def test_histogram_reweighting_defaults_follow_L_and_label_outside_the_window():
+    """Final review I-3 (ruling: a correct in-range run is labelled, only an explicit request refused).  At
+    L = 32 and 64 the default beta / betas (moved towards beta_c by 8/L) lie inside the overlap windows; the
+    old fixed defaults (planted: default_betas returning the L = 8 values) are labelled undetermined at L = 32
+    (windows do not chain: multiple-histogram values omitted) and L = 64 (beta outside: single values kept,
+    labelled); the same values given explicitly are refused.  L <= 8 keeps the printed defaults."""
+    from replicant import catalog_mc_fs as FS
+    assert FS.default_betas(8) == ("9/20", ("2/5", "beta_c", "12/25")) == FS.default_betas(2)
+    cheap = {"sweeps": 30, "burn_in": 10, "seeds": (0, 1)}
+    for L in (32, 64):
+        h = _run("histogram_reweighting_mc", L=L, **cheap)
+        v = h.values
+        assert v["single_window"][0] <= float(v["beta"]) <= v["single_window"][1], (L, v["single_window"])
+        assert "single_undetermined" not in v and "multi_undetermined" not in v, L
+        assert "energy_per_site_multihistogram" in v and "energy_per_site_reweighted" in v
+    fixed = FS.default_betas
+    FS.default_betas = lambda L: (FS.DEFAULTS["beta"], FS.DEFAULTS["betas"])
+    try:
+        h = _run("histogram_reweighting_mc", L=32, **cheap)
+        assert h.values["multi_status"] == "undetermined" and "chain" in h.values["multi_undetermined"]
+        assert "energy_per_site_multihistogram" not in h.values and "energy_per_site_reweighted" in h.values
+        h = _run("histogram_reweighting_mc", L=64, **cheap)
+        assert h.values["single_status"] == "undetermined" and "outside" in h.values["single_undetermined"]
+        assert "UNDETERMINED" in h.finality["energy_per_site_reweighted"].note
+        assert "energy_per_site_reweighted" in h.errors
+    finally:
+        FS.default_betas = fixed
+    _refused(lambda: _run("histogram_reweighting_mc", L=32, betas=FS.DEFAULTS["betas"], **cheap),
+             "precondition:histogram-overlap")
+    _refused(lambda: _run("histogram_reweighting_mc", L=64, beta="9/20", **cheap), "precondition:reweight-window")
+
+
 def test_displayed_acceptance_block_can_fail():
     from replicant.latex_mc_flat import wang_landau_mc
     from replicant.tex import verify_block

@@ -24,7 +24,8 @@ histogram whose extreme level already holds half the mass) (O is assumed to fall
 the tests check it on
 a grid).  Multiple histogram: the union of the runs' windows, which must chain (each window meets the next in
 beta), else precondition:histogram-overlap (the free energies f_m are not determined).  A beta outside the
-window: precondition:reweight-window.  Both are input-validity refusals, never sampler refusals.
+window: precondition:reweight-window.  Both are input-validity refusals, never sampler refusals; with
+enforce=False (the run path's implicit default beta) a beta outside the window is returned with in_window False.
 
   window(series, beta0) -> (lo, hi)                         series: one 1-d energy array per named seed
   overlap(series, beta0, beta) -> float
@@ -55,6 +56,7 @@ class Reweight:
     overlap: float          # single: O(beta); multiple: the largest run overlap
     window: tuple
     text: str
+    in_window: bool = True  # False only with enforce=False and beta outside the window (caller labels it)
 
 
 def _series(series):
@@ -123,16 +125,22 @@ def _bands(per, conf):
     return {k: ST.band(v, conf) for k, v in per.items()}
 
 
-def _inside(beta, win, what):
-    if not win[0] <= float(beta) <= win[1]:
+def _inside(beta, win, what, enforce=True):
+    """beta inside win?  Outside: refused precondition:reweight-window when enforced (an explicit request),
+    else False (the caller labels the estimate undetermined)."""
+    if win[0] <= float(beta) <= win[1]:
+        return True
+    if enforce:
         raise Refusal("precondition:reweight-window", f"beta = {float(beta):.6g} outside the reliable window "
                       f"[{win[0]:.6g}, {win[1]:.6g}] of {what} (overlap rule O >= {O_MIN:g})")
+    return False
 
 
-def single_histogram(series, beta0, beta, N, conf=0.99):
+def single_histogram(series, beta0, beta, N, conf=0.99, enforce=True):
+    """enforce=False: a beta outside the window gives the estimate with in_window False (not refused)."""
     s = _series(series)
     win = window(s, beta0)
-    _inside(beta, win, f"the run at beta0 = {float(beta0):.6g}")
+    ok = _inside(beta, win, f"the run at beta0 = {float(beta0):.6g}", enforce)
     per = {"u": [], "C": []}
     for x in s:
         u, C = _moments(x, log_factor(beta0, beta, x), beta, N)
@@ -142,8 +150,9 @@ def single_histogram(series, beta0, beta, N, conf=0.99):
     b, O = _bands(per, conf), overlap(s, beta0, beta)
     text = (f"single histogram beta0 = {float(beta0):.6g} -> beta = {float(beta):.6g}: u = {b['u'].mean:.6g} +- "
             f"{b['u'].half_width:.2g}, C = {b['C'].mean:.5g} +- {b['C'].half_width:.2g} ({conf:.0%} Student-t over "
-            f"{len(s)} seeds); overlap {O:.3f}, window [{win[0]:.6g}, {win[1]:.6g}]")
-    return Reweight(float(beta), per, b, O, win, text)
+            f"{len(s)} seeds); overlap {O:.3f}, window [{win[0]:.6g}, {win[1]:.6g}]"
+            + ("" if ok else "; beta OUTSIDE the window"))
+    return Reweight(float(beta), per, b, O, win, text, ok)
 
 
 def _lse_axis(a, axis):
@@ -168,8 +177,10 @@ def _free_energies(levels, counts, n_eff, betas):
     raise Refusal("no-solution:convergence", "Ferrenberg-Swendsen free energies did not converge in 1e5 iterations")
 
 
-def multiple_histogram(runs, beta, N, conf=0.99):
-    """beta: one inverse temperature (-> Reweight) or a sequence (-> [Reweight], the f_m solved once per seed)."""
+def multiple_histogram(runs, beta, N, conf=0.99, enforce=True):
+    """beta: one inverse temperature (-> Reweight) or a sequence (-> [Reweight], the f_m solved once per seed).
+    enforce=False: a target outside the combined window gives in_window False (windows that do not chain are
+    always refused precondition:histogram-overlap: the f_m are not determined)."""
     many = isinstance(beta, (list, tuple, np.ndarray))
     try:
         targets = [float(b) for b in (beta if many else (beta,))]       # floats, Fractions, mpf
@@ -184,8 +195,7 @@ def multiple_histogram(runs, beta, N, conf=0.99):
             raise Refusal("precondition:histogram-overlap", f"runs at beta = {b1:.6g} and {b2:.6g} do not overlap: "
                           f"windows [{w1[0]:.6g}, {w1[1]:.6g}] and [{w2[0]:.6g}, {w2[1]:.6g}]")
     win = (wins[0][0], wins[-1][1])
-    for b in targets:
-        _inside(b, win, "the combined runs")
+    oks = [_inside(b, win, "the combined runs", enforce) for b in targets]
     betas = np.array([b for b, _ in runs])
     per = [{"u": [], "C": []} for _ in targets]
     for i in range(len(runs[0][1])):
@@ -201,14 +211,15 @@ def multiple_histogram(runs, beta, N, conf=0.99):
             out["u"].append(u)
             out["C"].append(C)
     res = []
-    for b, out in zip(targets, per):
+    for b, out, ok in zip(targets, per, oks):
         out = {k: tuple(v) for k, v in out.items()}
         bd = _bands(out, conf)
         O = max(overlap(s, bm, b) for bm, s in runs)
         text = (f"multiple histogram over beta = {', '.join(f'{x:.6g}' for x in betas)} -> beta = {b:.6g}: u = "
                 f"{bd['u'].mean:.6g} +- {bd['u'].half_width:.2g}, C = {bd['C'].mean:.5g} +- {bd['C'].half_width:.2g} "
-                f"({conf:.0%} Student-t over {len(runs[0][1])} seeds); window [{win[0]:.6g}, {win[1]:.6g}]")
-        res.append(Reweight(b, out, bd, O, win, text))
+                f"({conf:.0%} Student-t over {len(runs[0][1])} seeds); window [{win[0]:.6g}, {win[1]:.6g}]"
+                + ("" if ok else "; beta OUTSIDE the window"))
+        res.append(Reweight(b, out, bd, O, win, text, ok))
     return res if many else res[0]
 
 
