@@ -74,6 +74,9 @@ def test_exact_dos_is_the_enumerated_histogram_and_gives_torus_thermo():
         fl = DX.canonical(DX.exact_dos(4).E, DX.exact_dos(4).ln_g, float(beta_value(2, beta)), 16)
         assert abs(fl.u - ex.u) < 1e-12 and abs(fl.C - ex.C) < 1e-11 and abs(fl.ln_z - ex.ln_z) < 1e-12
     assert abs(DX.exact_canonical(4, mp.mpf("0.5")).u - ex.u) > 1e-2          # control: another beta
+    from replicant.lattice.kaufman import kaufman_polynomial
+    for L in (3, 4):                     # the L >= 13 route (kaufman._z interpolated here) = kaufman_polynomial
+        assert DX._interpolated(L) == kaufman_polynomial(L, L).coefficients, L
     assert mp.mp.dps == before
     _refused(lambda: DX.exact_dos(17), "precondition:size")
 
@@ -174,9 +177,14 @@ def test_fixed_weight_walk_balance_and_ergodicity_chi2():
     assert not bad.ok, bad.text
 
 
+MUCA_SEEDS = tuple(range(16))
+
+
+@lru_cache(maxsize=1)
 def _muca():
-    run = _wl_unplanted()
-    return run, MU.muca_run(3, run.per_seed, run.k, run.seeds, 4, 150, 10)
+    """16 seeds x 8 walkers: WL (1/t) to t = 300 on 3 x 3, then 100 multicanonical sweeps on each seed's weights."""
+    run = WL.wang_landau(3, MUCA_SEEDS, 8, "one_over_t", 300 + 300 // 8, "1/300")
+    return run, MU.muca_run(3, run.per_seed, run.k, run.seeds, 8, 100, 10)
 
 
 def _agrees(rw, beta, m):
@@ -188,17 +196,37 @@ def _agrees(rw, beta, m):
                (("u", ex.u), ("C", ex.C), ("abs_m", am)))
 
 
-def test_multicanonical_reweighting_matches_the_exact_torus():
-    """Weights from each seed's WL estimate; u, C, <|m|> at four beta against the exact g(E) and the enumeration in
-    Bonferroni 99% bands over seeds (12 comparisons).  Planted reweighting factor w^{-0.9} must leave a band."""
-    _, m = _muca()
-    assert m.status == "equilibrated", m.text
+def _wl_canonical_biased(run, betas, m):
+    """The Wang-Landau canonical estimate (u, C from each seed's ln g) outside some Bonferroni band."""
+    t = ST.t_quantile(1 - (1 - 0.99) / (2 * m), len(run.seeds) - 1)
+    for b in betas:
+        ex = DX.exact_canonical(3, mp.mpf(b))
+        cs = [DX.canonical(run.E, row, b, 9) for row in run.per_seed]
+        for k, v in (("u", [c.u for c in cs]), ("C", [c.C for c in cs])):
+            bd = ST.band(v)
+            if abs(bd.mean - getattr(ex, k)) > t * bd.stderr:
+                return True
+    return False
+
+
+def test_multicanonical_reweighting_matches_the_exact_torus_and_removes_the_wl_bias():
+    """u, C, <|m|> at four beta against the exact g(E) and the enumeration in Bonferroni 99% bands over 16 seeds (12
+    comparisons).  The same bands resolve the WL canonical estimate (from ln g alone) as biased, so dropping the
+    multicanonical histogram from the reweighting (planted: the estimate becomes e^{S_WL - beta E}, the WL one) must
+    fail.  Measured on 40 sets of 16 seeds (100-739): the multicanonical estimate passes 40/40, the WL canonical one
+    (= the dropped-histogram plant) is rejected 38/40.  A planted factor w^{-0.9} must also fail."""
+    run, m = _muca()
+    assert run.status == "converged" and m.status == "equilibrated", (run.text, m.text)
     betas = (0.2, 0.4, 0.6, 1.0)
     assert all(_agrees(MU.reweight(m, b), b, 12) for b in betas), [MU.reweight(m, b).text for b in betas]
-    bad = _planted(MU._HOOKS, "weight_power", 0.9, lambda: [MU.reweight(m, b) for b in betas])
-    assert not all(_agrees(r, b, 12) for r, b in zip(bad, betas))
+    assert _wl_canonical_biased(run, betas, 12)
+    for key, value in (("histogram", "drop"), ("weight_power", 0.9)):
+        bad = _planted(MU._HOOKS, key, value, lambda: [MU.reweight(m, b) for b in betas])
+        assert not all(_agrees(r, b, 12) for r, b in zip(bad, betas)), key
     short = MU.muca_run(3, m.ln_w, m.k, m.seeds, 1, 8, 0)
     _refused(lambda: MU.reweight(short, 3.0), "precondition:reweight-window")
+    soft = MU.reweight(short, 3.0, enforce=False)
+    assert not soft.in_window and "OUTSIDE" in soft.text
 
 
 # ---- Ferrenberg-Swendsen on exact canonical draws --------------------------------------------------------------
@@ -244,6 +272,12 @@ def test_multiple_histogram_reweighting_and_overlap():
     assert not _planted(RW._HOOKS, "free_energies", "zero", lambda: all(
         _fs_ok(r, b, 8) for r, b in zip(RW.multiple_histogram(runs, targets, 16), targets)))
     _refused(lambda: RW.multiple_histogram(runs, 0.05, 16), "precondition:reweight-window")
+    from fractions import Fraction
+    two = [(b, ser[:2]) for b, ser in runs[1:3]]                # a small combination: only the beta types matter
+    want = RW.multiple_histogram(two, 0.45, 16).bands["u"].mean
+    for b in (Fraction(9, 20), mp.mpf("0.45")):                 # the package's rationals and mpf are numbers
+        assert abs(RW.multiple_histogram(two, b, 16).bands["u"].mean - want) < 1e-12
+    _refused(lambda: RW.multiple_histogram(runs, "x", 16), "precondition:beta")
     far = [(0.1, [_draws(0.1, 2000, (s, 7)) for s in SEEDS]), runs[-1]]
     _refused(lambda: RW.multiple_histogram(far, 0.3, 16), "precondition:histogram-overlap")
 
@@ -262,6 +296,13 @@ def test_entries_labels_finality_and_refusals():
     # CHEAP stops at t_max = 200 before F_final = 1/1000: labelled (WL and the multicanonical run on its weights)
     assert r.values["wl_status"] == "undetermined" and r.values["muca_status"] == "undetermined"
     assert "UNDETERMINED" in r.finality["energy_per_site_muca"].note
+    # a default beta outside the multicanonical window is labelled, an explicit one refused (ruling M5)
+    short = {**W, "muca_sweeps": 8, "muca_burn_in": 0}
+    o = _run("wang_landau_mc", **short)
+    assert o.values["muca_status"] == "undetermined" and "OUTSIDE" in o.values["reweight_summary"]
+    _refused(lambda: _run("wang_landau_mc", **{**short, "beta": "beta_c"}), "precondition:reweight-window")
+    z = _run("wang_landau_mc", **{**W, "t_max": 10})                 # no ground level yet: labelled, not refused
+    assert z.values["muca_status"] == "undetermined" and "energy_per_site_muca" not in z.values
     h = _run("histogram_reweighting_mc", **FS)
     assert h.rigor == "statistical" and not h.final and "energy_per_site_multihistogram" in h.errors
     assert h.values["single_window"][0] <= 0.44 <= h.values["single_window"][1]

@@ -29,8 +29,8 @@ window: precondition:reweight-window.  Both are input-validity refusals, never s
   window(series, beta0) -> (lo, hi)                         series: one 1-d energy array per named seed
   overlap(series, beta0, beta) -> float
   single_histogram(series, beta0, beta, N) -> Reweight(u, C per seed and bands, overlap, window)
-  multiple_histogram(runs, beta, N) -> Reweight (or [Reweight] for a sequence of beta)   runs: [(beta_m, [series per
-      seed])], the same seeds in every run; per seed its own f_m (so seeds stay independent), bands over seeds
+  multiple_histogram(runs, beta, N) -> Reweight (or [Reweight] for a list / tuple / array of beta)
+      runs: [(beta_m, [series per seed])], the same seeds in every run; per seed its own f_m (so seeds stay independent), bands over seeds
 _HOOKS["factor_scale"] (1.0; planted e.g. 1.25: e^{-1.25 (beta - beta0) E}, a wrong reweighting factor);
 _HOOKS["free_energies"] ("solve"; planted "zero": the f_m left at 0, not solved).
 """
@@ -170,8 +170,11 @@ def _free_energies(levels, counts, n_eff, betas):
 
 def multiple_histogram(runs, beta, N, conf=0.99):
     """beta: one inverse temperature (-> Reweight) or a sequence (-> [Reweight], the f_m solved once per seed)."""
-    many = not isinstance(beta, (int, float, np.floating))
-    targets = [float(b) for b in (beta if many else (beta,))]
+    many = isinstance(beta, (list, tuple, np.ndarray))
+    try:
+        targets = [float(b) for b in (beta if many else (beta,))]       # floats, Fractions, mpf
+    except (TypeError, ValueError):
+        raise Refusal("precondition:beta", f"beta = {beta!r}: need a number or a sequence of numbers")
     runs = sorted(((float(b), _series(s)) for b, s in runs), key=lambda r: r[0])
     if len(runs) < 2 or len({len(s) for _, s in runs}) != 1:
         raise Refusal("precondition:histogram-runs", "need >= 2 runs at distinct beta with the same named seeds")

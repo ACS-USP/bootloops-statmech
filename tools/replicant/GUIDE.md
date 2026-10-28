@@ -880,14 +880,17 @@ arXiv:cond-mat/0701672, Sec. III: F0 = 1, F halved when every level has H > 0 at
 "some fixed sweeps"; 10 is this package's choice), F = 1/t once F <= 1/t, t = trial moves / levels) or
 `wang_landau` (WL's 80% flatness, f -> sqrt f); the energy range is discovered (a new level gets the S of its
 visited neighbours and, past the first stage, restarts the walker's schedule; a walker leaves its first stage only
-after no new level for half its MC time: this package's rules, WL and BP assume a known range); ln g(ground) = ln 2 (WL); status "converged" (every walker reached F_final within t_max and all visited
+after no new level for half its MC time, so a restart at MC time t_r holds F = 1 until 2 t_r and a discovery after
+t_max / 2 leaves the walker undetermined: this package's rules, WL and BP assume a known range); ln g(ground) = ln 2 (WL); status "converged" (every walker reached F_final within t_max and all visited
 the same levels, the ground among them) or "undetermined". The 1/t estimate has a finite-time systematic bias at the
 rarest (edge) levels, ln g low by O(1/t) (resolved on 640 walkers at t = 1000 on 4 x 4: tests/test_mc_flat_slow.py;
-WL's PRE 64, 056101 reports the same boundary effect). Multicanonical (`montecarlo/multicanonical.py`): weights
+WL's PRE 64, 056101 report a related edge effect of the original algorithm in restricted energy windows). Multicanonical (`montecarlo/multicanonical.py`): weights
 exp(-S_WL) of each seed (Berg, arXiv:cond-mat/9909236, Eqs. (1.5)-(1.8); Berg & Neuhaus, arXiv:hep-lat/9202004, Eq.
-(7)), canonical u, C, <|m|> at any beta by Berg's Eq. (2.15) (exact given the weights, so they do not inherit the WL
-error); window rule: the canonical law the weights predict may put at most 10^-3 of its mass on levels some seed visited
-fewer than 20 times, else `precondition:reweight-window`. Ferrenberg-Swendsen (`montecarlo/reweight.py`; the 1988 /
+(7)), canonical u, C, <|m|> at any beta by Berg's Eq. (2.15) (exact given the weights, Berg: they do not inherit the WL
+error, tested: on 3 x 3 (default) and 4 x 4 (slow) the WL canonical estimate is resolved as biased in the bands the
+multicanonical one passes); window rule: the canonical law the weights predict may put at most 10^-3 of its mass on
+levels some seed visited fewer than 20 times; an explicitly requested beta there is refused `precondition:reweight-window`,
+the run path's default beta is labelled `muca_status` undetermined (as is a WL run that has not reached the ground level). Ferrenberg-Swendsen (`montecarlo/reweight.py`; the 1988 /
 1989 PRLs not fetched, the equations as printed by Kumar, Bouzida, Swendsen, Kollman & Rosenberg, J. Comput. Chem. 13,
 1011 (1992), Eqs. (17)-(20), (22)): single histogram e^{-(beta - beta0) E}; multiple histogram with g_k = 2 tau_int,k,
 the f_m iterated from 0 per seed; reliable window (this package's rule): the overlap O(beta) = sum_E min(p0, p_beta) of
@@ -909,17 +912,19 @@ iff the band's upper edge < -1/4, the midpoint of BP's t^{-1/2} and saturation),
 and 38/40), F = t^-2 (slope 40/40), a wrong flatness criterion (max H >= 0.8 <H>: slope 40/40); the fixed-weight walk's
 stationarity chi^2 from 20000 exact multicanonical draws (alpha = 0.01; a 5% acceptance error rejected 39/40, 37/40) and
 ergodicity chi^2 (planted: only half the sites proposed); multicanonical u, C, <|m|> at four beta against the exact
-values, a planted reweighting factor w^{-0.9}; FS on exact iid canonical draws (4 x 4): single histogram (a 10% factor
+values over 16 seeds, the WL canonical estimate resolved as biased in the same bands (38/40), and so the planted
+multicanonical-histogram drop (the estimate becomes the WL one) and a factor w^{-0.9} fail; FS on exact iid canonical draws (4 x 4): single histogram (a 10% factor
 error rejected 38/40), multiple histogram (unsolved free energies rejected 40/40), the window refusals; slow: WL at L = 4,
-8, 12 and 16 against the exact g(E), the edge bias resolved and decaying, the slopes printed with BP's -0.488(8) (Fig. 3,
+8, 12 and 16 against the exact g(E), the edge bias resolved and decaying, the multicanonical estimate free of it on
+4 x 4 where the WL canonical one is resolved as biased (20/20 seed sets), the slopes printed with BP's -0.488(8) (Fig. 3,
 L = 8; `reference/wang_landau_mc.json`, unclaimed), multicanonical on 8 x 8, FS with Metropolis (L = 8, 16) and SW (L = 8)
 chains against Kaufman inside the window, the overlap and Kish n_eff printed beyond it. Examples: `run wang_landau_mc
 --route sample` (4 x 4, 8 seeds x 8 walkers, 1/t to F = 1/1000, multicanonical at beta_c); `run wang_landau_mc --route
 sample --param L=8 --param t_max=20000 --param F_final=1/16000 --param muca_sweeps=4000 --param muca_burn_in=400` (with
-the default 400 sweeps the multicanonical energy drifts at L = 8 and is labelled undetermined); `run histogram_reweighting_mc --route sample` (SW 8 x 8, about 30 s); `run histogram_reweighting_mc --route sample --param
+the default 400 sweeps the multicanonical energy drifts at L = 8 and is labelled undetermined); `run histogram_reweighting_mc --route sample` (SW 8 x 8, about 2 s); `run histogram_reweighting_mc --route sample --param
 algorithm=metropolis --param L=16 --param sweeps=20000 --param burn_in=2000` (single and multiple histogram near beta_c).
 Planted hooks: `flat_walk._HOOKS["acceptance_power" | "sites"]`, `wang_landau._HOOKS["flatness" | "time_exponent"]`,
-`multicanonical._HOOKS["weight_power"]`, `reweight._HOOKS["factor_scale" | "free_energies"]`.
+`multicanonical._HOOKS["weight_power" | "histogram"]`, `reweight._HOOKS["factor_scale" | "free_energies"]`.
 `from replicant.bounds import ...` (E10; needs python-flint and `tools/baller`; SK conventions of
 families/sk.py, P = -beta f; parameters are taken as the exact rationals they denote, an mpf or float its
 exact binary value): `guerra_rs_bound(beta, h, q, digits=40)` -> `Ball`; `guerra_rs_best_bound(beta, h=0,

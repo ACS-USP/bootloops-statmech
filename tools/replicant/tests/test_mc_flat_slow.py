@@ -121,6 +121,7 @@ def test_error_saturation_and_its_slope():
 @slow
 def test_multicanonical_on_the_8x8_torus():
     r = _wl(8, 16000, snaps=(4000, 16000))
+    assert r.status == "converged", r.text          # determined weights only (an undetermined run feeds no band)
     m = MU.muca_run(8, r.per_seed, r.k, r.seeds, 8, 2000, 200)
     assert m.status == "equilibrated", m.text
     betas = (0.2, 0.3, BETA_C, 0.5, 0.7)
@@ -150,6 +151,43 @@ def test_multicanonical_on_the_8x8_torus():
     finally:
         FW._HOOKS["acceptance_power"] = saved
         assert FW._HOOKS["acceptance_power"] is saved
+
+
+@slow
+def test_multicanonical_does_not_inherit_the_wl_bias():
+    """4 x 4 torus, 32 seeds x 8 walkers: WL (1/t) to t = 1000, then 400 multicanonical sweeps.  At beta = 0.2, 0.3,
+    beta_c, 0.6, 1.0 the multicanonical u and C lie in Bonferroni 99% bands (10 comparisons) while the WL canonical
+    estimate from ln g alone is resolved outside some band; dropping the multicanonical histogram (planted) gives that
+    WL estimate, so it fails.  Measured on 20 sets of 32 seeds (100-739): multicanonical 20/20 pass, WL canonical
+    20/20 resolved as biased."""
+    seeds = tuple(range(2000, 2032))
+    r = WL.wang_landau(4, seeds, 8, "one_over_t", 1125, "1/1000")
+    assert r.status == "converged", r.text
+    m = MU.muca_run(4, r.per_seed, r.k, seeds, 8, 400, 40)
+    assert m.status == "equilibrated", m.text
+    betas = (0.2, 0.3, BETA_C, 0.6, 1.0)
+    t = ST.t_quantile(1 - 0.01 / (2 * 2 * len(betas)), len(seeds) - 1)
+    z_mu, z_wl = [], []
+    for b in betas:
+        ex = DX.exact_canonical(4, mp.mpf(b))
+        rw = MU.reweight(m, b)
+        cs = [DX.canonical(r.E, row, b, 16) for row in r.per_seed]
+        for k, wl in (("u", [c.u for c in cs]), ("C", [c.C for c in cs])):
+            bw = ST.band(wl)
+            z_mu.append((rw.bands[k].mean - getattr(ex, k)) / rw.bands[k].stderr)
+            z_wl.append((bw.mean - getattr(ex, k)) / bw.stderr)
+    print(f"Bonferroni t {t:.2f}; multicanonical z {np.round(z_mu, 1).tolist()}; WL canonical z "
+          f"{np.round(z_wl, 1).tolist()}")
+    assert max(abs(z) for z in z_mu) <= t and max(abs(z) for z in z_wl) > t
+    saved = MU._HOOKS["histogram"]
+    MU._HOOKS["histogram"] = "drop"
+    try:
+        dropped = [MU.reweight(m, b) for b in betas]
+    finally:
+        MU._HOOKS["histogram"] = saved
+        assert MU._HOOKS["histogram"] is saved
+    assert any(abs(rw.bands[k].mean - getattr(DX.exact_canonical(4, mp.mpf(b)), k)) > t * rw.bands[k].stderr
+               for rw, b in zip(dropped, betas) for k in ("u", "C"))
 
 
 @lru_cache(maxsize=None)
@@ -209,17 +247,19 @@ def test_histogram_reweighting_with_canonical_chains():
                 print(f"  beyond the window: beta = {far:.5f}, overlap {RW.overlap(es, BETA_C, far):.3f}, Kish "
                       f"n_eff / n {kish:.3g}, u = {bd.mean:.5f} +- {bd.half_width:.5f} vs Kaufman {u_far:.5f}")
         # multiple histogram across beta_c
-        runs, oks = [], []
+        runs, oks, taus = [], [], []
         for tag, b in enumerate((BETA_C - 2 * (BETA_C - lo), BETA_C, BETA_C + 2 * (hi - BETA_C)), start=1):
             es_b, ok_b, tau_b, _ = chain(L, b, n, n // 10, tag)
             runs.append((b, es_b))
             oks.append(ok_b)
+            taus.append(tau_b)
         if not all(oks):
             print(f"{name} L = {L}: a multiple-histogram run is undetermined, not compared")
             continue
         grid = np.linspace(runs[0][0], runs[-1][0], 5)
         for rw, b in zip(RW.multiple_histogram(runs, tuple(grid), L * L), grid):
-            good, want = _inside(rw, b, L, n, tau, 2 * grid.size)
+            near = taus[int(np.argmin([abs(b - bm) for bm, _ in runs]))]    # tau_int of the run nearest this beta
+            good, want = _inside(rw, b, L, n, near, 2 * grid.size)
             print(f"{name} L = {L}: {rw.text}; Kaufman u = {want[0]:.6f}, C = {want[1]:.5f}")
             assert good, (name, L, b, rw.text, want)
     assert compared >= 2, compared

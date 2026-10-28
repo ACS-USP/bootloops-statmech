@@ -6,8 +6,9 @@ Route sample (statistical):
                     stderr over seeds; ln g(ground) = ln 2), and from it ln Z / N, u, C at beta; wl_status
                     "converged" or "undetermined"; beta_c (exact-by-literature, the default beta)
   multicanonical    walkers with the fixed weights exp(-S_WL(E)) of each seed (montecarlo/multicanonical.py), u, C
-                    and <|m|> at beta by Berg's Eq. (2.15); a beta outside the window rule is refused
-                    precondition:reweight-window; muca_status "equilibrated" or "undetermined"
+                    and <|m|> at beta by Berg's Eq. (2.15); an explicit beta outside the window rule is refused
+                    precondition:reweight-window, the default beta there labelled; muca_status "equilibrated" or
+                    "undetermined" (also when the WL run has not reached the ground level: no multicanonical run)
   exact-targets     printed, never refusing (a correct sampler is not refused at runtime): Kaufman's torus u, C at
                     beta (L <= 64), the exact g(E) of montecarlo/dos_exact.py (L <= 12 here) with the ln g error
                     profile, <|m|> by enumeration (L <= 4)
@@ -36,8 +37,10 @@ CAVEAT = ("sample route, statistical: Wang-Landau walkers and multicanonical wal
           "+- stderr; never certified, never final; wl_status / muca_status 'undetermined' when a walker missed "
           "F_final or a level, or the multicanonical energy drifts.  The 1/t estimate carries a finite-time "
           "systematic bias at the rarest (edge) levels, ln g underestimated by O(1/t) (measured in "
-          "tests/test_mc_flat_slow.py; Wang & Landau's PRE 64, 056101 reports the same boundary effect), larger "
-          "than the seed stderr when many walkers are averaged; the multicanonical averages do not inherit it")
+          "tests/test_mc_flat_slow.py; Wang & Landau's PRE 64, 056101 report a related edge effect of the original "
+          "algorithm in restricted energy windows), larger than the seed stderr when many walkers are averaged; the "
+          "multicanonical averages do not inherit it (tested: on 4 x 4 the WL canonical estimate is resolved as biased "
+          "where the multicanonical one is not, tests/test_mc_flat_slow.py)")
 STAT = ("energy_per_site_wl", "specific_heat_wl", "ln_z_per_site_wl", "energy_per_site_muca", "specific_heat_muca",
         "abs_magnetisation_muca")
 DEFAULTS = {"L": 4, "seeds": tuple(range(8)), "walkers": 8, "schedule": "one_over_t", "t_max": 4000,
@@ -112,16 +115,22 @@ def _muca(p):
     from .montecarlo.multicanonical import reweight
     g = _p(p)
     key = (g["L"], g["seeds"], g["walkers"], g["schedule"], g["t_max"], g["F_final"])
+    if 0 not in set(int(x) for x in _wl_of(g).k):     # no ground level to start from: labelled, not refused
+        why = "UNDETERMINED: the Wang-Landau run has not visited the ground level, no multicanonical run"
+        return Out({"muca_status": "undetermined", "muca_summary": why}, why, notes=(why,))
     m = _muca_run(key, g["muca_sweeps"], g["muca_burn_in"])
-    rw = reweight(m, g["beta_f"])
+    explicit = "beta" in p                    # an explicit out-of-window request is refused; the default is labelled
+    rw = reweight(m, g["beta_f"], enforce=explicit)
     vals, errs, hw = _band_out({"energy_per_site": rw.per_seed["u"], "specific_heat": rw.per_seed["C"],
                                 "abs_magnetisation": rw.per_seed["abs_m"]}, "_muca")
-    status = m.status if _wl_of(g).status == "converged" else "undetermined"
+    status = m.status if _wl_of(g).status == "converged" and rw.in_window else "undetermined"
     vals.update(muca_status=status, muca_summary=m.text, reweight_summary=rw.text)
     return Out(vals, f"{m.text}; {rw.text}", errors=errs, statistical=tuple(k for k in vals if k.endswith("_muca")),
                notes=(f"multicanonical: {m.text}; 99% Student-t half-widths over seeds: {hw}",
                       f"reweighting (Berg Eq. (2.15)): {rw.text}"
-                      + ("; UNDETERMINED: the Wang-Landau weights did not converge" if status != m.status else "")))
+                      + ("; UNDETERMINED: the Wang-Landau weights did not converge" if _wl_of(g).status != "converged"
+                         else "") + ("" if rw.in_window else "; UNDETERMINED: the default beta is outside the "
+                                     "multicanonical window (an explicit beta there is refused)")))
 
 
 def _exact(p):

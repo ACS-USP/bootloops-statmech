@@ -15,7 +15,8 @@ Window rule (Berg below Eq. (2.15): "re-weighting ... can only work in a tempera
 histogram includes the canonical histogram"), stated here: beta is reliable iff the canonical law the weights
 predict, P_w(E) ~ e^{S_WL(E) - beta E}, puts at most MASS_MAX = 10^-3 of its mass on levels some seed visited
 fewer than H_MIN = 20 times (a count's relative error 1/sqrt(20) ~ 0.22); otherwise precondition:reweight-window
-(an input-validity refusal).
+(an input-validity refusal; reweight(..., enforce=False) returns the estimate with in_window False instead, which the
+catalog run path labels undetermined when beta was not requested explicitly).
 Status "equilibrated" iff every seed's walkers visited every level and stats.equilibration of the per-sweep
 energy (one trace per seed: the mean over its walkers) shows no drift; else "undetermined".
 
@@ -24,7 +25,9 @@ energy (one trace per seed: the mean over its walkers) shows no drift; else "und
   stationarity_chi2(L, ln_g, samples, seed, alpha) / ergodicity_chi2(L, ln_g, chains, sweeps, seed, alpha) -> Chi2
       against the exact law pi(s) ~ exp(-ln_g(E(s))) over exact_small's classes (L <= 4): one sweep (N random-site
       proposals) applied to `samples` exact draws; or `chains` walkers from all +1 after `sweeps` sweeps
-_HOOKS["weight_power"] (1.0; planted e.g. 0.9: the reweighting factor w_mu^{-0.9}, a wrong reweighting factor).
+_HOOKS["weight_power"] (1.0; planted e.g. 0.9: the reweighting factor w_mu^{-0.9}, a wrong reweighting factor);
+_HOOKS["histogram"] ("use"; planted "drop": the multicanonical histogram left out, so the estimate is the canonical
+law of the weights themselves, e^{S_WL - beta E}: the WL estimate, not a multicanonical one).
 Second stream: the multicanonical walkers of seed s draw from numpy default_rng((s, MUCA_STREAM)), not WL's stream.
 """
 from dataclasses import dataclass
@@ -36,7 +39,7 @@ from . import stats as ST
 from .flat_walk import Walkers
 
 MUCA_STREAM = 0x4D55
-_HOOKS = {"weight_power": 1.0}
+_HOOKS = {"weight_power": 1.0, "histogram": "use"}
 H_MIN = 20
 MASS_MAX = 1e-3
 
@@ -64,6 +67,7 @@ class Reweighted:
     per_seed: dict          # "u", "C", "abs_m" -> tuple over seeds
     bands: dict
     mass_poor: float
+    in_window: bool
     text: str
 
 
@@ -110,19 +114,23 @@ def _logp(a):
     return p / p.sum(axis=-1, keepdims=True)
 
 
-def reweight(run, beta, conf=0.99):
+def reweight(run, beta, conf=0.99, enforce=True):
+    """enforce: refuse a beta outside the window (an explicit request); False: return the estimate with
+    in_window False, for the caller to label undetermined (the run path's default beta)."""
     b = float(beta)
     N = run.L * run.L
     E = run.E.astype(float)
     pred = _logp(run.ln_w - b * E)                       # P_w per seed
     poor = (run.H < H_MIN).any(axis=0)
     mass = float(pred[:, poor].sum(axis=1).max()) if poor.any() else 0.0
-    if mass > MASS_MAX:
+    inside = mass <= MASS_MAX
+    if not inside and enforce:
         raise Refusal("precondition:reweight-window", f"beta = {b:.6g}: the weights put {mass:.3g} > {MASS_MAX:g} of "
                       f"the canonical mass on levels visited fewer than {H_MIN} times (E = "
                       f"{run.E[poor].tolist()}); outside the multicanonical run's reliable window")
     with np.errstate(divide="ignore"):
-        P = _logp(np.log(run.H) + _HOOKS["weight_power"] * run.ln_w - b * E)   # Berg Eq. (2.15), level histogram
+        lh = np.log(run.H) if _HOOKS["histogram"] == "use" else 0.0 * run.H
+        P = _logp(lh + _HOOKS["weight_power"] * run.ln_w - b * E)   # Berg Eq. (2.15), level histogram
     u = P @ E
     var = (P * (E[None, :] - u[:, None]) ** 2).sum(axis=1)
     mbar = np.where(run.H > 0, run.msum / np.maximum(run.H, 1), 0.0) / N
@@ -130,8 +138,8 @@ def reweight(run, beta, conf=0.99):
     bands = {key: ST.band(v, conf) for key, v in per.items()}
     text = (f"beta = {b:.6g}: u = {bands['u'].mean:.6g} +- {bands['u'].half_width:.2g}, C = {bands['C'].mean:.5g} +- "
             f"{bands['C'].half_width:.2g} ({conf:.0%} Student-t over {len(run.seeds)} seeds); predicted mass on poorly "
-            f"visited levels {mass:.2g} (rule: <= {MASS_MAX:g})")
-    return Reweighted(b, per, bands, mass, text)
+            f"visited levels {mass:.2g} (rule: <= {MASS_MAX:g})" + ("" if inside else ": OUTSIDE the window"))
+    return Reweighted(b, per, bands, mass, inside, text)
 
 
 # ---- detailed balance and ergodicity of the fixed-weight walk ------------------------------------------------

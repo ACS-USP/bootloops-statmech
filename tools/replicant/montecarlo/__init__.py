@@ -9,7 +9,7 @@
   metropolis.py    checkerboard single-spin-flip Metropolis for the 2D Ising model (the local baseline)
   run.py           runs over named seeds and their statistics
   fk_percolation.py  the FK machinery at q = 1 is bond percolation: P2's exact crossing polynomial
-  dos_exact.py     M2: the exact g(E) of the Ising torus (Kaufman's integer polynomial, L <= 16) and its canonical averages
+  dos_exact.py     M2: the exact g(E) of the Ising torus (Kaufman's integer polynomial, L <= 16), canonical averages
   flat_walk.py     M2: the single-spin-flip walk in energy shared by Wang-Landau and the multicanonical run
   wang_landau.py   M2: Wang-Landau (original and 1/t schedules), the ln g error profile and the error-against-time slope
   multicanonical.py  M2: multicanonical runs with WL weights, reweighting to beta, the fixed-weight chi^2 tests

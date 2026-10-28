@@ -16,7 +16,9 @@ walk a known energy range; here the range is discovered.  A new level (found by 
 S(new) = the largest S of the walker's visited levels within 2 of it (the levels it can have been entered from; a
 new level at S = 0 would trap the walk there, every move out refused); a walker past its first stage (F < F0 or in
 the 1/t phase) also restarts its schedule: F = F0, H = 0, the 1/t phase left.  To make late discoveries rare, a
-walker leaves its first stage (F = F0) only when it has found no new level for the last half of its MC time.  These
+walker leaves its first stage (F = F0) only when it has found no new level for the last half of its MC time, so a
+restart at MC time t_r holds F = F0 until 2 t_r (a discovery after t_max / 2 leaves the walker undetermined; its
+initial error then decays as 1/t, the order of the intrinsic 1/t bias).  These
 rules are this package's, stated; restarts are counted per walker (WLRun.restarts).
 Check period: every `check_every` MC time (BP give "some fixed sweeps (i.e., 1000 MC time)"; the default 10
 here is this package's choice, stated, so the 1/t phase starts within ~100 MC time at L <= 12).
@@ -157,8 +159,8 @@ def wang_landau(L, seeds, walkers=8, schedule="one_over_t", t_max=10 ** 4, F_fin
         Hm, S2 = H.reshape(R, K), S.reshape(R, K)
         new = (Hm > 0) & ~vis & ~done[:, None]
         if new.any():                       # the range grew (module docstring)
-            near = np.where(vis, S2, -np.inf)
-            near = np.max([np.roll(near, d, axis=1) for d in (-2, -1, 1, 2)], axis=0)   # visited levels within 2
+            pad = np.pad(np.where(vis, S2, -np.inf), ((0, 0), (2, 2)), constant_values=-np.inf)
+            near = np.max([pad[:, 2 + d:2 + d + K] for d in (-2, -1, 1, 2)], axis=0)   # visited levels within 2
             S2[new] = np.maximum(S2[new], near[new])
             grew = new.any(axis=1) & ((F < F0) | late)   # a walker past its first stage restarts its schedule
             F, late = np.where(grew, F0, F), late & ~grew
