@@ -68,8 +68,21 @@ ROUTES = {"replica": "replica method: replicated partition function Z^n, disorde
           "online": "online learning: the N -> oo order-parameter ODEs in alpha = examples / N, from "
                     "Gaussian averages over the local fields, integrated, and checked against finite-N "
                     "simulation over named seeds",
-          "sample": "finite-graph sampling: random graphs over named seeds, percolated and labelled by "
-                    "union-find; means +- stderr (statistical, never certified)"}
+          "sample": "sampling over named seeds: finite graphs or lattices, or Markov chains; means +- "
+                    "stderr (statistical, never certified)"}
+# the sample route's text per model family (ROUTES["sample"] for any other family)
+SAMPLE_BY_FAMILY = {"percolation": "finite-graph sampling: random graphs or lattices over named seeds, "
+                                   "percolated and labelled by union-find; means +- stderr (statistical, "
+                                   "never certified)"}
+_MC = ("Markov-chain Monte Carlo over named seeds (cluster, flat-histogram, histogram-reweighting or "
+       "population-annealing chains); means +- stderr (statistical, never certified)")
+SAMPLE_BY_FAMILY.update(potts=_MC, ising=_MC)
+
+
+def route_text(res, spec):
+    if res.route == "sample" and spec is not None and spec.family in SAMPLE_BY_FAMILY:
+        return SAMPLE_BY_FAMILY[spec.family]
+    return ROUTES.get(res.route, res.route)
 
 
 def _block(b: TexBlock, bib):
@@ -217,7 +230,7 @@ def _result_body(res, bib, extra, slow):
            (prose(res.entry.description) + " " + bib.cite(res.entry.cite) + "\n\n"
             if res.entry else "") + _blocks(_model_blocks(res), bib)]
     out.append(f"\\section{{Method and route}}\nRoute: \\textbf{{{escape(res.route)}}} "
-               f"({prose(ROUTES.get(res.route, res.route))}). Rigor: "
+               f"({prose(route_text(res, spec))}). Rigor: "
                f"\\textbf{{{prose(res.rigor)}}}. {prose(_caveat(res))}\n")
     if res.report is not None and res.report.kind == "composed":
         out.append("\\subsection{Reused and adapted steps}\n" +

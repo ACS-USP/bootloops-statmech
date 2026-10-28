@@ -312,6 +312,11 @@ def test_statistical_and_physics_labels_present():
             (name, route)
         if rigor == "certified":
             assert "(certified ball)" in doc, (name, route)
+        if route == "sample":          # final review I-4: the route text is true for the entry's family
+            head = next(l for l in doc.splitlines() if l.startswith("Route: ")).split("). Rigor:")[0]
+            mc = catalog()[name].spec.family != "percolation"
+            assert ("percolated" in head) != mc and ("union-find" in head) != mc, (name, head)
+            assert ("Markov-chain" in head) == mc, (name, head)
     vb = compose(catalog()["viana_bray"].spec, "cavity").run(
         beta="0.8", pop=200, sweeps=4, burn_in=4, runs=2, seed=3)
     doc = render_latex(vb)
