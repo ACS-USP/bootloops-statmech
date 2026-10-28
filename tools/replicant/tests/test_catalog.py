@@ -33,7 +33,7 @@ ROUTES = {"rem": {"replica"}, "sk": {"replica", "cavity", "amp"}, "pspin": {"rep
           "percolation_lattice": {"exact", "sample"}, "percolation_kcore": {"cavity", "sample"},
           "percolation_bootstrap": {"cavity", "sample"}, "cluster_mc": {"sample"},
           "wang_landau_mc": {"sample"}, "histogram_reweighting_mc": {"sample"},
-          "population_annealing_mc": {"sample"}}
+          "population_annealing_mc": {"sample"}, "dense_memory": {"replica"}, "dense_memory_ising": {"replica"}}
 
 
 def _bank_keys():

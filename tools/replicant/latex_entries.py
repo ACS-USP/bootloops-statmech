@@ -362,7 +362,8 @@ def derivation(name, route):
     if name in ("xorsat", "ksat"):
         from . import latex_csp
         return getattr(latex_csp, name)(route)
-    mod = {"ldpc_bec": "inference", "series_ising2d": "series", "ridge": "learning",
+    mod = {"ldpc_bec": "inference", "series_ising2d": "series", "ridge": "learning", "dense_memory": "dense_memory",
+           "dense_memory_ising": "dense_memory",
            "spiked_wigner": "spiked_sbm", "sbm": "spiked_sbm", "ising2d": "lattice", "ising1d": "lattice",
            "bethe_ising": "lattice", "ising2d_anisotropic": "lattice_geom", "ising_triangular":
            "lattice_geom", "ising_honeycomb": "lattice_geom", "sk_bounds": "bounds", "online_perceptron": "online",

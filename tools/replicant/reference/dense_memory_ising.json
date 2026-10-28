@@ -1,0 +1,20 @@
+{
+  "fixed_points_radius0": {
+    "value": "0.346573590279972654708616060729",
+    "tol": "1e-25",
+    "cite": "Ising dense memory with F(x) = e^x: all patterns are fixed points of the single-flip dynamics with probability -> 1 for alpha < I(1)/2 = log(2)/2: Demircigil, Heusel, Lowe, Upgang & Vermet, 'On a model of associative memory with huge storage capacity', J. Stat. Phys. 168, 288 (2017), arXiv:1702.01929v2 (PDF read; journal version not checked), Remark 1.4 (Thm 1.3 at rho = 0). Convention (their Sec. 1): N Ising neurons, M = e^(alpha N) + 1 patterns uniform on {-1,+1}^N, interaction F(x) = e^x (lam = 1), single-flip dynamics T_i of their Eq. (1); I(x) = ((1+x) log(1+x) + (1-x) log(1-x))/2. A printed number.",
+    "independent_route": "the birthday count of pattern pairs within Hamming distance rho*N: (1/N) log of the exact binomial tail sum_{k<=rho N} C(N,k)/2^N from log-gamma at N up to 2e6 tends to -I(1-2 rho) (dense_memory/ising.py, tests/test_dense_memory.py); and exact simulation of the single-flip dynamics at N = 16, 20 (sim.ising_flip_trial): in every sampled instance with no two patterns within Hamming distance 1 all patterns are fixed points, and instances with such a pair mostly are not"
+  },
+  "fixed_points_radius0p1": {
+    "value": "0.184032103584248534955341046617",
+    "tol": "1e-25",
+    "cite": "Ising dense memory with F(x) = e^x: errors on a Hamming sphere of radius rho N = 0.1 N are corrected for alpha < I(1 - 2 rho)/2 = I(0.8)/2: Demircigil, Heusel, Lowe, Upgang & Vermet, 'On a model of associative memory with huge storage capacity', J. Stat. Phys. 168, 288 (2017), arXiv:1702.01929v2 (PDF read; journal version not checked), Thm 1.3. Convention (their Sec. 1): N Ising neurons, M = e^(alpha N) + 1 patterns uniform on {-1,+1}^N, interaction F(x) = e^x (lam = 1), single-flip dynamics T_i of their Eq. (1); I(x) = ((1+x) log(1+x) + (1-x) log(1-x))/2. The source gives a formula, not a number: the value is the formula evaluated in exact arithmetic (sympy) at the stated point.",
+    "independent_route": "the birthday count of pattern pairs within Hamming distance rho*N: (1/N) log of the exact binomial tail sum_{k<=rho N} C(N,k)/2^N from log-gamma at N up to 2e6 tends to -I(1-2 rho) (dense_memory/ising.py, tests/test_dense_memory.py); and exact simulation of the single-flip dynamics at N = 16, 20 (sim.ising_flip_trial): in every sampled instance with no two patterns within Hamming distance 1 all patterns are fixed points, and instances with such a pair mostly are not"
+  },
+  "fixed_points_radius0p25": {
+    "value": "0.0654060179705684795646009031169",
+    "tol": "1e-25",
+    "cite": "Ising dense memory with F(x) = e^x: errors on a Hamming sphere of radius rho N = 0.25 N are corrected for alpha < I(0.5)/2: Demircigil, Heusel, Lowe, Upgang & Vermet, 'On a model of associative memory with huge storage capacity', J. Stat. Phys. 168, 288 (2017), arXiv:1702.01929v2 (PDF read; journal version not checked), Thm 1.3. Convention (their Sec. 1): N Ising neurons, M = e^(alpha N) + 1 patterns uniform on {-1,+1}^N, interaction F(x) = e^x (lam = 1), single-flip dynamics T_i of their Eq. (1); I(x) = ((1+x) log(1+x) + (1-x) log(1-x))/2. The source gives a formula, not a number: the value is the formula evaluated in exact arithmetic (sympy) at the stated point.",
+    "independent_route": "the birthday count of pattern pairs within Hamming distance rho*N: (1/N) log of the exact binomial tail sum_{k<=rho N} C(N,k)/2^N from log-gamma at N up to 2e6 tends to -I(1-2 rho) (dense_memory/ising.py, tests/test_dense_memory.py); and exact simulation of the single-flip dynamics at N = 16, 20 (sim.ising_flip_trial): in every sampled instance with no two patterns within Hamming distance 1 all patterns are fixed points, and instances with such a pair mostly are not"
+  }
+}

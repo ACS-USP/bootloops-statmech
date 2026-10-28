@@ -372,6 +372,7 @@ def catalog() -> dict:
     if not _CATALOG:
         from .catalog_bounds import bounds_entries
         from .catalog_csp import csp_entries
+        from .catalog_dense_memory import dense_memory_entries
         from .catalog_entries import dense_entries
         from .catalog_inference import inference_entries
         from .catalog_lattice import lattice_entries
@@ -386,7 +387,7 @@ def catalog() -> dict:
         for e in (dense_entries() + sparse_entries() + csp_entries() + inference_entries()
                   + learning_entries() + series_entries() + lattice_entries() + bounds_entries()
                   + online_entries() + percolation_entries() + [percolation_lattice()] + kcore_entries()
-                  + mc_entries()):
+                  + mc_entries() + dense_memory_entries()):
             _CATALOG[e.name] = e
     return dict(_CATALOG)
 

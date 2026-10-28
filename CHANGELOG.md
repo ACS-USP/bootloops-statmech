@@ -141,7 +141,20 @@ All notable changes to BootLoops are recorded here. The format follows
   (Hukushima-Iba as described by Machta and Wang-Machta-Katzgraber; free energy against Kaufman and exact enumeration,
   family diagnostics, the finite-R bias and its corrections), all route `sample`, statistical, unequilibrated runs
   labelled `undetermined`; a shared statistics module (tau_int, binning, jackknife, Student-t bands, equilibration
-  diagnostic, chi^2). Default tier +0.5 s (ruling: <= 1 s).
+  diagnostic, chi^2). Default tier +0.5 s (ruling: <= 1 s).- `replicant` (D1): dense associative memories with exponentially many patterns (`dense_memory/`, entries `dense_memory` and
+  `dense_memory_ising`, route replica, 38 entries in all). `dense_memory` reproduces Lucibello & Mezard (PRL 132, 077301, arXiv:2304.14964)
+  for Gaussian and spherical patterns: the Random Energy Model noise of the softmax denominator by a seven-step label-replica
+  derivation (`derive_dense_memory.py`, reusing `families/rem.py`) and by three further routes agreeing to 1e-30, the REM freezing line
+  and Parisi parameter, the single-pattern threshold alpha_1(lam) and its inverse lambda_1(alpha), the all-patterns bound (Gaussian
+  log(2)/4 for lam >= 0.70091, spherical alpha_c = alpha_1), one-step basins, the small-load and scaled-dot-product regimes and the
+  Ramsauer bound as restated there; 17 banked values from the printed formulas and numbers. `dense_memory_ising` takes Demircigil et
+  al.'s rigorous fixed-point exponent I(1 - 2 rho)/2 (log(2)/2, lam = 1) and derives the binary REM noise and the single-flip
+  thresholds (labelled not-computed). Independent checks: the exact finite-N overlap law (agreeing with `rem_quenched_finite_n` at
+  alpha = log 2), the paper's gradient descent, the single-flip dynamics, Gray-code enumeration; planted controls fail. Polynomial
+  interactions are refused `unsupported:interaction`; a finite-temperature free energy of the memory is not in the paper and is not
+  claimed. `dense_memory/MAPPING_INFONCE.md` maps the model to InfoNCE (lam = 1/(tau d)) and states what it does not say about the
+  critical n(d, tau) and the per-query threshold c(d) tau.
+
 ### Changed
 - `replicant` (documentation and cleanup, O7): GUIDE (catalog, refusal table, routes, finality notes, hazards,
   every worked example re-run literally on a clean export), README, REFERENCES (every source of the four plans
