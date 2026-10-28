@@ -127,11 +127,17 @@ def test_family_statistics_reproduce_wmks_exponential_values():
 # ---- the free energy against exact ln Z -------------------------------------------------------------------------
 def test_free_energy_and_energy_match_the_exact_targets_and_the_plants_fail():
     """R = 600, 10 temperatures, 1 sweep, seeds 0-7; all five runs equilibrated (asserted, so the band is fed by
-    determined runs only).  Measured on 200 disjoint 8-seed sets (seeds 100-1699): unplanted 5/200 rejected (2.5%
-    against the nominal family-wise 1%; one set of seeds 1404-1411 gave t = -15 on the Gaussian matrix #0, eight
-    trajectories that are distinct but end within 0.005 of each other), 0/200 undetermined.  The plants are run on
-    the Gaussian matrix #0 alone (a family of its two comparisons); measured on the sets 100-419: reweighting factor
-    x 0.97 rejected 40/40 (x 0.99: 11/40), resampling missing 40/40; the same on the +-J matrix #0."""
+    determined runs only; the margin is thin on the torus: the smallest R~ / rho_t over 4000 seeds is 104.9 against
+    the threshold 100, so a change of schedule or sweeps may fail the label assert before the band).  Calibration
+    (the reviewer's 500 disjoint 8-seed sets, seeds 100-4099, which contain my first 200): unplanted 6/500 rejected,
+    1.2% (binomial 95% interval about 0.4-2.6%), consistent with the nominal family-wise 1%.  ln Z~ is Gaussian
+    over seeds (|skew| <= 0.07) and the within-set variance follows chi^2_7 / 7 (KS p = 0.40), so the set 1404-1411
+    (t = -15, its eight values within 0.005) is a chance small-s tail of Student-t on 8 seeds (about 4e-6 per set),
+    not a defect.  The plants are run on the Gaussian matrix #0 alone (a family of its two comparisons); measured on
+    the sets 100-419: reweighting factor x 0.97 rejected 40/40 (x 0.99: 11/40), resampling missing 40/40; the same
+    on the +-J matrix #0.  Not resolved here: a normalisation error below about 0.05 in total ln Z (e.g. Q divided by
+    R~ + 1, ln Z~ low by about 0.017, about 1 stderr); that is caught exactly by
+    test_the_normalisation_is_the_mean_at_the_run_s_own_population_size."""
     rows = _comparisons(_systems())
     assert all(st == "equilibrated" for *_, st in rows), rows
     assert _joint_ok(rows), rows
@@ -141,13 +147,16 @@ def test_free_energy_and_energy_match_the_exact_targets_and_the_plants_fail():
         assert not _joint_ok(bad), (key, bad)
 
 
-def test_finite_population_bias_is_resolved_and_removed():
-    """WMK Eqs. (15), (16): one run's ln Z~ is biased low by var(beta F~)/2 + higher cumulants.  At R = 5 (Gaussian
-    SK N = 16, beta = 2, 10 temperatures, 1 sweep, 256 seeds 1000-1255) the simple mean's 99% band lies below the
-    exact ln Z, while mean + s^2/2 (jackknifed over seeds) and Machta's weighted average (Eq. (7), jackknifed) cover
-    it.  Measured on 20 disjoint 256-seed sets: simple band below 20/20; s^2/2-corrected covers 19/20; weighted
-    covers 19/20.  These runs are labelled undetermined by the run path (asserted): the test asserts a property of
-    the estimator, not a value."""
+def test_estimator_property_finite_population_bias_and_its_removal():
+    """ESTIMATOR-PROPERTY TEST (controller ruling, M3 fix round 1): it uses runs deliberately labelled undetermined
+    by the run path (asserted below: too few families and var(beta F~) > 1/2), and it ASSERTS A VALUE BAND for the
+    corrected estimators against the exact ln Z on those runs.  It tests the estimators' finite-R bias and its
+    removal; no run-path output takes a value from such runs (the entry labels them undetermined).
+    WMK Eqs. (15), (16): one run's ln Z~ is biased low by var(beta F~)/2 + higher cumulants.  At R = 5 (Gaussian SK
+    N = 16, beta = 2, 10 temperatures, 1 sweep, 256 seeds 1000-1255): the simple mean's 99% band lies below the
+    exact ln Z (the bias is resolved); mean + s^2/2 (jackknifed over seeds) and Machta's weighted average (Eq. (7),
+    nominal-R normalisation, jackknifed) each lie within their 99% band of it.  Measured on 20 disjoint 256-seed
+    sets (1000-6119): simple band below 20/20; s^2/2-corrected covers 19/20; weighted covers 20/20."""
     from replicant.numerics.finite_size import gaussian_sk_couplings
     J = gaussian_sk_couplings(16, 1, 3)[0]
     ex = SKM.exact_log_z(J, 2.0)
@@ -158,19 +167,43 @@ def test_finite_population_bias_is_resolved_and_removed():
     b = ST.band(x)
     assert b.mean + b.half_width < ex
     corr = ST.jackknife(lambda a: a[0].mean() + a[0].var(ddof=1) / 2, [x], n_blocks=M)
-    wtd = ST.jackknife(lambda a: PA.weighted_ln_z(a[0]), [x], n_blocks=M)
+    wtd = PA._jackknife_weighted(run.ln_z_nominal)
     assert abs(corr.estimate - ex) <= t * corr.stderr and abs(wtd.estimate - ex) <= t * wtd.stderr
     s = PA.summary(run)
     assert s.status == "undetermined" and any("families" in r for r in s.reasons) and any(
         "var(beta F~)" in r for r in s.reasons)
-    assert abs(s.bias_estimate * 16 + x.var(ddof=1) / 2) < 1e-12
+    assert abs(s.bias_estimate * 16 + x.var(ddof=1) / 2) < 1e-12 and abs(s.ln_z_weighted * 16 - wtd.estimate) < 1e-9
+
+
+def test_the_normalisation_is_the_mean_at_the_run_s_own_population_size():
+    """Q must be the mean of the weights over the population actually present (WMK Eq. (2)).  Checked exactly, at
+    the run's own size: the first annealing step of every seed against ln mean exp(-beta_1 E) of that seed's
+    regenerated uniform start (R = 600), and _resample on a population of fluctuated size R~ = 613 != R.  The planted
+    Q divided by R~ + 1 (ln Z~ low by about temperatures / R, below the main check's resolution) fails both."""
+    from replicant.numerics.finite_size import gaussian_sk_couplings
+    J = gaussian_sk_couplings(10, 1, 7)[0]
+    seeds, R, beta = (0, 1, 2), 600, 1.5
+
+    def first_steps():
+        run = PA.anneal(PA.SK(J), beta, R, 10, 1, seeds)
+        out = []
+        for i, sd in enumerate(seeds):
+            E = SKM.sk_energy(J, PA.SK(J).init(np.random.default_rng([sd, PA.STREAM]), R))
+            want = np.log(np.mean(np.exp(-run.betas[1] * E)))
+            out.append(abs(run.ln_z[i, 1] - run.ln_z[i, 0] - want))
+        x = -0.15 * SKM.sk_energy(J, np.random.default_rng(4).choice((-1.0, 1.0), size=(613, 10)))
+        out.append(abs(PA._resample(x, R, np.random.default_rng(5))[0] - np.log(np.mean(np.exp(x)))))
+        return max(out)
+    assert first_steps() < 1e-12
+    assert _planted(PA._HOOKS, "q_offset", 1, first_steps) > 1e-3
 
 
 def test_labels_follow_the_diagnostics_and_a_broken_family_bookkeeping_is_caught():
     """A population collapsed by two large steps without sweeps (4 x 4 at beta_c, R = 1000) has few families and
     must be labelled undetermined; the planted bookkeeping that refounds every family at each step hides the
     collapse (the label flips), so the family check depends on the tracking.  A synthetic run isolates each
-    reason: var(beta F~) > 1/2 alone, an extinct population alone."""
+    reason: var(beta F~) > 1/2 alone, an extinct population alone, fewer than two surviving seeds (labelled with NaN
+    values, never refused).  Machta's weighted average keeps an extinct run as a zero weight (Eq. (7) over all M)."""
     bc = 0.4406867935097715
     fn = lambda: PA.summary(PA.anneal(PA.Ising2D(4), bc, 1000, 2, 0, (0, 1)))
     s = fn()
@@ -185,6 +218,22 @@ def test_labels_follow_the_diagnostics_and_a_broken_family_bookkeeping_is_caught
     assert PA.summary(wide).reasons == (f"var(beta F~) over seeds {np.var([10, 11.5, 9, 10], ddof=1):.3g} > 0.5",)
     dead = PA.PARun(ln_z=calm.ln_z.copy(), **{**base, "extinct": np.array([False, False, False, True])})
     assert PA.summary(dead).status == "undetermined" and "died out" in PA.summary(dead).reasons[0]
+    lone = PA.PARun(ln_z=np.array([[0, 10.0], [0, -np.inf], [0, -np.inf], [0, -np.inf]]),
+                    **{**base, "extinct": np.array([False, True, True, True]),
+                       "energy": np.array([[-1.0, -1.0]] + [[-1.0, np.nan]] * 3)})
+    ls = PA.summary(lone)
+    assert ls.status == "undetermined" and "fewer than two surviving seeds (1 of 4)" in ls.reasons[-1]
+    assert np.isnan(ls.ln_z_weighted) and np.isnan(ls.ln_z_mean.mean)
+    assert np.isclose(PA.weighted_ln_z([10.0, -np.inf]), 10.0 - np.log(2)) and PA.weighted_ln_z([-np.inf]) == -np.inf
+    gone = PA.PARun(ln_z=np.array([[0, 5, 10.0], [0, 5, 10.1], [0, 5, 9.9], [0, -np.inf, -np.inf]]),
+                    **{**base, "betas": np.array([0.0, 0.5, 1.0]), "extinct": np.array([False, False, False, True]),
+                       "energy": np.array([[-1.0, -1, -1]] * 3 + [[-1.0, np.nan, np.nan]]),
+                       "sizes": np.array([[500, 500, 500]] * 3 + [[500, 0, 0]])})
+    gs = PA.summary(gone)                # three survivors: the weighted average keeps the extinct run as a zero
+    assert gs.status == "undetermined" and np.isfinite(gs.ln_z_weighted) and gs.ln_z_mean.df == 2
+    plain = PA.weighted_ln_z([10.0, 10.1, 9.9, -np.inf])          # ln(3/4) below the three survivors' average
+    assert abs(plain - PA.weighted_ln_z([10.0, 10.1, 9.9]) - np.log(0.75)) < 1e-12
+    assert abs(gs.ln_z_weighted - plain / 16) <= gs.ln_z_weighted_stderr   # the jackknife's bias step
 
 
 def test_named_seeds_are_independent():

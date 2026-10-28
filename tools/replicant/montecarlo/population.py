@@ -16,9 +16,15 @@ gives the free energy (Machta Eq. (7), WMK Eq. (6)), so E[ln Z~] = ln Z - var(be
 UNDERESTIMATES ln Z by about var(beta F~)/2 = rho_f / (2R).  `summary` reports the simple mean over seeds (biased),
 that bias estimated as -s^2/2 (s^2 the sample variance of ln Z~ over seeds), and Machta's weighted estimator
 ln[(1/M) sum_r exp(ln Z~_r)] with a jackknife over seeds (stats.jackknife, one seed per block), which removes the
-leading bias.  WMK's Eq. (2) divides by the actual size R~, a ratio estimator: e^{ln Z~} is then unbiased only up to
-O(temperatures / R) (this package's estimate, from E[R / R~] <= 1 + 1/(4R) per step; at R = 5, 10, 20 on the 4 x 4
-torus, 2048 seeds, the weighted estimate lies within 2.6 standard errors of Kaufman's value).
+leading bias.  Normalisation.  WMK's Eq. (2) divides by the actual size R~ (a ratio estimator); then e^{ln Z~} is
+biased at O(temperatures / R): measured E[Z~ / Z] = 1.0153 +- 0.0020 at R = 5 (Gaussian SK N = 16, beta = 2, 10
+temperatures, 1 sweep, 200000 runs; the reviewer's independent code: 1.022 +- 0.002).  Dividing by the nominal R
+instead, ln Z~_nom = ln Z~ + sum_{k < K} ln(R~_k / R), makes e^{ln Z~_nom} exactly unbiased for Z whatever the
+population sizes (a martingale argument, E n_j = tau_j; derived here and by the reviewer, not printed in the
+sources): measured 0.9995 +- 0.0027 on the same runs.  The WMK form has the smaller variance (sd of ln Z~ 0.84
+against 1.01 there), so the simple mean uses it (`ln_z`), and Machta's weighted average, whose point is an unbiased
+average of e^{ln Z~}, uses the nominal form (`ln_z_nominal`).  An extinct run contributes e^{-inf} = 0 to that
+average (Machta Eq. (7) averages over all M runs) and is left out of the simple mean.
 Families (WMK Sec. IV B): replica i of the initial population founds family i; n_i is the fraction of the final
 population descending from it;
   rho_t = R~ sum_i n_i^2 (Eq. (28)), R~ / rho_t the effective number of independent measurements;
@@ -39,7 +45,8 @@ Random numbers: seed s uses numpy default_rng([s, 0x5041]) for its start, resamp
 never draw from another seed's stream, so its results do not depend on the other seeds in the run (tested).
 _HOOKS (tests): "reweight_scale" 1.0 (planted c: exp(-c (beta' - beta) E) in Q and tau, a wrong reweighting factor);
 "resample" True (False: n_j = 1, the resampling step missing); "families" "track" ("reset": every replica refounds
-its own family at each step, a broken family bookkeeping).
+its own family at each step, a broken family bookkeeping); "q_offset" 0 (1: Q divides by R~ + 1, a normalisation off
+by one, ln Z~ low by about temperatures / R).
 """
 import math
 from dataclasses import dataclass
@@ -51,7 +58,7 @@ from ..core import Refusal
 FAMILY_MIN = 100
 VAR_MAX = 0.5
 STREAM = 0x5041
-_HOOKS = {"reweight_scale": 1.0, "resample": True, "families": "track"}
+_HOOKS = {"reweight_scale": 1.0, "resample": True, "families": "track", "q_offset": 0}
 
 
 class Ising2D:
@@ -103,11 +110,17 @@ class PARun:
     R: int
     betas: np.ndarray          # (temperatures + 1,)
     seeds: tuple
-    ln_z: np.ndarray           # (seeds, temperatures + 1): ln Z~ of each seed at each beta
+    ln_z: np.ndarray           # (seeds, temperatures + 1): ln Z~ of each seed at each beta (WMK's Q, actual R~)
     energy: np.ndarray         # (seeds, temperatures + 1): population mean of H / N after the sweeps
     sizes: np.ndarray          # (seeds, temperatures + 1): R~
     families: np.ndarray       # (seeds, 4): rho_t, R~ / rho_t, rho_s, e^{S_f} at the final beta
     extinct: np.ndarray        # (seeds,) bool
+
+    @property
+    def ln_z_nominal(self):
+        """(seeds,) ln Z~ at the final beta with Q divided by the nominal R: e^{ln Z~_nom} unbiased for Z."""
+        with np.errstate(divide="ignore"):
+            return self.ln_z[:, -1] + np.log(self.sizes[:, :-1] / self.R).sum(axis=1)
 
 
 def family_stats(counts):
@@ -129,7 +142,7 @@ def _resample(x, R, rng):
     """ln Q and the copy numbers for log-weights x = -(beta' - beta) E of one seed's population."""
     m = float(x.max())
     w = np.exp(x - m)
-    lnQ = m + math.log(float(w.mean()))
+    lnQ = m + math.log(float(w.sum()) / (len(w) + _HOOKS["q_offset"]))
     if not _HOOKS["resample"]:
         return lnQ, np.ones(len(x), np.int64)
     tau = R * w / w.sum()
@@ -196,40 +209,66 @@ class PASummary:
 
 
 def weighted_ln_z(x):
-    """Machta Eq. (7): ln[(1/M) sum_r exp(x_r)] (log-sum-exp)."""
+    """Machta Eq. (7): ln[(1/M) sum_r exp(x_r)] (log-sum-exp; an x_r = -inf, an extinct run, contributes 0)."""
     x = np.asarray(x, float)
     m = float(x.max())
+    if not math.isfinite(m):
+        return m
     return m + math.log(float(np.exp(x - m).mean()))
+
+
+def _jackknife_weighted(x):
+    """Leave-one-seed-out jackknife of weighted_ln_z (stats.jackknife's estimate and stderr, one seed per block), in
+    O(M) and admitting the -inf of an extinct run (which stats' time-series check refuses)."""
+    from .stats import Jackknife
+    x = np.asarray(x, float)
+    n, m = len(x), float(x.max())
+    w = np.exp(x - m)
+    with np.errstate(divide="ignore"):
+        loo = m + np.log(np.maximum(w.sum() - w, 0.0) / (n - 1))
+    if not np.isfinite(loo).all():              # one surviving run: its removal leaves no weight
+        return Jackknife(weighted_ln_z(x), math.nan, n)
+    se = math.sqrt((n - 1) / n * float(((loo - loo.mean()) ** 2).sum()))
+    return Jackknife(n * weighted_ln_z(x) - (n - 1) * float(loo.mean()), se, n)
+
+
+def _nan_band():
+    from ..amp._stats import Band
+    return Band(math.nan, math.nan, math.nan, 0, 0.99, math.nan)
 
 
 def summary(run):
     from . import stats as ST
-    x, N, M = run.ln_z[:, -1], run.N, len(run.seeds)
+    N, M = run.N, len(run.seeds)
+    xn = run.ln_z_nominal
+    ok = np.isfinite(run.ln_z[:, -1]) & np.isfinite(run.energy[:, -1])
+    x, en = run.ln_z[ok, -1], run.energy[ok, -1]
     reasons = []
     if run.extinct.any():
         reasons.append(f"population died out for seeds {[s for s, e in zip(run.seeds, run.extinct) if e]}")
-        ok = np.isfinite(x) & np.isfinite(run.energy[:, -1])
-        x, en = x[ok], run.energy[ok, -1]
-    else:
-        en = run.energy[:, -1]
-    if len(x) < 2:
-        raise Refusal("precondition:two-samples", "population annealing: fewer than two surviving seeds")
-    var = float(np.var(x, ddof=1))
     low = [(s, float(f[1])) for s, f in zip(run.seeds, run.families) if not f[1] >= FAMILY_MIN]
-    if low:
-        worst = min(low, key=lambda t: t[1] if t[1] == t[1] else -1.0)
-        reasons.append(f"too few families (R~ / rho_t < {FAMILY_MIN}) for {len(low)} of {M} seeds (lowest: seed "
+    alive = [t for t in low if t[1] == t[1]]
+    if alive:
+        worst = min(alive, key=lambda t: t[1])
+        reasons.append(f"too few families (R~ / rho_t < {FAMILY_MIN}) for {len(alive)} of {M} seeds (lowest: seed "
                        f"{worst[0]}, R~ / rho_t = {worst[1]:.3g})")
+    if len(x) < 2:                      # labelled, never refused: a correct sampler is not refused at runtime
+        reasons.append(f"fewer than two surviving seeds ({len(x)} of {M})")
+        why = "UNDETERMINED: " + "; ".join(reasons)
+        return PASummary(_nan_band(), math.nan, math.nan, math.nan, math.nan, _nan_band(), "undetermined",
+                         tuple(reasons), f"population annealing: R = {run.R}, {M} seeds; {why}")
+    var = float(np.var(x, ddof=1))
     if not var <= VAR_MAX:
         reasons.append(f"var(beta F~) over seeds {var:.3g} > {VAR_MAX}")
-    jk = ST.jackknife(lambda a: weighted_ln_z(a[0]), [x], n_blocks=len(x))
+    jk = _jackknife_weighted(xn)
     band, eb = ST.band(x / N), ST.band(en)
     status = "undetermined" if reasons else "equilibrated"
     fam = run.families[np.isfinite(run.families[:, 1])]
     text = (f"population annealing: R = {run.R}, {len(run.betas) - 1} temperatures to beta = {run.betas[-1]:.6g}, "
             f"{M} seeds; ln Z / N = {band.mean:.6g} +- {band.stderr:.2g} (simple mean, biased by about "
-            f"{-var / (2 * N):.2g}), weighted (Machta Eq. (7), jackknife) {jk.estimate / N:.6g} +- {jk.stderr / N:.2g}; "
-            f"var(beta F~) = {var:.3g}; R~ / rho_t min {fam[:, 1].min():.4g}, e^S_f min {fam[:, 3].min():.4g}; "
+            f"{-var / (2 * N):.2g}), weighted (Machta Eq. (7), nominal-R normalisation, jackknife) "
+            f"{jk.estimate / N:.6g} +- {jk.stderr / N:.2g}; var(beta F~) = {var:.3g}; R~ / rho_t min "
+            f"{fam[:, 1].min():.4g}, e^S_f min {fam[:, 3].min():.4g}; "
             + (f"UNDETERMINED: {'; '.join(reasons)}" if reasons else "equilibrated (families and var(beta F~))"))
     return PASummary(band, jk.estimate / N, jk.stderr / N, -var / (2 * N), var, eb, status, tuple(reasons), text)
 

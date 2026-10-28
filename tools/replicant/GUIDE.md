@@ -937,9 +937,13 @@ Ising: M1's checkerboard sweep, `montecarlo/metropolis.py`, even L >= 4; SK / +-
 N ln 2 + sum ln Q (Machta / WMK Eq. (4)), one value per named seed (an independent run). Bias at finite R (WMK Eqs.
 (15), (16), (23)): E ln Z~ = ln Z - var(beta F~)/2 - ..., so one run underestimates ln Z by about rho_f / (2R); the entry
 reports the simple mean (`ln_z_per_site_pa`, with the bias estimate -s^2/(2N) in `pa_diagnostics`) and Machta's weighted
-average ln[(1/M) sum_r e^{ln Z~_r}] (his Eq. (7), jackknifed over seeds: `ln_z_per_site_weighted`). WMK's R~ in Q is a
-ratio estimator, unbiased only to O(temperatures / R) (this package's remark; at R = 5, 10, 20 on 4 x 4, 2048 seeds,
-the weighted estimate lies within 2.6 standard errors of Kaufman's value). Families (WMK Sec. IV B): rho_t = R~ sum n_i^2 (Eq. (28)), S_f = -sum n_i ln n_i (Eq. (30)), e^{S_f} the
+average ln[(1/M) sum_r e^{ln Z~_r}] (his Eq. (7), jackknifed over seeds, an extinct run a zero weight:
+`ln_z_per_site_weighted`). Normalisation: WMK's Eq. (2) divides Q by the actual R~; then e^{ln Z~} is biased at
+O(temperatures / R) (measured E[Z~ / Z] = 1.0153 +- 0.0020 at R = 5, Gaussian SK N = 16, beta = 2, 200000 runs; the
+reviewer's independent code 1.022 +- 0.002). Dividing by the nominal R (`PARun.ln_z_nominal` = ln Z~ + sum_{k<K} ln(R~_k
+/ R)) makes e^{ln Z~} exactly unbiased (a martingale argument, derived here and by the reviewer, not printed in the
+sources; measured 0.9995 +- 0.0027); the simple mean keeps WMK's form (smaller variance), the weighted average uses the
+nominal one (tested in the slow tier). Fewer than two surviving seeds: labelled undetermined, values NaN. Families (WMK Sec. IV B): rho_t = R~ sum n_i^2 (Eq. (28)), S_f = -sum n_i ln n_i (Eq. (30)), e^{S_f} the
 effective number of families, rho_s = R~ / e^{S_f} (Eq. (31)). Labels: `pa_status` "equilibrated" when every seed has
 R~ / rho_t >= 100 (WMK Sec. V B require R >= 100 rho_s and Sec. VI B prefer rho_t; using rho_t with their factor 100 is
 this package's choice, and implies theirs), var(beta F~) over seeds <= 1/2 (Machta Sec. III: "smaller than about 0.5")
@@ -949,15 +953,20 @@ each with a planted control restored by an identity assert and a measured power:
 20000 exact draws, alpha = 0.01; +-5% acceptance rejected 40/40, 39/40), its exact ln Z = E11's integer spectrum on +-J;
 the family statistics against WMK's exponential-family values rho_t = 2 mu, rho_s ~ 1.53 mu; ln Z (mean + s^2/2) and u
 against Kaufman (4 x 4, beta = 2/5) and enumeration (two Gaussian, two +-J matrices, N = 10, beta = 3/2), one Bonferroni
-family of ten comparisons over seeds 0-7, R = 600 (unplanted 5/200 seed sets rejected; a 3% wrong reweighting factor and
-the resampling step missing rejected 40/40); the finite-R bias resolved at R = 5 (256 seeds: the simple mean below the
-exact value 20/20, mean + s^2/2 and the weighted average covering it 19/20); the labels (too few families; var > 1/2;
-extinct) and a planted family bookkeeping that hides a collapse; slow: 8 x 8 and 16 x 16 at beta_c and 1/2, SK and +-J
-at N = 18, beta = 5/2 (four matrices each), the bias at R = 10, 20, 40 with R var(beta F~) printed. Examples: `run
+family of ten comparisons over seeds 0-7, R = 600 (unplanted 6/500 seed sets rejected, 1.2%, consistent with the nominal
+1%, the reviewer's measurement; a 3% wrong reweighting factor and the resampling step missing rejected 40/40; it does not
+resolve a normalisation error below about 0.05 in total ln Z, which an exact check of Q at the run's own population size
+catches: planted Q / (R~ + 1)); estimator-property tests (controller ruling: they assert value bands for the corrected
+estimators on runs the tool labels undetermined, asserted so; no run-path output takes a value from them): the finite-R
+bias resolved at R = 5 (256 seeds: the simple mean below the exact value 20/20; mean + s^2/2 covering it 19/20, the
+weighted average 20/20); the labels (too few families; var > 1/2; extinct; fewer than two survivors) and a planted family
+bookkeeping that hides a collapse; slow: 8 x 8 and 16 x 16 at beta_c and 1/2, SK and +-J at N = 18, beta = 5/2 (four
+matrices each), and the estimator-property tests: the bias at R = 10, 20, 40 with R var(beta F~) printed, E[Z~ / Z] of
+the two normalisations at R = 5. Examples: `run
 population_annealing_mc --route sample` (4 x 4 at beta_c, R = 1000, 20 temperatures, 2 sweeps, about 0.2 s of annealing);
 `run population_annealing_mc --route sample --param model=sk_pm_one --param N=16 --param beta=2`; `--param L=16 --param
 population=5000 --param temperatures=40` (about 17 s). Planted hooks: `population._HOOKS["reweight_scale" | "resample" |
-"families"]`, `sk_metropolis._HOOKS["acceptance_scale"]`.
+"families" | "q_offset"]`, `sk_metropolis._HOOKS["acceptance_scale"]`.
 `from replicant.bounds import ...` (E10; needs python-flint and `tools/baller`; SK conventions of
 families/sk.py, P = -beta f; parameters are taken as the exact rationals they denote, an mpf or float its
 exact binary value): `guerra_rs_bound(beta, h, q, digits=40)` -> `Ball`; `guerra_rs_best_bound(beta, h=0,
@@ -1175,7 +1184,7 @@ re-runs the entry's banked comparisons) and its JSON (`target`, `spec`, `route`,
 | `precondition:algorithm`, `:potts-q`, `:size`, `:sweeps`, `:burn-in`, `:named-seeds`, `:beta`, `:exact-size`, `:checkerboard`; `no-solution:sampler-invariant`, `:route-disagreement` | `cluster_mc` / `montecarlo/`: an algorithm not swendsen_wang / wolff / metropolis (metropolis: q = 2 and even L only); q not an int in 2 .. 64; L not an int in 2 .. 256; sweeps not in 8 .. 10^6, burn_in not in 0 .. 10^6; fewer than 2 distinct named seeds; beta not 'beta_c' or a rational > 0; an enumeration beyond 2^16 states; an SW partition that does not cover the N sites, a Wolff cluster or a Metropolis energy that disagrees with the final spins; the two routes to beta_c(q) differing by more than 1e-30 |
 | `precondition:schedule`, `:f-final`, `:walkers`, `:t-max`, `:check-every`, `:muca-sweeps`, `:muca-burn-in`, `:weights`, `:reweight-window`; `no-solution:level-set`, `:sampler-invariant`, `:not-an-integer-polynomial`, `:certification` | `wang_landau_mc` / `montecarlo/wang_landau.py`, `multicanonical.py`, `dos_exact.py`: a schedule not one_over_t / wang_landau; F_final not a rational in (0, 1); walkers not in 1 .. 256, t_max not in 10 .. 10^7; muca sweeps / burn-in out of range; multicanonical weights not (seeds, levels) or not covering the ground level; a beta whose predicted canonical mass on levels visited < 20 times exceeds 10^-3; a run's visited levels compared with an exact level set they do not equal; a tracked level or magnetisation that disagrees with the spins; L > 16 for the exact g(E), or an interpolated coefficient ball holding no integer |
 | `precondition:reweight-window`, `:histogram-overlap`, `:histogram`, `:histogram-runs`, `:betas`; `no-solution:convergence` | `histogram_reweighting_mc` / `montecarlo/reweight.py`: a target beta outside the overlap window (O < 1/2) of the run(s); multiple-histogram runs whose windows do not chain; a one-level histogram; fewer than 2 runs or runs with different seed counts; betas not >= 2 distinct values; the Ferrenberg-Swendsen free energies not converged in 10^5 iterations |
-| `precondition:model`, `:checkerboard`, `:size`, `:disorder`, `:beta`, `:population`, `:temperatures`, `:sweeps`, `:named-seeds`, `:enumeration-size`, `:two-samples`; `no-solution:sampler-invariant` | `population_annealing_mc` / `montecarlo/population.py`, `sk_metropolis.py`: a model not ising2d / sk_gaussian / sk_pm_one; an odd L or L outside 4 .. 64; N outside 2 .. 64; a disorder seed not an int >= 0; beta not a rational > 0 ('beta_c' only for ising2d); R, temperatures or sweeps out of range; fewer than 2 distinct named seeds; the SK enumeration beyond N = 20; fewer than two surviving seeds; a tracked SK energy that disagrees with the spins, or population blocks that do not add up |
+| `precondition:model`, `:checkerboard`, `:size`, `:disorder`, `:beta`, `:population`, `:temperatures`, `:sweeps`, `:named-seeds`, `:enumeration-size`; `no-solution:sampler-invariant` | `population_annealing_mc` / `montecarlo/population.py`, `sk_metropolis.py`: a model not ising2d / sk_gaussian / sk_pm_one; an odd L or L outside 4 .. 64; N outside 2 .. 64; a disorder seed not an int >= 0; beta not a rational > 0 ('beta_c' only for ising2d); R, temperatures or sweeps out of range; fewer than 2 distinct named seeds; the SK enumeration beyond N = 20; a tracked SK energy that disagrees with the spins, or population blocks that do not add up |
 | `precondition:time-series`, `:ragged-runs`, `:windows`, `:two-samples`, `:chi2-cells`, `:chi2-alpha`, `:fit-sizes` | `montecarlo/stats.py`: a series too short or not finite; equilibration traces not (runs >= 2, T >= 4); a band over one run; runs of different lengths given to equilibration or power_fit; chi^2 cells that do not align or probabilities that do not sum to 1, or fewer than two cells; alpha outside (0, 1); a z fit with fewer than 3 increasing L or 2 runs |
 | `unbanked:missing-entry`, `:malformed`, `:no-citation`, `:no-independent-route` | a banked reference value is absent or has no citation / no independent route (a value that fed a fit never certifies it) |
 | `tex-engine:failed`, `tex-engine:unavailable` | `--pdf`: the engine ran and failed, or could not reach its offline resources |

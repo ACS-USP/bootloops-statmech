@@ -3,9 +3,11 @@
     equilibrated runs only; planted at 8 x 8: a 1% wrong reweighting factor, the resampling step missing
   - SK at N = 18, four Gaussian and four +-J matrices at beta = 5/2 (below T_c = 1): ln Z and u against enumeration
     (+-J: E11's integer spectrum), one Bonferroni family
-  - the finite-R bias at R = 10, 20, 40 (4 x 4 at beta = 1/2, 1024 seeds each): the simple mean resolved below
-    Kaufman, mean + s^2/2 and Machta's weighted average covering it; R var(beta F~) (WMK's rho_f) and the family
-    sizes rho_t, rho_s printed"""
+  - estimator-property tests (controller ruling, M3 fix round 1: they assert value bands for the corrected
+    estimators on runs the tool labels undetermined, asserted so, and no run-path output takes a value from them):
+    the finite-R bias at R = 10, 20, 40 (4 x 4 at beta = 1/2, 1024 seeds each), the simple mean resolved below
+    Kaufman, mean + s^2/2 and Machta's weighted average covering it, R var(beta F~) (WMK's rho_f) and rho_t, rho_s
+    printed; E[Z~ / Z] at R = 5 over 200000 runs: the nominal-R form unbiased, WMK's actual-R~ form resolved high"""
 import os
 import sys
 
@@ -88,20 +90,42 @@ def test_sk_and_pm_one_matrices_at_low_temperature():
 
 
 @slow
-def test_finite_population_bias_scales_and_is_removed():
+def test_estimator_property_finite_population_bias_scales_and_is_removed():
+    """Estimator-property test on runs labelled undetermined (asserted): value bands for the corrected estimators."""
     lnz, _ = _kaufman(4, "1/2")
-    t99 = ST.t_quantile(1 - ALPHA / 2, 1023)
     for R in (10, 20, 40):
         run = PA.anneal(PA.Ising2D(4), 0.5, R, 10, 1, range(10_000, 11_024))
         x = run.ln_z[:, -1]
         b = ST.band(x)
         corr = ST.jackknife(lambda a: a[0].mean() + a[0].var(ddof=1) / 2, [x], n_blocks=64)
-        wtd = ST.jackknife(lambda a: PA.weighted_ln_z(a[0]), [x], n_blocks=64)
+        wtd = PA._jackknife_weighted(run.ln_z_nominal)
         rho_t, rho_s = np.nanmean(run.families[:, 0]), np.nanmean(run.families[:, 2])
         print(f"R = {R}: mean - exact = {b.mean - lnz:+.4f} +- {b.half_width:.4f} (99%), -s^2/2 = {-x.var(ddof=1) / 2:+.4f};"
               f" corrected {corr.estimate - lnz:+.4f} +- {corr.stderr:.4f}; weighted {wtd.estimate - lnz:+.4f} +- "
               f"{wtd.stderr:.4f}; R var(beta F~) = {R * x.var(ddof=1):.3g}; mean rho_t {rho_t:.3g}, rho_s {rho_s:.3g}")
+        assert PA.summary(run).status == "undetermined"
         assert b.mean + b.half_width < lnz
         assert abs(corr.estimate - lnz) <= ST.t_quantile(1 - ALPHA / 2, 63) * corr.stderr
         assert abs(wtd.estimate - lnz) <= ST.t_quantile(1 - ALPHA / 2, 63) * wtd.stderr
-    assert t99 > 0
+
+
+@slow
+def test_estimator_property_the_nominal_normalisation_is_unbiased_for_z():
+    """E[Z~ / Z] over 200000 independent runs at R = 5 (Gaussian SK N = 16, beta = 2, 10 temperatures, 1 sweep;
+    seeds 100000-299999; standard errors from 100 chunks of 2000 runs; extinct runs count as 0).  Measured:
+    nominal-R form 0.9995 +- 0.0027, WMK's actual-R~ form 1.0153 +- 0.0020.  Asserted: the nominal form within its
+    99% band of 1, the WMK form above 1 beyond its 99% band.  These runs are undetermined (R = 5): an
+    estimator-property test asserting value bands on them."""
+    from replicant.numerics.finite_size import gaussian_sk_couplings
+    J = gaussian_sk_couplings(16, 1, 3)[0]
+    ex = SKM.exact_log_z(J, 2.0)
+    run = PA.anneal(PA.SK(J), 2.0, 5, 10, 1, range(100_000, 300_000))
+    t = ST.t_quantile(1 - ALPHA / 2, 99)
+    out = {}
+    for name, v in (("nominal", run.ln_z_nominal), ("wmk", run.ln_z[:, -1])):
+        b = ST.band(np.exp(v - ex).reshape(100, -1).mean(axis=1))
+        out[name] = b
+        print(f"{name}: E[Z~ / Z] = {b.mean:.4f} +- {b.stderr:.4f}")
+    assert PA.summary(run).status == "undetermined"
+    assert abs(out["nominal"].mean - 1) <= t * out["nominal"].stderr
+    assert out["wmk"].mean - 1 > t * out["wmk"].stderr

@@ -4,8 +4,8 @@ Wang-Machta-Katzgraber 2015) of the 2D Ising model on the L x L torus or of one 
 Route sample (statistical):
   population-annealing  named seeds = independent runs (montecarlo/population.py): ln Z / N as the simple mean of the
                         runs' estimates (biased low by about var(beta F~) / 2, WMK Eq. (16); the estimate printed in
-                        pa_diagnostics) and as Machta's weighted average (his Eq. (7), jackknifed over seeds), u at
-                        beta; pa_status "equilibrated" or "undetermined" (families: R~ / rho_t >= 100 per seed;
+                        pa_diagnostics) and as Machta's weighted average (his Eq. (7), nominal-R normalisation,
+                        an extinct run a zero weight, jackknifed over seeds), u at beta; pa_status "equilibrated" or "undetermined" (families: R~ / rho_t >= 100 per seed;
                         var(beta F~) <= 1/2; no extinct population); beta_c (ising2d, exact-by-literature)
   exact-targets         printed, never refusing: Kaufman's torus ln Z / N and u (lattice/kaufman.py,
                         lattice/torus_thermo.py, L <= 64); SK: ln Z and u by enumeration of the 2^N states (N <= 20;
