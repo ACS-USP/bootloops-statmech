@@ -1,0 +1,104 @@
+{
+  "gaussian_alpha1_plateau": {
+    "value": "0.5",
+    "tol": "1e-25",
+    "cite": "Gaussian patterns, single-pattern retrieval threshold alpha_1(lam) at lam = 3 >= 1: Lucibello & Mezard, 'The Exponential Capacity of Dense Associative Memories', Phys. Rev. Lett. 132, 077301 (2024), arXiv:2304.14964v4 (PDF read; journal version not checked), Sec. V ('saturates at lambda = 1 to the value alpha_1 = 1/2') and Eq. (D7). Convention (their Sec. II): P = e^(alpha N) i.i.d. patterns with E|xi|^2 = N, x with |x| = rho sqrt(N) independent of patterns mu >= 2, overlaps eps = x.xi/N, interaction exp(lam x.xi), E(x) ~ -max(x.xi^1, N phi) + |x|^2/2 (Eq. (6)). A printed number.",
+    "independent_route": "the noise phi from three other routes of dense_memory/rem_noise.py (Legendre transform of zeta, the minimised 1RSB functional over pattern labels bisected on (A25), Laplace's method on the rate function) agree with the closed form to 1e-30 (tests/test_dense_memory.py); the exact finite-N overlap law (sim.rem_phi_mc: Poisson counts per overlap bin, N = 100, 400, 1600) converges to it; and the paper's gradient descent run directly (sim.gd_retrieval, N = 200) retrieves above and collapses below the lam_1(alpha) built on it; alpha_1 also from the Legendre-dual closed form s(1) = 1/2 for lam >= s'(1) = 1"
+  },
+  "gaussian_alpha1_lam0p5": {
+    "value": "0.375000000000000000000000000000",
+    "tol": "1e-25",
+    "cite": "Gaussian patterns, alpha_1(lam) = lam (1 - lam/2) for 0 <= lam < 1 at lam = 1/2 (3/8): Lucibello & Mezard, 'The Exponential Capacity of Dense Associative Memories', Phys. Rev. Lett. 132, 077301 (2024), arXiv:2304.14964v4 (PDF read; journal version not checked), Eq. (D7). Convention (their Sec. II): P = e^(alpha N) i.i.d. patterns with E|xi|^2 = N, x with |x| = rho sqrt(N) independent of patterns mu >= 2, overlaps eps = x.xi/N, interaction exp(lam x.xi), E(x) ~ -max(x.xi^1, N phi) + |x|^2/2 (Eq. (6)). The source gives a formula, not a number: the value is the formula evaluated in exact arithmetic (sympy) at the stated point.",
+    "independent_route": "the noise phi from three other routes of dense_memory/rem_noise.py (Legendre transform of zeta, the minimised 1RSB functional over pattern labels bisected on (A25), Laplace's method on the rate function) agree with the closed form to 1e-30 (tests/test_dense_memory.py); the exact finite-N overlap law (sim.rem_phi_mc: Poisson counts per overlap bin, N = 100, 400, 1600) converges to it; and the paper's gradient descent run directly (sim.gd_retrieval, N = 200) retrieves above and collapses below the lam_1(alpha) built on it"
+  },
+  "gaussian_alpha_c_lb_plateau": {
+    "value": "0.173286795139986327354308030365",
+    "tol": "1e-25",
+    "cite": "Gaussian patterns, lower bound on the all-patterns capacity alpha_c^lb(lam) = log(2)/4 for lam >~ 0.70091, here lam = 2: Lucibello & Mezard, 'The Exponential Capacity of Dense Associative Memories', Phys. Rev. Lett. 132, 077301 (2024), arXiv:2304.14964v4 (PDF read; journal version not checked), Sec. V ('saturates at large lambda to the value alpha_c^lb = log 2 / 4') and App. D 2 after Eq. (D13). A printed number.",
+    "independent_route": "the bound recomputed by direct numerical minimisation of A(alpha, lam) over the pattern norm r on a fine grid (tests/test_dense_memory.py), not through the stationary point r^2 = 1/2; the paper's own simulations of the all-patterns probability (their Fig. 8) cross near it"
+  },
+  "gaussian_lambda_saturation": {
+    "value": "0.70091",
+    "tol": "1e-5",
+    "cite": "Gaussian patterns, the value of lam above which alpha_c^lb = log(2)/4: Lucibello & Mezard, 'The Exponential Capacity of Dense Associative Memories', Phys. Rev. Lett. 132, 077301 (2024), arXiv:2304.14964v4 (PDF read; journal version not checked), App. D 2 ('When lambda >~ 0.70091 one gets alpha_c^lb = log(2)/4'). A printed number, given to five decimals (replicant computes 0.7009178..., consistent with truncation); tol 1e-5 covers rounding at the fifth decimal.",
+    "independent_route": "solved a second way: the root of I~(r) = log(2)/4 (the cheapest atypical norm) with r_0^2 = alpha/(lam(1 - lam/2)) (D12), in dense_memory/thresholds.py lambda_saturation, against the bisection of A(alpha, lam) = alpha at lam just below and above it (tests)"
+  },
+  "gaussian_lam_star_a0p1": {
+    "value": "0.447213595499957939281834733746",
+    "tol": "1e-25",
+    "cite": "Gaussian patterns, REM condensation threshold lam_* = sqrt(2 alpha)/rho at alpha = 0.1, rho = 1: Lucibello & Mezard, 'The Exponential Capacity of Dense Associative Memories', Phys. Rev. Lett. 132, 077301 (2024), arXiv:2304.14964v4 (PDF read; journal version not checked), Eq. (D6) (also the text after Eq. (5)). Convention (their Sec. II): P = e^(alpha N) i.i.d. patterns with E|xi|^2 = N, x with |x| = rho sqrt(N) independent of patterns mu >= 2, overlaps eps = x.xi/N, interaction exp(lam x.xi), E(x) ~ -max(x.xi^1, N phi) + |x|^2/2 (Eq. (6)). The source gives a formula, not a number: the value is the formula evaluated in exact arithmetic (sympy) at the stated point.",
+    "independent_route": "the noise phi from three other routes of dense_memory/rem_noise.py (Legendre transform of zeta, the minimised 1RSB functional over pattern labels bisected on (A25), Laplace's method on the rate function) agree with the closed form to 1e-30 (tests/test_dense_memory.py); the exact finite-N overlap law (sim.rem_phi_mc: Poisson counts per overlap bin, N = 100, 400, 1600) converges to it; and the paper's gradient descent run directly (sim.gd_retrieval, N = 200) retrieves above and collapses below the lam_1(alpha) built on it; lam_* also as the root of lam zeta'(lam) - zeta(lam) = alpha (rem_noise.condensation_lambda, method legendre)"
+  },
+  "gaussian_phi_uncondensed": {
+    "value": "0.600000000000000000000000000000",
+    "tol": "1e-25",
+    "cite": "Gaussian patterns, REM noise phi_{alpha,rho}(lam) = alpha/lam + lam rho^2/2 for lam < lam_*, at alpha = 0.1, lam = 0.2, rho = 1: Lucibello & Mezard, 'The Exponential Capacity of Dense Associative Memories', Phys. Rev. Lett. 132, 077301 (2024), arXiv:2304.14964v4 (PDF read; journal version not checked), Eq. (5) and (D5). Convention (their Sec. II): P = e^(alpha N) i.i.d. patterns with E|xi|^2 = N, x with |x| = rho sqrt(N) independent of patterns mu >= 2, overlaps eps = x.xi/N, interaction exp(lam x.xi), E(x) ~ -max(x.xi^1, N phi) + |x|^2/2 (Eq. (6)). The source gives a formula, not a number: the value is the formula evaluated in exact arithmetic (sympy) at the stated point.",
+    "independent_route": "the noise phi from three other routes of dense_memory/rem_noise.py (Legendre transform of zeta, the minimised 1RSB functional over pattern labels bisected on (A25), Laplace's method on the rate function) agree with the closed form to 1e-30 (tests/test_dense_memory.py); the exact finite-N overlap law (sim.rem_phi_mc: Poisson counts per overlap bin, N = 100, 400, 1600) converges to it; and the paper's gradient descent run directly (sim.gd_retrieval, N = 200) retrieves above and collapses below the lam_1(alpha) built on it"
+  },
+  "gaussian_phi_condensed": {
+    "value": "0.447213595499957939281834733746",
+    "tol": "1e-25",
+    "cite": "Gaussian patterns, REM noise phi = rho sqrt(2 alpha) for lam >= lam_*, at alpha = 0.1, lam = 2, rho = 1: Lucibello & Mezard, 'The Exponential Capacity of Dense Associative Memories', Phys. Rev. Lett. 132, 077301 (2024), arXiv:2304.14964v4 (PDF read; journal version not checked), Eq. (5) and (D5). Convention (their Sec. II): P = e^(alpha N) i.i.d. patterns with E|xi|^2 = N, x with |x| = rho sqrt(N) independent of patterns mu >= 2, overlaps eps = x.xi/N, interaction exp(lam x.xi), E(x) ~ -max(x.xi^1, N phi) + |x|^2/2 (Eq. (6)). The source gives a formula, not a number: the value is the formula evaluated in exact arithmetic (sympy) at the stated point.",
+    "independent_route": "the noise phi from three other routes of dense_memory/rem_noise.py (Legendre transform of zeta, the minimised 1RSB functional over pattern labels bisected on (A25), Laplace's method on the rate function) agree with the closed form to 1e-30 (tests/test_dense_memory.py); the exact finite-N overlap law (sim.rem_phi_mc: Poisson counts per overlap bin, N = 100, 400, 1600) converges to it; and the paper's gradient descent run directly (sim.gd_retrieval, N = 200) retrieves above and collapses below the lam_1(alpha) built on it"
+  },
+  "gaussian_cos_theta_large_lambda": {
+    "value": "0.447213595499957939281834733746",
+    "tol": "1e-25",
+    "cite": "Gaussian patterns, one-step basin cos(theta_c) at large lam, cos(theta_c) > sqrt(2 alpha), at alpha = 0.1 (lam = 20 >= lam_*): Lucibello & Mezard, 'The Exponential Capacity of Dense Associative Memories', Phys. Rev. Lett. 132, 077301 (2024), arXiv:2304.14964v4 (PDF read; journal version not checked), App. D 3 ('for large lambda ... cos(theta_c) > sqrt(2 alpha). Clearly, the basin disappears when alpha > 0.5'). The source gives a formula, not a number: the value is the formula evaluated in exact arithmetic (sympy) at the stated point.",
+    "independent_route": "the nearest-pattern cosine c_max(alpha) = eps*(alpha, 1) from the root of the annealed entropy (App. B, D 3 Eqs. (D14)-(D23)), by the independent rate-function route of rem_noise.eps_star"
+  },
+  "spherical_lam_star_a0p3": {
+    "value": "1.22392733540273481165987866139",
+    "tol": "1e-25",
+    "cite": "Spherical patterns, REM condensation threshold lam_*(alpha, rho) = e^(2 alpha) sqrt(1 - e^(-2 alpha))/rho at alpha = 0.3, rho = 1: Lucibello & Mezard, 'The Exponential Capacity of Dense Associative Memories', Phys. Rev. Lett. 132, 077301 (2024), arXiv:2304.14964v4 (PDF read; journal version not checked), Eq. (C5). Convention (their Sec. II): P = e^(alpha N) i.i.d. patterns with E|xi|^2 = N, x with |x| = rho sqrt(N) independent of patterns mu >= 2, overlaps eps = x.xi/N, interaction exp(lam x.xi), E(x) ~ -max(x.xi^1, N phi) + |x|^2/2 (Eq. (6)). The source gives a formula, not a number: the value is the formula evaluated in exact arithmetic (sympy) at the stated point.",
+    "independent_route": "the noise phi from three other routes of dense_memory/rem_noise.py (Legendre transform of zeta, the minimised 1RSB functional over pattern labels bisected on (A25), Laplace's method on the rate function) agree with the closed form to 1e-30 (tests/test_dense_memory.py); the exact finite-N overlap law (sim.rem_phi_mc: Poisson counts per overlap bin, N = 100, 400, 1600) converges to it; and the paper's gradient descent run directly (sim.gd_retrieval, N = 200) retrieves above and collapses below the lam_1(alpha) built on it; lam_* also as the root of lam zeta'(lam) - zeta(lam) = alpha with zeta of (C3)"
+  },
+  "spherical_phi_uncondensed": {
+    "value": "0.677428076220093124455707377653",
+    "tol": "1e-25",
+    "cite": "Spherical patterns, REM noise for lam < lam_*: phi = (alpha + (sqrt(1+4 lam^2 rho^2) - 1 - log((1 + sqrt(1+4 lam^2 rho^2))/2))/2)/lam at alpha = 0.3, lam = 1, rho = 1: Lucibello & Mezard, 'The Exponential Capacity of Dense Associative Memories', Phys. Rev. Lett. 132, 077301 (2024), arXiv:2304.14964v4 (PDF read; journal version not checked), the display above Eq. (C5) (with zeta of Eq. (C3)). Convention (their Sec. II): P = e^(alpha N) i.i.d. patterns with E|xi|^2 = N, x with |x| = rho sqrt(N) independent of patterns mu >= 2, overlaps eps = x.xi/N, interaction exp(lam x.xi), E(x) ~ -max(x.xi^1, N phi) + |x|^2/2 (Eq. (6)). The source gives a formula, not a number: the value is the formula evaluated in exact arithmetic (sympy) at the stated point.",
+    "independent_route": "the noise phi from three other routes of dense_memory/rem_noise.py (Legendre transform of zeta, the minimised 1RSB functional over pattern labels bisected on (A25), Laplace's method on the rate function) agree with the closed form to 1e-30 (tests/test_dense_memory.py); the exact finite-N overlap law (sim.rem_phi_mc: Poisson counts per overlap bin, N = 100, 400, 1600) converges to it; and the paper's gradient descent run directly (sim.gd_retrieval, N = 200) retrieves above and collapses below the lam_1(alpha) built on it"
+  },
+  "spherical_phi_condensed": {
+    "value": "0.671705563402577132005584369080",
+    "tol": "1e-25",
+    "cite": "Spherical patterns, REM noise phi = rho sqrt(1 - e^(-2 alpha)) for lam >= lam_*, at alpha = 0.3, lam = 10, rho = 1: Lucibello & Mezard, 'The Exponential Capacity of Dense Associative Memories', Phys. Rev. Lett. 132, 077301 (2024), arXiv:2304.14964v4 (PDF read; journal version not checked), the display above Eq. (C5). Convention (their Sec. II): P = e^(alpha N) i.i.d. patterns with E|xi|^2 = N, x with |x| = rho sqrt(N) independent of patterns mu >= 2, overlaps eps = x.xi/N, interaction exp(lam x.xi), E(x) ~ -max(x.xi^1, N phi) + |x|^2/2 (Eq. (6)). The source gives a formula, not a number: the value is the formula evaluated in exact arithmetic (sympy) at the stated point.",
+    "independent_route": "the noise phi from three other routes of dense_memory/rem_noise.py (Legendre transform of zeta, the minimised 1RSB functional over pattern labels bisected on (A25), Laplace's method on the rate function) agree with the closed form to 1e-30 (tests/test_dense_memory.py); the exact finite-N overlap law (sim.rem_phi_mc: Poisson counts per overlap bin, N = 100, 400, 1600) converges to it; and the paper's gradient descent run directly (sim.gd_retrieval, N = 200) retrieves above and collapses below the lam_1(alpha) built on it"
+  },
+  "spherical_alpha1_lam1": {
+    "value": "0.622571923779906875544292622347",
+    "tol": "1e-25",
+    "cite": "Spherical patterns, single-pattern retrieval threshold at lam = 1: Lucibello & Mezard, 'The Exponential Capacity of Dense Associative Memories', Phys. Rev. Lett. 132, 077301 (2024), arXiv:2304.14964v4 (PDF read; journal version not checked), Eq. (7) and App. C 1: the alpha with phi_(alpha,1)(1) = 1 (Eq. (7), 'identified by phi_(alpha_1,1)(lambda) = 1'), using the uncondensed branch (the paper: 'the retrieval phase boundary is entirely in the region of the REM which is uncondensed', App. C 1) with zeta of (C3): alpha_1 = lam - zeta(lam). Convention (their Sec. II): P = e^(alpha N) i.i.d. patterns with E|xi|^2 = N, x with |x| = rho sqrt(N) independent of patterns mu >= 2, overlaps eps = x.xi/N, interaction exp(lam x.xi), E(x) ~ -max(x.xi^1, N phi) + |x|^2/2 (Eq. (6)). The source gives a condition, not a number: the value solves it in exact arithmetic (sympy).",
+    "independent_route": "the noise phi from three other routes of dense_memory/rem_noise.py (Legendre transform of zeta, the minimised 1RSB functional over pattern labels bisected on (A25), Laplace's method on the rate function) agree with the closed form to 1e-30 (tests/test_dense_memory.py); the exact finite-N overlap law (sim.rem_phi_mc: Poisson counts per overlap bin, N = 100, 400, 1600) converges to it; and the paper's gradient descent run directly (sim.gd_retrieval, N = 200) retrieves above and collapses below the lam_1(alpha) built on it; the exact finite-N sampler; and the gradient descent of Eq. (2) run directly collapses below and retrieves above lam_1(alpha) (their Fig. 6)"
+  },
+  "spherical_alpha1_lam3": {
+    "value": "1.09087715431959558609208535383",
+    "tol": "1e-25",
+    "cite": "Spherical patterns, single-pattern retrieval threshold at lam = 3: Lucibello & Mezard, 'The Exponential Capacity of Dense Associative Memories', Phys. Rev. Lett. 132, 077301 (2024), arXiv:2304.14964v4 (PDF read; journal version not checked), Eq. (7) with (C3) as for lam = 1: the alpha with phi_(alpha,1)(3) = 1. Convention (their Sec. II): P = e^(alpha N) i.i.d. patterns with E|xi|^2 = N, x with |x| = rho sqrt(N) independent of patterns mu >= 2, overlaps eps = x.xi/N, interaction exp(lam x.xi), E(x) ~ -max(x.xi^1, N phi) + |x|^2/2 (Eq. (6)). The source gives a condition, not a number: the value solves it in exact arithmetic (sympy).",
+    "independent_route": "the noise phi from three other routes of dense_memory/rem_noise.py (Legendre transform of zeta, the minimised 1RSB functional over pattern labels bisected on (A25), Laplace's method on the rate function) agree with the closed form to 1e-30 (tests/test_dense_memory.py); the exact finite-N overlap law (sim.rem_phi_mc: Poisson counts per overlap bin, N = 100, 400, 1600) converges to it; and the paper's gradient descent run directly (sim.gd_retrieval, N = 200) retrieves above and collapses below the lam_1(alpha) built on it"
+  },
+  "spherical_cos_theta_large_lambda": {
+    "value": "0.425757262911647980885129858723",
+    "tol": "1e-25",
+    "cite": "Spherical patterns, one-step basin at lam >= lam_*: cos(theta_c)(alpha) = sqrt(1 - e^(-2 alpha)) at alpha = 0.1 (lam = 20): Lucibello & Mezard, 'The Exponential Capacity of Dense Associative Memories', Phys. Rev. Lett. 132, 077301 (2024), arXiv:2304.14964v4 (PDF read; journal version not checked), App. C 3 (end). The source gives a formula, not a number: the value is the formula evaluated in exact arithmetic (sympy) at the stated point.",
+    "independent_route": "the nearest-pattern cosine eps*(alpha, 1), the continuous Gilbert-Varshamov distance of App. B, by the independent rate-function route of rem_noise.eps_star; their Fig. 9 simulations"
+  },
+  "scaled_threshold": {
+    "value": "0.7",
+    "tol": "1e-25",
+    "cite": "Scaled dot product, lam = lam~/N^a, P = exp(alpha~ N^(1-a)): alpha~_1 = alpha~_c = lam~, at lam~ = 0.7: Lucibello & Mezard, 'The Exponential Capacity of Dense Associative Memories', Phys. Rev. Lett. 132, 077301 (2024), arXiv:2304.14964v4 (PDF read; journal version not checked), Sec. VI and Fig. 10. A printed identity.",
+    "independent_route": "the signal lam~ N^(1-a) against the noise lam N Phi = alpha~ N^(1-a) for any ensemble (Sec. VI); the paper's Fig. 10 simulations"
+  },
+  "few_patterns_cos_theta": {
+    "value": "0.371692218884983844695240676130",
+    "tol": "1e-25",
+    "cite": "Few patterns (P << e^N): cos(theta_c) = sqrt(2 log P/N), at P = 1000, N = 100: Lucibello & Mezard, 'The Exponential Capacity of Dense Associative Memories', Phys. Rev. Lett. 132, 077301 (2024), arXiv:2304.14964v4 (PDF read; journal version not checked), App. B Eq. (B8). The source gives a formula, not a number: the value is the formula evaluated in exact arithmetic (sympy) at the stated point. (Valid for log P << N; the paper tests it for P = c N^k with spherical patterns, their Fig. 5.)",
+    "independent_route": "the limit alpha -> 0 of the exact eps*(alpha, 1) / sqrt(2 alpha) = 1 for both ensembles (tests/test_dense_memory.py)"
+  },
+  "ramsauer_small_lambda_ratio": {
+    "value": "0.1",
+    "tol": "1e-6",
+    "cite": "Ramsauer et al. capacity bound as restated by Lucibello & Mezard: alpha_c,rams^lb(lam) ~ lam/10 at small lam, so alpha/lam -> 1/10: Lucibello & Mezard, 'The Exponential Capacity of Dense Associative Memories', Phys. Rev. Lett. 132, 077301 (2024), arXiv:2304.14964v4 (PDF read; journal version not checked), App. E after Eq. (E7). A printed asymptote, evaluated here at lam = 1e-6 (relative correction 2e-7); the bound itself is Theorem 3 of Ramsauer et al. (arXiv:2008.02217), which this package has NOT read.",
+    "independent_route": "the series of (E7): x/W0(x) = 1 + x + O(x^2) with x = 2 lam/5, so (1/4) log(x/W0(x)) = lam/10 (1 + O(lam)), checked at three small lam in tests/test_dense_memory.py"
+  }
+}
