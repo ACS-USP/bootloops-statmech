@@ -24,7 +24,10 @@ population sizes (a martingale argument, E n_j = tau_j; derived here and by the 
 sources): measured 0.9995 +- 0.0027 on the same runs.  The WMK form has the smaller variance (sd of ln Z~ 0.84
 against 1.01 there), so the simple mean uses it (`ln_z`), and Machta's weighted average, whose point is an unbiased
 average of e^{ln Z~}, uses the nominal form (`ln_z_nominal`).  An extinct run contributes e^{-inf} = 0 to that
-average (Machta Eq. (7) averages over all M runs) and is left out of the simple mean.
+average (Machta Eq. (7) averages over all M runs) and is left out of the simple mean.  A population that dies out
+only at the last temperature (every n_j = 0 after the last resampling) keeps a finite ln Z~ (that Q was computed
+from the population before the resampling) and has a NaN energy; it is left out of the simple mean (which needs
+both finite), enters the weighted average with that finite ln Z~, and the run is labelled undetermined (extinct).
 Families (WMK Sec. IV B): replica i of the initial population founds family i; n_i is the fraction of the final
 population descending from it;
   rho_t = R~ sum_i n_i^2 (Eq. (28)), R~ / rho_t the effective number of independent measurements;
@@ -219,7 +222,10 @@ def weighted_ln_z(x):
 
 def _jackknife_weighted(x):
     """Leave-one-seed-out jackknife of weighted_ln_z (stats.jackknife's estimate and stderr, one seed per block), in
-    O(M) and admitting the -inf of an extinct run (which stats' time-series check refuses)."""
+    O(M) and admitting the -inf of an extinct run (which stats' time-series check refuses).  With a single finite
+    entry (one surviving run) a leave-one-out value is -inf and the stderr is returned as NaN, with the plain
+    weighted estimate; `summary` never reaches this case (fewer than two survivors return earlier, undetermined
+    with NaN values), only a direct caller can."""
     from .stats import Jackknife
     x = np.asarray(x, float)
     n, m = len(x), float(x.max())
