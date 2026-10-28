@@ -52,6 +52,32 @@ def test_catalog_entry_runs_and_refuses():
         assert out.ok, out
 
 
+def test_rho_sign_and_unreached_asymptote_are_labelled_not_refused():
+    """Final review I-5(b): local_optimal at N = 60 with the default R0 = 0.01: finite-N fluctuations
+    reach rho_k <= 0, so sim_status is undetermined:rho-sign and eps_sim is omitted (no seed dropped)
+    while the ODE values are kept (rule=optimal, the review's input, is the slow test).  Hebb at
+    eta = 0.01: eps_exponent labelled undetermined, the closed-form eps_constant kept."""
+    from replicant.online import simulate_tcm as S
+    e = catalog()["online_tcm"]
+    res = compose(e.spec, "online").run(rule="local_optimal", alpha="1", N=60)
+    v = res.values
+    assert v["sim_status"].startswith("undetermined:rho-sign") and "eps_sim" not in v and "eps_sim" not in res.errors
+    assert 0 < v["eps"] < 0.5 and any("finite-N simulation UNDETERMINED" in n for n in res.notes)
+    _refuses(lambda: S.simulate_tcm("local_optimal", 3, 60, 1.0, tuple(range(20)), init=(0.01, 1.0)),
+             "undetermined:rho-sign")
+    h = compose(e.spec, "online").run(rule="hebb", eta="0.01", alpha="1").values
+    assert h["asymptote_status"].startswith("undetermined:asymptote") and "eps_exponent" not in h
+    assert h["eps_constant"] > 0 and 0 < h["eps"] < 0.5
+
+
+@slow
+def test_slow_optimal_rule_at_small_N_is_labelled():
+    """I-5(b) at the review's input: rule=optimal, alpha = 1, N = 60 (the nonlocal ODE costs ~2 s)."""
+    res = compose(catalog()["online_tcm"].spec, "online").run(rule="optimal", alpha="1", N=60)
+    assert res.values["sim_status"].startswith("undetermined:rho-sign") and "eps_sim" not in res.values
+    assert 0 < res.values["eps"] < 0.5
+
+
 @slow
 def test_latex_blocks_checked_and_a_wrong_one_caught():
     """The online_tcm sympy blocks agree with the code at their first point (test_latex checks all);

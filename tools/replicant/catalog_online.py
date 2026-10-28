@@ -11,7 +11,9 @@ Run parameters:
                     (in [0, 1/2), default 0); noise_estimate: the noise the optimal rule assumes
   R0, Q0            initial state (default 0, 1, Biehl-Riegler Fig. 1; the optimal rule needs R0 > 0)
   (always)          asymptote eps ~ C alpha^-p from the ODE at alpha = 1e4 (eps_exponent measured,
-                    eps_constant), for noise = 0 or the Hebb rule; for the optimal rule also
+                    eps_constant), for noise = 0 or the Hebb rule (a log-slope off the derived p at
+                    alpha = 1e4, e.g. Hebb at eta = 0.01, is labelled asymptote_status undetermined
+                    and the two values omitted; the rest of the run is kept); for the optimal rule also
                     eps_constant_formula = 2 / I(noise) (derived integral)
   alpha             the learning curve at alpha: eps, R, Q, rho (Hebb: + its closed form)
   optimal, noise>0  noise-robustness boundaries in the estimate (Copelli et al. 1997 Fig. 1a)
@@ -111,7 +113,17 @@ def _asym_when(p):
 
 def _asymptote(p):
     f = _flow(p)
-    slope, c = O.asymptote(f, _init(p), ALPHA_BIG)
+    try:
+        slope, c = O.asymptote(f, _init(p), ALPHA_BIG)
+    except Refusal as r:            # a diagnostic of this auxiliary step: labelled, the run is kept
+        if r.reason != "undetermined:asymptote":
+            raise
+        why = (f"{r.detail}: the power law is not reached at alpha = {ALPHA_BIG:g} (e.g. Hebb with a small "
+               "eta, whose Q0 dominates eta^2 alpha until alpha ~ Q0 / eta^2); eps_exponent and eps_constant "
+               "not reported")
+        return Out({"alpha_big": ALPHA_BIG, "eps_exponent_derived": O.EXPONENT[f.rule],
+                    "asymptote_status": f"undetermined:asymptote: {why}"}, f"UNDETERMINED: {why}",
+                   notes=(f"asymptote UNDETERMINED: {why}",))
     vals = {"eps_exponent": slope, "eps_constant": c, "alpha_big": ALPHA_BIG,
             "eps_exponent_derived": O.EXPONENT[f.rule]}
     notes = ()
@@ -135,16 +147,31 @@ def _robust(p):
                notes=notes)
 
 
+def sim_band(run, n, seeds):
+    """(band, None) of run() (a finite-N simulation), or (None, Out) when a seed's rho reached 0
+    (undetermined:rho-sign, raised by the simulators): labelled sim_status, eps_sim omitted, no seed dropped
+    (a band over the remaining seeds would be selected); the run's ODE values are kept."""
+    try:
+        return run().band, None
+    except Refusal as r:
+        if r.reason != "undetermined:rho-sign":
+            raise
+        why = f"{r.detail}; eps_sim not reported (no seed is dropped: a band over the rest would be selected)"
+        return None, Out({"N": n, "seeds": list(seeds), "sim_status": f"undetermined:rho-sign: {why}"},
+                         f"UNDETERMINED: {why}", notes=(f"finite-N simulation UNDETERMINED: {why}",))
+
+
 def _finite(p):
     n = p["N"]
     if isinstance(n, bool) or not isinstance(n, int):
         raise Refusal("precondition:size", f"N={n!r}: need an int >= 10")
     f, a = _flow(p), _num(p, "alpha")
     seeds = _checks.seeds(p.get("seeds", _SEEDS))
-    sim = SIM.simulate_perceptron(f.rule, n, a, seeds, eta=f.eta, noise=f.noise,
-                                  noise_estimate=f.noise_est if f.rule == "optimal" else None,
-                                  init=_init(p))
-    b = sim.band
+    b, und = sim_band(lambda: SIM.simulate_perceptron(f.rule, n, a, seeds, eta=f.eta, noise=f.noise,
+                                                      noise_estimate=f.noise_est if f.rule == "optimal" else None,
+                                                      init=_init(p)), n, seeds)
+    if und:
+        return und
     return Out({"eps_sim": b.mean, "eps_sim_halfwidth99": b.half_width, "N": n, "seeds": list(seeds)},
                f"eps over seeds {list(seeds)} at N = {n}, alpha = {a:g}: {b.mean:.6g} +- "
                f"{b.half_width:.3g} (99% Student-t, df = {b.df})",
@@ -197,8 +224,8 @@ def online_perceptron():
            **{k: asym for k in ("eps_exponent", "eps_constant")}, "eps_constant_formula": formula,
            "no_learning_boundary": rob, "robust_boundary": rob, "eps_sim": sim}
     meta = ("rule", "eta", "noise", "noise_estimate", "R0", "Q0", "alpha", "alpha_big",
-            "eps_exponent_derived", "hebb_closed_form_gap", "robust_boundary_error",
-            "eps_sim_halfwidth99", "N", "seeds")
+            "eps_exponent_derived", "asymptote_status", "hebb_closed_form_gap", "robust_boundary_error",
+            "eps_sim_halfwidth99", "N", "seeds", "sim_status")
     spec = ModelSpec("online_perceptron", "spherical", "gaussian", constraint="online", prior="teacher")
     return entry("online_perceptron", spec, f"{BR}; {VKC}; {KC92}; {CEKBSRC}", {"online": steps}, refs,
                  {"online": CAVEAT}, "online perceptron learning of a perceptron teacher: Hebb, "
@@ -216,4 +243,4 @@ def online_entries():
     return [online_perceptron(), online_linear(), online_drift(), online_tcm(), online_scm()]
 
 
-__all__ = ["online_entries", "online_perceptron"]
+__all__ = ["online_entries", "online_perceptron", "sim_band"]

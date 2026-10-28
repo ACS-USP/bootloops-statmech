@@ -23,7 +23,7 @@ Run parameters:
 import math
 
 from .catalog import Out, RefCheck, Stability, entry, fstep, has
-from .catalog_online import _num
+from .catalog_online import _num, sim_band
 from .core import Refusal
 from .csp import _checks
 from .online import drift as DR
@@ -135,10 +135,11 @@ def _finite(p):
         raise Refusal("precondition:size", f"N={n!r}: need an int >= 10")
     a, rule = _num(p, "alpha"), p.get("rule", "optimal")
     seeds = _checks.seeds(p.get("seeds", _SEEDS))
-    sim = SIM.simulate_drift(rule, n, a, seeds, D=_D(p) or 0.0, drift=p.get("drift", "random"),
-                             eta=_num(p, "eta", 1), noise=_num(p, "noise", 0),
-                             noise_estimate=_num(p, "noise_estimate"), init=_init(p))
-    b = sim.band
+    b, und = sim_band(lambda: SIM.simulate_drift(rule, n, a, seeds, D=_D(p) or 0.0, drift=p.get("drift", "random"),
+                                                 eta=_num(p, "eta", 1), noise=_num(p, "noise", 0),
+                                                 noise_estimate=_num(p, "noise_estimate"), init=_init(p)), n, seeds)
+    if und:                         # a seed reached rho <= 0: labelled, the ODE values are kept
+        return und
     return Out({"eps_sim": b.mean, "eps_sim_halfwidth99": b.half_width, "N": n, "seeds": list(seeds)},
                f"eps over seeds {list(seeds)} at N = {n}, alpha = {a:g}: {b.mean:.6g} +- {b.half_width:.3g} "
                f"(99% Student-t, df = {b.df})", errors={"eps_sim": b.stderr}, statistical=("eps_sim",),
@@ -186,7 +187,7 @@ def online_drift():
            **{k: small for k in ("eps_exponent", "eps_coefficient")}, "eps_inf_closed": closed,
            "eps_inf_kc93": kc, "eps_sim": sim}
     meta = ("rule", "drift", "D", "eta", "noise", "R0", "Q0", "alpha", "bound_gap", "closed_form_gap",
-            "eps_exponent_derived", "eps_sim_halfwidth99", "N", "seeds")
+            "eps_exponent_derived", "eps_sim_halfwidth99", "N", "seeds", "sim_status")
     spec = ModelSpec("online_drift", "spherical", "gaussian", constraint="online", prior="teacher")
     return entry("online_drift", spec, f"{VKC}; {KC93}; {BS}", {"online": steps}, refs, {"online": CAVEAT},
                  "online learning of a perceptron teacher that drifts (randomly or deterministically, VKC 1998, "

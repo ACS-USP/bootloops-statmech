@@ -247,6 +247,27 @@ def test_catalog_entry_values_and_labels():
     assert "eps_constant" not in noisy.values                  # skipped: no power law claimed
 
 
+def test_unreached_asymptote_is_labelled_and_the_curve_kept():
+    """Final review I-5(a): Hebb at eta = 0.01 has not reached eps ~ alpha^-1/2 at alpha = 1e4 (Q0 = 1
+    dominates eta^2 alpha); the asymptote is labelled undetermined (eps_exponent / eps_constant omitted)
+    and the learning curve at alpha is kept.  O.asymptote itself still refuses.  Same ruling for the
+    finite-N rho-sign diagnostic."""
+    e = catalog()["online_perceptron"]
+    res = compose(e.spec, "online").run(rule="hebb", eta="0.01", alpha="2")
+    v = res.values
+    assert v["asymptote_status"].startswith("undetermined:asymptote") and "0.7922" in v["asymptote_status"]
+    assert "eps_exponent" not in v and "eps_constant" not in v and v["hebb_closed_form_gap"] < 1e-9
+    assert abs(v["eps"] - O.integrate(O.perceptron_flow("hebb", eta=0.01), 2.0, (0.0, 1.0)).eps[-1]) < 1e-12
+    assert any("asymptote UNDETERMINED" in n for n in res.notes)
+    assert "asymptote_status" not in compose(e.spec, "online").run(rule="hebb", alpha="2").values
+    _refuses(lambda: O.asymptote(O.perceptron_flow("hebb", eta=0.01), (0.0, 1.0)), "undetermined:asymptote")
+    # the finite-N step: seeds 14, 18 reach rho <= 0 (the optimal rule from R0 = 0.01 at N = 200): labelled
+    # sim_status (catalog_online.sim_band, shared with online_tcm / online_drift), eps_sim omitted, eps kept
+    res = compose(e.spec, "online").run(rule="optimal", noise="0.2", R0="0.01", N=200, alpha="5")
+    assert res.values["sim_status"].startswith("undetermined:rho-sign") and "eps_sim" not in res.values
+    assert 0 < res.values["eps"] < 0.5
+
+
 def test_guide_is_true():
     """The GUIDE's online rows: every refusal reason it lists is raised by the code, and the worked
     example's perceptron numbers are what the CLI prints."""

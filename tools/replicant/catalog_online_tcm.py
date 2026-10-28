@@ -13,16 +13,19 @@ Run parameters:
   (always)          the asymptote: optimal rules eps_constant = lim alpha eps from the rate at theta -> 0;
                     local_optimal and hebb also eps_exponent (ODE log-slope at alpha = 1e4); local_optimal
                     eps_constant_perceptron = P0 C(lambda_K) (O1's perceptron route); hebb eps_constant from
-                    the closed form at alpha = 1e10
+                    the closed form at alpha = 1e10; a log-slope off the derived p at alpha = 1e4 (hebb with
+                    a small eta) labels asymptote_status undetermined, eps_exponent omitted
   (local rules)     the CKC96 mapping: noise_equivalent lambda_K, time_factor K; at alpha also the
                     perceptron ODE at the mapped noise (rho_perceptron_mapped, equivalence_gap)
   alpha             the learning curve: eps, eps_branch, R, Q, rho
-  N (seeds)         finite-N simulation at alpha over named seeds (default 0-19): eps_sim
+  N (seeds)         finite-N simulation at alpha over named seeds (default 0-19): eps_sim; when a seed's
+                    rho_k reaches 0 (the optimal rules at small N with the default R0) sim_status is
+                    undetermined:rho-sign and eps_sim is omitted (no seed dropped), the ODE values kept
 """
 import math
 
 from .catalog import Out, RefCheck, Stability, entry, fstep, has
-from .catalog_online import _num
+from .catalog_online import _num, sim_band
 from .core import Refusal
 from .csp import _checks
 from .online import odes as O
@@ -93,9 +96,16 @@ def _asymptote(p):
         vals["eps_constant"] = TF.rate_limit_constant(f)
         how = "rate limit at theta = 1e-3, 5e-4"
     if f.rule != "optimal":
-        slope, c = TF.asymptote_tcm(f, _init(p), ALPHA_BIG)
-        vals.update(eps_exponent=slope, alpha_big=ALPHA_BIG)
-        how = f"log-slope {slope:.5f} at alpha = {ALPHA_BIG:g}"
+        try:
+            slope, c = TF.asymptote_tcm(f, _init(p), ALPHA_BIG)
+            vals.update(eps_exponent=slope, alpha_big=ALPHA_BIG)
+            how = f"log-slope {slope:.5f} at alpha = {ALPHA_BIG:g}"
+        except Refusal as r:        # labelled (eps_exponent omitted), the rest of the run is kept
+            if r.reason != "undetermined:asymptote":
+                raise
+            why = f"{r.detail}: the power law is not reached at alpha = {ALPHA_BIG:g}; eps_exponent not reported"
+            vals.update(alpha_big=ALPHA_BIG, asymptote_status=f"undetermined:asymptote: {why}")
+            how, notes = f"UNDETERMINED exponent ({why})", (f"asymptote UNDETERMINED: {why}",)
     else:
         notes = ("the nonlocal ODE (a 3D field average per step) is integrated to alpha = 1e4 in the slow tests only; "
                  "the exponent 1 is derived (theta ~ 1/(k alpha)), not measured here",)
@@ -139,7 +149,9 @@ def _finite(p):
         raise Refusal("precondition:size", f"N={n!r}: need an int multiple of K")
     f, a = _flow(p), _num(p, "alpha")
     seeds = _checks.seeds(p.get("seeds", _SEEDS))
-    b = SIM.simulate_tcm(f.rule, f.K, n, a, seeds, eta=f.eta, init=_init(p)).band
+    b, und = sim_band(lambda: SIM.simulate_tcm(f.rule, f.K, n, a, seeds, eta=f.eta, init=_init(p)), n, seeds)
+    if und:                         # finite-N fluctuations reached rho <= 0: labelled, the ODE values are kept
+        return und
     return Out({"eps_sim": b.mean, "eps_sim_halfwidth99": b.half_width, "N": n, "seeds": list(seeds)},
                f"eps over seeds {list(seeds)} at N = {n}, alpha = {a:g}: {b.mean:.6g} +- {b.half_width:.3g} "
                f"(99% Student-t, df = {b.df})", errors={"eps_sim": b.stderr}, statistical=("eps_sim",),
@@ -177,7 +189,7 @@ def online_tcm():
            **{k: asym for k in ("eps_exponent", "eps_constant")}, "eps_constant_perceptron": perc,
            **{k: mapping for k in ("noise_equivalent", "tie_probability")}, "eps_sim": sim}
     meta = ("rule", "K", "eta", "R0", "Q0", "alpha", "alpha_big", "eps_exponent_derived", "time_factor",
-            "equivalence_gap", "eps_sim_halfwidth99", "N", "seeds")
+            "equivalence_gap", "eps_sim_halfwidth99", "N", "seeds", "asymptote_status", "sim_status")
     spec = ModelSpec("online_tcm", "spherical", "gaussian", constraint="online", prior="teacher")
     return entry("online_tcm", spec, f"{CC95}; {CKC96}", {"online": steps}, refs, {"online": CAVEAT},
                  "online learning in the tree committee machine (K odd non-overlapping branches, majority vote): "
