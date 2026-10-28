@@ -32,10 +32,11 @@ l', l'' and the m inside the corrections are Taylor coefficients of ln lambda_{1
   ring_observables(N, a, b, r) -> RingObs (exact Fractions at a = e^K, b = e^H rational)
   ring_brute(N, a, b, r) -> RingObs       (N <= 12: sums over the 2^N configurations)
   ring_check(N, beta, h, r, J=1) -> RingCheck   balls at rational beta, h: ring, closed, correction, bound
+                                   (precision raised while a ring ball is not finite; .skipped)
 _HOOKS["magnetization" | "susceptibility" | "correlation" | "correlation_length"]: the closed forms
 (arb K, H [, beta | r]) -> arb, planted-error hooks (tests).
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from fractions import Fraction
 from itertools import product
 
@@ -241,6 +242,7 @@ class RingCheck:
     r: int
     rho: Ball
     observables: dict    # name -> Observable: magnetization, susceptibility, correlation, correlation_length
+    skipped: dict = field(default_factory=dict)    # name -> why the ring cannot give it (2 r + 1 = N)
 
     @property
     def ok(self):
@@ -274,11 +276,27 @@ def _coef(s, i):
     return s.coeffs()[i]
 
 
+PREC_MAX = 1 << 16      # bits: ring_check's precision escalation cap (beta up to ~ 6000 at N = 8)
+
+
 def ring_check(N, beta, h, r=1, J=1, prec=None) -> RingCheck:
+    """RingCheck at `prec` bits (default 4 * 40 + 64 + 4 N); while a ring ball is not finite (at
+    large beta G_N(r + 1)/G_N(r) rounds to 1), the precision is doubled up to PREC_MAX.  At
+    2 r + 1 = N, G_N(r + 1) = G_N(r) by the ring's reflection symmetry (r + 1 = N - r): the ring
+    correlation length -1/ln 1 is undefined and is left out (RingCheck.skipped says why).  A ball
+    still not finite at PREC_MAX fails its identity and limit legs (never a NaN that passes)."""
     N, r = _ring_args(N, r)
     bq, K, H = _kh(beta, h, J)
-    from flint import arb
     prec = prec or 4 * 40 + 64 + 4 * N
+    while True:
+        chk = _check_at(N, r, bq, K, H, prec)
+        if all(o.ring.arb.is_finite() for o in chk.observables.values()) or 2 * prec > PREC_MAX:
+            return chk
+        prec *= 2
+
+
+def _check_at(N, r, bq, K, H, prec):
+    from flint import arb
     with baller().hygiene.ctx_guard(prec=prec):
         k, x, be = arb_q(K), arb_q(H), arb_q(bq)
         ring = _ring(N, k.exp(), x.exp(), r, arb(1))
@@ -314,16 +332,25 @@ def ring_check(N, beta, h, r=1, J=1, prec=None) -> RingCheck:
             c, b = corr[name]
             diff = rings[name] - closed[name]
             bu = arb(b.abs_upper())
+            fin = rings[name].is_finite()
             out[name] = Observable(ball_of(rings[name]), ball_of(closed[name]), ball_of(c),
-                                   ball_of(bu), bool(diff.overlaps(c)),
-                                   not bool(diff.abs_lower() > b.abs_upper()),
+                                   ball_of(bu), fin and bool(diff.overlaps(c)),
+                                   fin and not bool(diff.abs_lower() > b.abs_upper()),
                                    _tested(bu, closed[name]))
-        cxi = _HOOKS["correlation_length"](k, x)
-        bxi = arb(xi_lim.rad())
-        out["correlation_length"] = Observable(
-            ball_of(xi_ring), ball_of(cxi), ball_of(xi_ring - xi_corr), ball_of(bxi),
-            bool(xi_corr.overlaps(cxi)), bool(xi_lim.overlaps(cxi)), _tested(bxi, cxi))
-        return RingCheck(N, r, ball_of(rho), out)
+        skipped = {}
+        if 2 * r + 1 == N:
+            skipped["correlation_length"] = (f"N = {N}, r = {r}: G_N(r + 1) = G_N(r) by the ring's "
+                                             "reflection symmetry, so -1/ln[G_N(r + 1)/G_N(r)] is "
+                                             "undefined; use r < (N - 1)/2")
+        else:
+            cxi = _HOOKS["correlation_length"](k, x)
+            bxi = arb(xi_lim.rad())
+            fin = xi_ring.is_finite()
+            out["correlation_length"] = Observable(
+                ball_of(xi_ring), ball_of(cxi), ball_of(xi_ring - xi_corr), ball_of(bxi),
+                fin and bool(xi_corr.overlaps(cxi)), fin and bool(xi_lim.overlaps(cxi)),
+                _tested(bxi, cxi))
+        return RingCheck(N, r, ball_of(rho), out, skipped)
 
 
 __all__ = ["Observable", "RingCheck", "RingObs", "ising1d_correlation", "ising1d_correlation_length",

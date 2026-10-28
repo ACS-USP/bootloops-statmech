@@ -155,6 +155,31 @@ def test_ising1d_limit_leg_reported_untested_at_small_N():
     assert _refusal(lambda: compose(e.spec, "exact").run(N=8, r=7)).reason == "precondition:distance"
 
 
+def test_ising1d_nonfinite_ring_balls_never_printed():
+    """Final review I-1.  N = 3, r = 1: G_3(2) = G_3(1) by the ring's reflection symmetry, so the
+    ring correlation length -1/ln 1 is undefined: it is omitted with a note, the rest is kept.
+    beta = 50: G_N(r + 1)/G_N(r) is 1 at the first working precision; ring_check raises the
+    precision until the ball is finite.  A NaN ball is refused no-solution:enclosure, never printed."""
+    from flint import arb
+    from replicant.catalog import catalog
+    from replicant.compose import compose
+    from replicant.lattice import observables1d as O
+    from replicant.lattice.ball import Ball
+    assert _refusal(lambda: Ball(arb("nan"), 40).value_and_error(40)).reason == "no-solution:enclosure"
+    c = O.ring_check(3, 1, 0, 1)
+    assert "correlation_length" not in c.observables and "reflection" in c.skipped["correlation_length"]
+    assert c.ok
+    e = catalog()["ising1d"]
+    res = compose(e.spec, "exact").run(N=3, r=1)
+    assert "ring_correlation_length" not in res.values and "correlation_length" in res.values
+    assert "reflection" in res.values["ring_skipped"]["correlation_length"]
+    res = compose(e.spec, "exact").run(beta=50)
+    assert res.values["ring_correlation_length"] not in ("nan", "inf"), res.values
+    xi = O.ring_check(8, 50, 0, 1).observables["correlation_length"]
+    assert xi.ring.arb.is_finite() and xi.identity and xi.within_bound
+    assert compose(e.spec, "exact").run(beta=30).values == compose(e.spec, "exact").run(beta=30).values
+
+
 @slow
 def test_slow_ising1d_susceptibility_is_the_field_derivative_symbolically():
     """chi = beta dm/dH of Baxter Eq. (2.1.18), mechanically (sympy): beta dm/dH - chi = 0."""

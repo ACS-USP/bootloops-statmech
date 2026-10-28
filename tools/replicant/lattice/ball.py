@@ -9,7 +9,8 @@ decimal digits are certified (baller's 1-ulp display criterion).  Multi-output c
 (the fail-closed integrity check of baller's vendored files) runs once before the first use.
 
   Ball(arb, digits)  .mid() / .rad() (mpf), .value_and_error(), .contains(x), .overlaps(other),
-                     .render(digits), -ball;  rad() is an upper bound of the radius
+                     .render(digits), -ball;  rad() is an upper bound of the radius;
+                     value_and_error() refuses a non-finite ball no-solution:enclosure
   certify(thunk, digits=DIGITS, start_dps=None) -> Ball
   rational(x, name) -> Fraction   (int, Fraction, decimal string; refuses bool / non-finite)
   arb_q(Fraction) -> arb          (exact)
@@ -87,7 +88,12 @@ class Ball:
     def value_and_error(self, dps=40):
         """(v, e) as decimal strings: v the midpoint to `dps` significant digits, e >= |v - x| for
         every x in the ball (computed in arb against the exact decimal v, rounded up).  Printing v
-        and e in full therefore prints an enclosure; the entries store these strings."""
+        and e in full therefore prints an enclosure; the entries store these strings.  A
+        non-finite ball (NaN midpoint or infinite radius) encloses nothing printable: refused
+        no-solution:enclosure."""
+        if not self.arb.is_finite():
+            raise Refusal("no-solution:enclosure", f"the ball {self.arb.str(5)} is not finite: no "
+                          "value with an error bound can be printed")
         v = self.arb.mid().str(dps, radius=False)
         with baller().hygiene.ctx_guard(prec=max(self._prec(), 4 * dps + 64)):
             exact = _arb()(v)                       # the decimal v, to the working precision

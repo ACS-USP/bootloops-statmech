@@ -5,7 +5,9 @@ META_*).  Every physical value is a python-flint arb ball (lattice/), printed as
 catalog_lattice._put: a 40-digit midpoint and in `errors` an upper bound of |value - x| over the ball.
   ising1d: magnetization, susceptibility (two closed forms), correlation (connected, distance r),
            correlation_length; the N-ring's ring_* values, which must overlap closed form + exact
-           finite-N correction and lie within the explicit N -> oo bound (else no-solution:ring-limit)
+           finite-N correction and lie within the explicit N -> oo bound (else no-solution:ring-limit;
+           a ball still not finite after ring_check's precision escalation: no-solution:enclosure;
+           at 2 r + 1 = N the ring correlation length is undefined and omitted, ring_skipped says why)
   ising2d: energy (Onsager Eq. (116); -sqrt 2 at beta_c, Eq. (121)), specific_heat off beta_c
            (Eq. (117)); at beta_c no value, the divergence is reported with its amplitude
            specific_heat_amplitude (Eq. (120)) and the log-slope consistency check; the L x Ly
@@ -50,31 +52,34 @@ def _obs1d(p):
         raise Refusal("precondition:distance", f"r = {r!r}: need an int in 0 .. {max(N - 2, 0)} "
                       f"(the ring has N = {N} sites)")
     chk = O1.ring_check(N, beta, h, r)
+    nan = [k for k, o in chk.observables.items() if not o.ring.arb.is_finite()]
+    if nan:
+        raise Refusal("no-solution:enclosure", f"N = {N}: the ring's {', '.join(nan)} ball is not "
+                      f"finite at {O1.PREC_MAX} bits")
     if not chk.ok:
         bad = [k for k, o in chk.observables.items() if not (o.identity and o.within_bound)]
         raise Refusal("no-solution:ring-limit", f"N = {N}: the ring's {', '.join(bad)} disagree with "
                       "the closed form beyond the exact finite-N correction or the N -> oo bound")
     ob = chk.observables
+    rings = {f"ring_{k}": o.ring for k, o in ob.items()}
     v, e = _put(magnetization=O1.ising1d_magnetization(beta, h),
                 susceptibility=O1.ising1d_susceptibility(beta, h),
                 susceptibility_fluctuation=O1.ising1d_susceptibility_fluctuation(beta, h),
                 correlation=O1.ising1d_correlation(beta, h, r),
-                correlation_length=O1.ising1d_correlation_length(beta, h),
-                ring_magnetization=ob["magnetization"].ring,
-                ring_susceptibility=ob["susceptibility"].ring,
-                ring_correlation=ob["correlation"].ring,
-                ring_correlation_length=ob["correlation_length"].ring)
+                correlation_length=O1.ising1d_correlation_length(beta, h), **rings)
+    skip = {"ring_skipped": dict(chk.skipped)} if chk.skipped else {}
     bounds = {k: (o.bound.render(3) if o.bound.arb.is_finite() else "inf")
               + ("" if o.limit_tested else " (not tested)") for k, o in ob.items()}
     untested = chk.limit_untested
-    return Out({**v, "correlation_r": r, "ring_limit_bounds": bounds,
+    return Out({**v, **skip, "correlation_r": r, "ring_limit_bounds": bounds,
                 "ring_limit_untested": list(untested), "ring_rho": chk.rho.value_and_error(20)[0]},
                f"closed forms (Baxter Ch. 2); ring N = {N}: ring = closed + exact finite-N "
                f"correction, |ring - closed| <= the N -> oo bound (rho^N = "
                f"{(chk.rho.arb ** N).str(3, radius=False)}; the limit check is informative only when "
                "rho^N is small: "
                + (f"not tested for {', '.join(untested)}, whose bound is infinite or not below the "
-                  "value's size)" if untested else "every leg tested)"), errors=e)
+                  "value's size)" if untested else "every leg tested)")
+               + "".join(f"; ring_{k} omitted: {why}" for k, why in chk.skipped.items()), errors=e)
 
 
 def _ring_note(what):
@@ -102,7 +107,7 @@ FIN_1D = {
     "ring_correlation": _ring_note("<s_0 s_r> - m_N^2"),
     "ring_correlation_length": _ring_note("-1/ln[G_N(r + 1)/G_N(r)]"),
 }
-META_1D = ("correlation_r", "ring_limit_bounds", "ring_limit_untested", "ring_rho")
+META_1D = ("correlation_r", "ring_limit_bounds", "ring_limit_untested", "ring_rho", "ring_skipped")
 
 
 # ---- ising2d ---------------------------------------------------------------------------------
