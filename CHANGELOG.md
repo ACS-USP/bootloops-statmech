@@ -173,6 +173,20 @@ All notable changes to BootLoops are recorded here. The format follows
   `precondition:named-seeds`. `lattice.ball.certify` no longer treats an exact ball (radius 0 at two
   precisions) as a radius stall. The LDPC MAP-threshold cite names MMU Example 6 only for (3, 6); the
   spherical p-spin `no-transition:gardner` detail states its scan and resolution first.
+- `replicant` (final review of the online, exact-Ising, percolation and Monte Carlo plans): `ising1d` crashed
+  (`ValueError`) on a NaN ring ball (N = 3, r = 1; beta = 50): a non-finite ball is now refused
+  `no-solution:enclosure`, the ring check raises its precision until its balls are finite and omits the ring
+  correlation length where the ring's reflection symmetry makes it undefined (2 r + 1 = N). The percolation FSS
+  crashed (`IndexError`) or printed `p_c_crossing` NaN with stderr 0 when too few seeds or sweeps left the
+  crossing unresolved: such values are omitted and labelled `undetermined:crossing` (also `:collapse`, `:width`).
+  `histogram_reweighting_mc`'s fixed default beta / betas were refused at L >= 32 by its own window: for L > 8 they
+  now move towards beta_c by 8/L (L <= 8 unchanged), and an implicit default outside the window is labelled
+  undetermined, not refused. The online asymptote and finite-N rho-sign diagnostics label instead of discarding the
+  run (`asymptote_status`, `sim_status`); online runs that compute no value say so. The Monte Carlo LaTeX documents
+  no longer describe their route as union-find graph sampling. `population_annealing_mc` refuses parameters its
+  model does not read and sweeps = 0; one s_max cap for both percolation routes; no "+ systematic 0" in RefCheck
+  details. No banked number changed. Default tier 662 tests, 30.2 s cold on a clean export (three runs, 30.17-30.21 s;
+  +1.4 s, mostly the FSS and online regression tests); full tier 868 tests.
 
 ### Known issues
 - `replicant`: `families/sk.py` `_rsb_phi_e` (v1, float64 Gauss-Hermite) is inaccurate in the q0 = 0

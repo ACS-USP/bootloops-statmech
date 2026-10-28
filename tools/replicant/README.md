@@ -22,7 +22,7 @@ has python-flint): without python-flint the lattice and bounds tests fail loudly
 From the repository root:
 
 ```
-python3 tools/replicant/selftest.py                        # default battery, about 29 s
+python3 tools/replicant/selftest.py                        # default battery, about 30 s
 cd tools && python3 -m replicant list                      # the 36 catalog entries
 python3 -m replicant run perceptron --param alpha=1.5 --out /tmp/result.json --latex /tmp/p.tex
 ```
@@ -166,14 +166,14 @@ sample`), and `--pdf` (with `--latex`) to compile the derivation.
 
 ## Test tiers
 
-- Default: `python3 tools/replicant/selftest.py` (655 tests, about 29 s; measured 28.3-28.9 s cold on a clean
-  export). Also `python3 run_selftests.py replicant` from the repository root, with the venv activated (it runs
+- Default: `python3 tools/replicant/selftest.py` (662 tests, about 30 s; measured 30.2 s cold on a clean
+  export after the final fix wave). Also `python3 run_selftests.py replicant` from the repository root, with the venv activated (it runs
   the `python3` on PATH; without python-flint the certified lattice, bounds and percolation tests and the Monte
   Carlo exact targets fail, by design).
-- Full: `python3 tools/replicant/selftest.py --full` adds the 204 `@slow` tests (full RSB,
+- Full: `python3 tools/replicant/selftest.py --full` adds the 206 `@slow` tests (full RSB,
   population dynamics at reference sizes, the K-SAT and LDPC crossings, Monte Carlo and enumeration
   held-out routes, solver-based checks, the online simulations at N = 1000, the lattice, percolation and
-  Monte Carlo checks at reference sizes); about 35 minutes on a laptop (measured 34 min 39 s, 859 tests).
+  Monte Carlo checks at reference sizes); about 35 minutes on a laptop (measured 34 min 39 s with 859 tests before the final fix wave, now 868 tests).
 - The held-out tests are `tests/test_heldout*.py` (helpers `tests/heldout_common.py`, `tests/heldout_mc.py`).
 - `@slow` is a plain function attribute honoured by `selftest.py` only. pytest ignores the
   marker and would run every test, slow ones included.
