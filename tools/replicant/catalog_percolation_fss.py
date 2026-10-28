@@ -42,18 +42,28 @@ def _se(t):
 
 
 def _summary(r, exact_pc):
+    """Contrasts against the bands; a band whose value is undetermined gives "undetermined", never a
+    comparison against NaN."""
     nu43, nu1 = 0.75, 1.0
-    out = {"nu 4/3 vs nu 1": contrast(r.inv_nu, nu43, nu1)}
+    und = lambda *ks: next((r.undetermined[k] for k in ks if k in r.undetermined), None)
+    half = lambda t: (t[2] - t[1]) / 2 + t[3]
+    col = und("p_c_collapse", "inv_nu_collapse")
+    out = {"nu 4/3 vs nu 1": und("inv_nu_collapse") or contrast(r.inv_nu, nu43, nu1)}
     if exact_pc is not None:
-        out["exact p_c inside the crossing band (+ systematic)"] = contrast(r.p_c, exact_pc, exact_pc)["a_inside"]
-        out["exact p_c inside the collapse band (+ systematic)"] = contrast(r.p_c_collapse, exact_pc,
-                                                                              exact_pc)["a_inside"]
-        out["exact p_c: collapse at (p_c, 3/4)"] = r.collapse_test(exact_pc, nu43)["verdict"]
-        out["exact p_c: crossing"] = r.crossing_test(exact_pc)
-    out["resolution: p_c crossing box half-width"] = (r.p_c[2] - r.p_c[1]) / 2 + r.p_c[3]
-    out["resolution: p_c collapse box half-width"] = (r.p_c_collapse[2] - r.p_c_collapse[1]) / 2 + r.p_c_collapse[3]
-    out["resolution: 1/nu box half-width"] = (r.inv_nu[2] - r.inv_nu[1]) / 2 + r.inv_nu[3]
+        out["exact p_c inside the crossing band (+ systematic)"] = (
+            und("p_c_crossing") or contrast(r.p_c, exact_pc, exact_pc)["a_inside"])
+        out["exact p_c inside the collapse band (+ systematic)"] = (
+            und("p_c_collapse") or contrast(r.p_c_collapse, exact_pc, exact_pc)["a_inside"])
+        out["exact p_c: collapse at (p_c, 3/4)"] = col or r.collapse_test(exact_pc, nu43)["verdict"]
+        out["exact p_c: crossing"] = und("p_c_crossing") or r.crossing_test(exact_pc)
+    out["resolution: p_c crossing box half-width"] = und("p_c_crossing") or half(r.p_c)
+    out["resolution: p_c collapse box half-width"] = und("p_c_collapse") or half(r.p_c_collapse)
+    out["resolution: 1/nu box half-width"] = und("inv_nu_collapse") or half(r.inv_nu)
     return out
+
+
+def _band_text(name, t, why, digits):
+    return f"{name} undetermined" if why else f"{name} {t[0]:.{digits}f} [{t[1]:.{digits}f}, {t[2]:.{digits}f}]"
 
 
 def fss_step(when, lat_of):
@@ -80,10 +90,13 @@ def fss_step(when, lat_of):
                 "fss_validation": validation, "fss_contrasts": _summary(r, exact_pc),
                 "fss_status": {k: r.undetermined.get(k, "determined") for k in FSS_FINALITY}}
         und = "".join(f"; {k} {why}" for k, why in r.undetermined.items())
-        return Out({**vals, **meta}, f"FSS Ls = {Ls}: crossing p_c {r.p_c[0]:.5f} [{r.p_c[1]:.5f}, "
-                   f"{r.p_c[2]:.5f}] "
-                   f"+- {r.p_c[3]:.2g} (syst.); collapse p_c {r.p_c_collapse[0]:.5f}, 1/nu {r.inv_nu[0]:.3f} "
-                   f"[{r.inv_nu[1]:.3f}, {r.inv_nu[2]:.3f}] +- {r.inv_nu[3]:.2g}" + und, errors=errs,
+        u = r.undetermined
+        cross = _band_text("crossing p_c", r.p_c, u.get("p_c_crossing"), 5)
+        cross += "" if "p_c_crossing" in u else f" +- {r.p_c[3]:.2g} (syst.)"
+        coll = "collapse p_c undetermined" if "p_c_collapse" in u else f"collapse p_c {r.p_c_collapse[0]:.5f}"
+        nu = _band_text("1/nu", r.inv_nu, u.get("inv_nu_collapse"), 3)
+        nu += "" if "inv_nu_collapse" in u else f" +- {r.inv_nu[3]:.2g}"
+        return Out({**vals, **meta}, f"FSS Ls = {Ls}: {cross}; {coll}, {nu}" + und, errors=errs,
                    statistical=tuple(vals),
                    notes=tuple(f"{k} undetermined (value omitted): {why}" for k, why in r.undetermined.items())
                    + ("finite-size scaling: 99% bootstrap percentile bands (1000 replicates over the named "

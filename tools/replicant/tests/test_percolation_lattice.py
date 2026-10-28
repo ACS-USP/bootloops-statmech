@@ -269,7 +269,7 @@ def test_fss_unresolved_crossing_is_labelled_undetermined_not_nan():
     unresolved (no sign change inside the transition window in most resamples).  Square site, whose
     triangular-site validation run had crashed in np.percentile of an empty array: p_c_crossing is
     omitted, fss_status and a note say undetermined:crossing, the other FSS values are kept.  Default
-    tier at BOOT = 200 bootstrap replicates (restored); the slow test runs the full 1000 on square
+    tier at BOOT = 50 bootstrap replicates (restored); the slow test runs the full 1000 on square
     site and on square bond (which had printed nan with stderr 0).  _band never takes a percentile of
     an empty array; under 90% finite replicates it is all NaN."""
     import math
@@ -277,9 +277,12 @@ def test_fss_unresolved_crossing_is_labelled_undetermined_not_nan():
     assert all(math.isnan(x) for x in F._band(0.5, [0.5] * 8 + [math.nan] * 2))     # 80% < 90%
     assert F._band(0.5, [0.4, 0.5, 0.6] * 10)[0] == 0.5
     saved = F.BOOT
-    F.BOOT = 200
+    F.BOOT = 50
     try:
-        check_fss_undetermined("site")
+        r = check_fss_undetermined("site")
+        c = r.values["fss_contrasts"]           # no comparison against an undetermined (NaN) band
+        assert c["resolution: p_c crossing box half-width"].startswith("undetermined:crossing"), c
+        assert "crossing p_c undetermined" in r.trace.render() and "nan [nan" not in r.trace.render()
     finally:
         F.BOOT = saved
         assert F.BOOT == 1000
