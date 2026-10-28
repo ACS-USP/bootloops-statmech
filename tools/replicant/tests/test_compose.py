@@ -300,6 +300,8 @@ _DOCUMENTED = {
     ("wang_landau_mc", "sample"): {"L", "seeds", "walkers", "schedule", "t_max", "F_final", "beta", "muca_sweeps",
                                    "muca_burn_in"},
     ("histogram_reweighting_mc", "sample"): {"algorithm", "L", "beta0", "beta", "betas", "seeds", "sweeps", "burn_in"},
+    ("population_annealing_mc", "sample"): {"model", "L", "N", "disorder", "beta", "population", "temperatures",
+                                            "sweeps", "seeds"},
     ("percolation_kcore", "cavity"): {"law", "c", "alpha", "pk", "d", "K", "k", "dilution", "p"},
     ("percolation_kcore", "sample"): {"law", "c", "alpha", "pk", "d", "K", "k", "dilution", "p", "N", "seeds"},
     ("percolation_bootstrap", "cavity"): {"d", "ell", "q"},

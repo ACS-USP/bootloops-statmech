@@ -352,7 +352,7 @@ def test_lattice_entries_are_certified_with_radii_and_others_unchanged():
                             "ising_triangular", "ising_honeycomb", "percolation_bethe",
                             "percolation_graph", "percolation_lattice", "percolation_kcore",
                             "percolation_bootstrap", "cluster_mc", "wang_landau_mc",
-                            "histogram_reweighting_mc"))
+                            "histogram_reweighting_mc", "population_annealing_mc"))
     assert compose(cat["rem"].spec).run().rigor == "physics-level"
     # a certified route that returns a value without its radius is refused
     from replicant.catalog import Out, entry, fstep

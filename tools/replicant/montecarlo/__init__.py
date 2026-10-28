@@ -14,4 +14,6 @@
   wang_landau.py   M2: Wang-Landau (original and 1/t schedules), the ln g error profile and the error-against-time slope
   multicanonical.py  M2: multicanonical runs with WL weights, reweighting to beta, the fixed-weight chi^2 tests
   reweight.py      M2: Ferrenberg-Swendsen single and multiple histogram reweighting, the overlap window
+  sk_metropolis.py   M3: sequential single-spin-flip Metropolis for SK / +-J couplings on a population, exact ln Z
+  population.py    M3: population annealing, the free-energy estimator, its finite-R bias, family diagnostics
 """

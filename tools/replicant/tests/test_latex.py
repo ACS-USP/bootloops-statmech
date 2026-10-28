@@ -30,6 +30,7 @@ from replicant.tex import Check, TexBlock, escape, invented, prose, render, veri
 from replicant.tex_print import WIDTH, lines, width
 
 from replicant.catalog_mc_fs import CHEAP as FS_CHEAP
+from replicant.catalog_mc_pa import CHEAP as PA_CHEAP
 from replicant.catalog_mc_wl import CHEAP as WL_CHEAP
 
 # cheap parameters per (entry, route): every route of every entry gets a document
@@ -43,7 +44,8 @@ CHEAP = {("sk", "cavity"): {"beta": "1.5", "h": "0.3"},
          ("percolation_bethe", "sample"): {"N": 500}, ("percolation_graph", "sample"): {"N": 500},
          ("percolation_lattice", "sample"): {"Lx": 6, "sweeps": 4},
          ("cluster_mc", "sample"): {"L": 3, "sweeps": 40, "burn_in": 8, "seeds": (0, 1)},
-         ("wang_landau_mc", "sample"): WL_CHEAP, ("histogram_reweighting_mc", "sample"): FS_CHEAP, ("percolation_kcore", "sample"): {"N": 500},
+         ("wang_landau_mc", "sample"): WL_CHEAP, ("histogram_reweighting_mc", "sample"): FS_CHEAP,
+         ("population_annealing_mc", "sample"): PA_CHEAP, ("percolation_kcore", "sample"): {"N": 500},
          ("percolation_bootstrap", "sample"): {"N": 500}}
 PM_ONE_SK = ModelSpec("sk", "ising", "pm_one", params={"beta": "0.5"})
 
